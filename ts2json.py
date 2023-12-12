@@ -2,7 +2,7 @@
 """
 Created on Thu Oct 19 11:55:32 2023
 
-@author: otto
+@author: Otto Milvang, sjakk@milvang.no
 """
 
 import sys

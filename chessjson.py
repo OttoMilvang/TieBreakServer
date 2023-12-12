@@ -2,7 +2,7 @@
 """
 Created on Wed Nov  1 11:01:49 2023
 
-@author: otto
+@author: Otto Milvang, sjakk@milvang.no
 """
 import sys
 import json
@@ -290,8 +290,8 @@ class chessjson:
                         arnd[nteam] = []
                     cgame = game.copy() if makecopy else game
                     arnd[nteam].append(cgame)
-        with open('C:\\temp\\allgames.json', 'w') as f:
-            json.dump(allgames, f, indent=2)
+        #with open('C:\\temp\\allgames.json', 'w') as f:
+        #    json.dump(allgames, f, indent=2)
         return allgames
 
 

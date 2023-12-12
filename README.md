@@ -14,6 +14,7 @@
 - **-f** or **--file-format** - TRF for <A HREF="https://www.fide.com/FIDE/handbook/C04Annex2_TRF16.pdf">FIDE TRF-16</A>, JCH for Chess-JSON, TS for Tournament Service files
 - **-e** or **--event-number** - In files with multiple event, tournaments are numbered 1,2,3, ... use 0 for passthrough
 - **-n** or **--number-of-rounds** - Number of rounds in Tie-break calculation
+- **-d** or **--delimiter** - Predefined delimiters B=blank, T=tab, S=Semicolon, C=comma, default is JSON output
 - **-t** or **--tie-break** - List of Rank order specifiers
 
 ## 👷 Rank order specifiers

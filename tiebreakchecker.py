@@ -37,7 +37,8 @@ def read_command_line():
         help="path to input file")
     
     parser.add_argument("-o", "--output-file", required=False,
-        default='C:\\temp\\out.json',
+        #default='C:\\temp\\out.json',
+        default='-',
         help="path to output file")
     parser.add_argument("-f", "--file-format", required=False,
         #default='TS',
@@ -54,7 +55,7 @@ def read_command_line():
     parser.add_argument("-m", "--match-score", required=False, nargs='*',
         help="Point system for games, default W:1.0,D:0.5,L:0.0,Z:0,P:1.0,U:0.5" )
     parser.add_argument("-d", "--delimiter", required=False,
-        default=' ',
+#        default=' ',
         help="Delimiter in output text" )
     parser.add_argument("-t", "--tie-break", required=False, nargs='*',
         default=['PTS', 'BH#C2-p'],
@@ -151,6 +152,8 @@ def tiebreakchecker():
                 competitor['startno'] = startno = cmp['cid']
                 correct = correct and cmp['rank'] == tb.cmps[startno]['rank']
                 competitor['rank'] = cmp['rank'] = tb.cmps[startno]['rank']
+                if tb.isteam:
+                    competitor['boardPoints'] = tb.cmps[startno]['game']['bp']
                 competitor['tieBreak'] = cmp['tieBreak'] = tb.cmps[startno]['tieBreak']
                 competitors.append(competitor)
                 #print(startno, cmp['rank'], cmp['tieBreak'])
@@ -162,7 +165,24 @@ def tiebreakchecker():
         f = open(params['output_file'], 'w')
     if params['check']:
         tournament.event['status']['tiebreaks'] = tb.tiebreaks
-        json.dump(tournament.event['status'], f, indent=2)
+        res = tournament.event['status']
+        if 'delimiter' in params and params['delimiter'] != None and params['delimiter'].upper() != 'JSON':
+            tr = {'B': ' ', 'T': '\t', 'C': ',','S': ';'}
+            if params['delimiter'].upper() in tr:
+                delimiter = tr[params['delimiter'].upper()]
+            else:
+                delimiter = params['delimiter']
+            code = res['code'] if 'code' in res else 500
+            check = res['check'] if 'check' in res else False
+            print(str(code) + delimiter + str(check))
+            if code == 0:
+                for competitor in res['competitors']:
+                    line = str(competitor['startno']) + delimiter + str(competitor['rank'])
+                    for val in competitor['tieBreak']:
+                        line += delimiter + str(val)
+                    print (line)
+        else:    
+            json.dump(res, f, indent=2)
     else:
         json.dump(tournament.event, f, indent=2)
     if not params['output_file'] == '-':

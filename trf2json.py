@@ -2,7 +2,7 @@
 """
 Created on Mon Aug  7 16:48:53 2023
 
-@author: otto
+@author: Otto Milvang, sjakk@milvang.no
 """
 
 import sys
@@ -73,7 +73,7 @@ class trf2json(chessjson.chessjson):
                         self.parse_trf_info('fullName', trfvalue)
                     case '013': 
                         self.parse_trf_team(tournament, tournament['teamSection'], line)
-                        tournament['teamTorunament'] = True
+                        tournament['teamTournament'] = True
                     case '022': 
                         self.parse_trf_info('site', trfvalue)
                     case '032':
@@ -83,7 +83,7 @@ class trf2json(chessjson.chessjson):
                     case '052':
                         self.parse_trf_info('endDate', helpers.parse_date(trfvalue))
                     case '062':
-                        numplayers = int(trfvalue)
+                        numplayers = int(trfvalue.split()[0])
                     case '072':
                         numrated = int(trfvalue)
                     case '082':
@@ -492,7 +492,16 @@ class trf2json(chessjson.chessjson):
         
     def prepare_team_section(tournament):
         # update players in teams
-        pcmps = {}  # player competitors cross pointer table     
+        [cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
+        teams = tournament['teamSection']['competitors']
+        for team in teams:
+            team['gamePoints'] = 0
+            team['matchPoints'] = 0
+            team['result'] = []
+        gamess = tournament['playerSection']['results']    
+        
+            
+        
     
     
 #### Module test ####

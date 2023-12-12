@@ -2,7 +2,7 @@
 """
 Created on Tue Oct 31 13:57:55 2023
 
-@author: otto
+@author: Otto Milvang, sjakk@milvang.no
 """
 
 # ==============================

@@ -2,7 +2,7 @@
 """
 Created on Fri Aug 18 08:28:13 2023
 
-@author: otto
+@author: Otto Milvang, sjakk@milvang.no
 """
 
 ScoreToDp = [ -800,
