@@ -131,7 +131,8 @@ class tiebreak:
                     'orgrank': competitor['rank'],
                     'rank': 1,
                     'rating': (competitor['rating'] if 'rating' in competitor else 0),
-                    'tieBreak': []
+                    'tieBreak': [],
+                    'tbval': {}
                   }
             cmps[competitor['cid']] = cmp
         for rst in competition['results']: 
@@ -306,9 +307,9 @@ class tiebreak:
     def compute_recursive_if_tied(self, tb, cmps, scoretype, rounds, compute_singlerun):
         name = tb['name'].lower()
         ro = self.rankorder
-        name = tb['name'].lower()
         for player in ro:
             player[scoretype][name] = player['rank']  # 'de' rank value initial value = rank
+            player[scoretype]['moreloops'] = True  # 'de' rank value initial value = rank
         loopcount = 0
         moretodo = compute_singlerun(tb, cmps, scoretype, rounds, ro, loopcount)
         while moretodo:
@@ -321,22 +322,21 @@ class tiebreak:
                     if stop == len(ro) or currentrank !=  ro[stop][scoretype][name]:
                         break
                 # we have a range start .. stop-1 to check for top board result
-                subro = ro[start:stop] # subarray of rankorder
-                moretodo = compute_singlerun(tb,cmps, scoretype, rounds, subro, loopcount) or moretodo
-                subro = sorted(subro, key=lambda p: (-p[scoretype][name + 'val'], p['cid']))
-                rank = subro[0][scoretype][name]
-                val = subro[0][scoretype][name +'val']
-                for i in range(1, len(subro)):
-                    rank += 1
-                    if (val != subro[i][scoretype][name + 'val']):
-                        subro[i][scoretype][name] = rank
-                        val = subro[i][scoretype][name + 'val']
+                if ro[start][scoretype]['moreloops']:
+                    if stop - start == 1:
+                        moreloops = False
+                        ro[start][scoretype]['moreloops'] = moreloops
                     else:
-                       subro[i][scoretype][name] = subro[i-1][scoretype][name]
+                        subro = ro[start:stop] # subarray of rankorder
+                        moreloops = compute_singlerun(tb,cmps, scoretype, rounds, subro, loopcount) 
+                        for player in subro:
+                            player[scoretype]['moreloops'] = moreloops  # 'de' rank value initial value = rank
+                        moretodo = moretodo or moreloops
                 start = stop            
             #json.dump(ro, sys.stdout, indent=2)
             ro = sorted(ro, key=lambda p: (p['rank'], p[scoretype][name], p['cid']))
-        # reorder 'de' 
+            
+        # reorder 'tb' 
         start = 0;
         while start < len(ro):
             currentrank = ro[start]['rank']
@@ -351,11 +351,82 @@ class tiebreak:
                 ro[p][scoretype][name] -= offset
             start = stop
         return name
-            
+
+           
 
 
-    def compute_singlerun_direct_encounter(self, tb, cmps, scoretype, rounds):
-        pass
+    def compute_singlerun_direct_encounter(self, tb, cmps, scoretype, rounds, subro, loopcount):
+        if loopcount == 0:
+            return True
+        changes = 0
+        points = tb['pointtype']
+        currentrank = subro[0][scoretype]['de']
+        metall = True          # Met all opponents on same range
+        metmax = len(subro)-1  # Max number of opponents
+        for player in range(0, len(subro)):
+            de = subro[player][scoretype]
+            de['denum'] = 0    # number of opponens
+            de['deval'] = 0    # sum score against of opponens
+            de['demax'] = 0    # sum score against of opponens, unplayed = win
+            de['delist'] = { }  # list of results numgames, score, maxscore 
+            for rnd, rst in subro[player]['rsts'].items():
+                if rnd <= rounds:
+                    opponent = rst['opponent']
+                    if opponent > 0:
+                          played = True if tb['modifiers']['p4f'] else rst['played']
+                          if played and cmps[opponent][scoretype]['de'] == currentrank:
+                              # 6.1.2 compute average score 
+                              if opponent in de['delist']:
+                                  score = de['delist'][opponent]['score']
+                                  num = de['delist'][opponent]['num']
+                                  sumscore = score * num
+                                  de['deval'] -= score
+                                  num += 1
+                                  sumscore += rst['points']
+                                  score = sumscore / num
+                                  de['denum'] = 1
+                                  de['deval'] += score
+                                  de['delist'][opponent]['num'] = 1 
+                                  de['delist'][opponent]['score'] = score
+                              else:
+                                  de['denum'] += 1
+                                  de['deval'] += rst[points]
+                                  de['delist'][opponent] = { 'num': 1,
+                                                             'score': rst[points]
+                                                            }
+            #if not tb['modifiers']['p4f'] and de['denum'] < metmax:
+            if (not tb['modifiers']['p4f'] and de['denum'] < metmax) or tb['modifiers']['sws']:
+                metall = False
+                de['demax'] = de['deval'] + (metmax - de['denum']) * self.scoreList[scoretype]['W']
+            else:
+                de['demax'] = de['deval']
+        if metall: # 6.2 All players have met
+            subro = sorted(subro, key=lambda p: (-p[scoretype]['deval'], p['cid']))
+            rank = subro[0][scoretype]['de']
+            val = subro[0][scoretype]['deval']
+            for i in range(1, len(subro)):
+                rank += 1
+                if (val != subro[i][scoretype]['deval']):
+                    subro[i][scoretype]['de'] = rank
+                    val = subro[i][scoretype]['deval']
+                    changes += 1
+                else:
+                    subro[i][scoretype]['de'] = subro[i-1][scoretype]['de']
+        else: # 6.2 swiss tournament
+            subro = sorted(subro, key=lambda p: (-p[scoretype]['deval'], -p[scoretype]['demax'], p['cid']))
+            rank = subro[0][scoretype]['de']
+            val = subro[0][scoretype]['deval']
+            unique = True
+            for i in range(1, len(subro)):
+                rank += 1
+                if (unique and val > subro[i][scoretype]['demax']):
+                    subro[i][scoretype]['de'] = rank
+                    val = subro[i][scoretype]['deval']
+                    changes += 1
+                else:
+                    subro[i][scoretype]['de'] = subro[i-1][scoretype]['de']
+                    unique = False
+        return changes > 0 and loopcount < 30
 
         
     def compute_direct_encounter(self, tb, cmps, scoretype, rounds):
@@ -440,7 +511,7 @@ class tiebreak:
                             val = subro[i][scoretype]['deval']
                             changes += 1
                         else:
-                            subro[i][scoretype]['de'] = subro[i-1][scoretype]['de']
+                            subro[i][scoretype]['de'] <= subro[i-1][scoretype]['de']
                             unique = False
                 start = stop            
             #json.dump(ro, sys.stdout, indent=2)
@@ -600,58 +671,7 @@ class tiebreak:
             ro[player][scoretype]['bbeval'] -= ro[player][scoretype]['bp'][self.maxboard - loopcount +1]
         return loopcount < self.maxboard
 
-    def compute_topbottomboardresult(self, tb, cmps, scoretype, rounds):
-        name = tb['name'].lower()
-        ro = self.rankorder
-        name = tb['name'].lower()
-        for player in ro:
-            player[scoretype][name] = player['rank']  # 'de' rank value initial value = rank
-            player[scoretype]['tbrval'] = 0
-            player[scoretype]['bbeval'] = player[scoretype]['points']
-        board = 0
-        while board < self.maxboard:
-            board += 1
-            start = 0;
-            while start < len(ro):
-                currentrank = ro[start][scoretype][name]
-                for stop in range( start+1,  len(ro)+1):
-                    if stop == len(ro) or currentrank !=  ro[stop][scoretype][name]:
-                        break
-                # we have a range start .. stop-1 to check for top board result
-                subro = ro[start:stop] # subarray of rankorder
-                for player in range(0, len(subro)):
-                    subro[player][scoretype]['tbrval'] = subro[player][scoretype]['bp'][board]
-                    subro[player][scoretype]['bbeval'] -= subro[player][scoretype]['bp'][self.maxboard - board +1]
-                subro = sorted(subro, key=lambda p: (-p[scoretype][name + 'val'], p['cid']))
-                rank = subro[0][scoretype][name]
-                val = subro[0][scoretype][name +'val']
-                for i in range(1, len(subro)):
-                    rank += 1
-                    if (val != subro[i][scoretype][name + 'val']):
-                        subro[i][scoretype][name] = rank
-                        val = subro[i][scoretype][name + 'val']
-                    else:
-                       subro[i][scoretype][name] = subro[i-1][scoretype][name]
-                start = stop            
-            #json.dump(ro, sys.stdout, indent=2)
-            ro = sorted(ro, key=lambda p: (p['rank'], p[scoretype][name], p['cid']))
-        # reorder 'de' 
-        start = 0;
-        while start < len(ro):
-            currentrank = ro[start]['rank']
-            for stop in range( start,  len(ro)+1):
-                if stop == len(ro) or currentrank !=  ro[stop]['rank']:
-                    break
-                # we have a range start .. stop-1 to check for direct encounter
-            offset = ro[start][scoretype][name]
-            if ro[start][scoretype][name] != ro[stop-1][scoretype][name]:
-                offset -=1 
-            for p in range(start, stop):
-                ro[p][scoretype][name] -= offset
-            start = stop
-        return name
-            
-        
+ 
 
     def parse_tiebreak(self,  order, txt):
         #BH@23:IP#C1-P4F
@@ -764,8 +784,12 @@ class tiebreak:
             case 'SNO' | 'RANK':
                 tb['modifiers']['reverse'] = False
                 tbname = tb['name'].lower()
-            case 'DE':
+            case 'DF':
                 tbname = self.compute_direct_encounter(tb, cmps, scoretype, self.currentround)
+            case 'DE':
+                #tbname = self.compute_direct_encounter(tb, cmps, scoretype, self.currentround)
+                tb['modifiers']['reverse'] = False
+                tbname = self.compute_recursive_if_tied(tb, cmps, scoretype, self.currentround, self.compute_singlerun_direct_encounter)
             case 'WIN' | 'WON' | 'BPG' | 'BWG' | 'GE':
                 tbname = tb['name'].lower()
             case 'PS':

@@ -7,6 +7,7 @@ Created on Mon Aug  7 16:48:53 2023
 """
 import argparse
 import json
+import io
 import sys
 import helpers
 from chessjson import chessjson
@@ -78,26 +79,32 @@ def tiebreakchecker():
         error(501, "Bad command line")
 
     # Read input file
+    match(params['file_format']):
+        case 'JSON':
+            tournament = chessjson()
+            charset = "utf-8"
+        case 'TRF':
+            tournament = trf2json()
+            charset = "ascii"
+
+        case 'TS':
+            tournament = ts2json()
+            charset = "ascii"
+        case _:
+            error(503, "Error in file format: " + params['file_format'])
+    
+
+
     if not 'input_file' in params:
         error(501, "Missing parameter --input-file")
     if not 'output_file' in params:
             error(501, "Missing parameter --output-file")
     try:
-        with open(params['input_file']) as f:
+        with io.open(params['input_file'], mode="r", encoding = charset) as f:
             lines = f.read()
     except:
             error(502, "Error when reading file: " + params['input_file'])
 
-    match(params['file_format']):
-        case 'JSON':
-            tournament = chessjson()
-        case 'TRF':
-            tournament = trf2json()
-
-        case 'TS':
-            tournament = ts2json()
-        case _:
-            error(503, "Error in file format: " + params['file_format'])
     
 
     tournament.parse_file(lines)

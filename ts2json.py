@@ -724,7 +724,7 @@ class ts2json(chessjson.chessjson):
                 case 'LocalGames': 
                     '1483'
                 case 'FideId': 
-                    '1500015', 
+                    profile['localId'] = helpers.parse_int(value) 
                 case 'FideRating': 
                     profile['rating'][1] = helpers.parse_int(value)
                 case 'FideRapidRating': 
