@@ -9,6 +9,7 @@ import argparse
 import json
 import io
 import sys
+import codecs
 import helpers
 from chessjson import chessjson
 from trf2json import trf2json
@@ -85,7 +86,7 @@ def tiebreakchecker():
             charset = "utf-8"
         case 'TRF':
             tournament = trf2json()
-            charset = "ascii"
+            charset = "latin1"
 
         case 'TS':
             tournament = ts2json()
@@ -100,13 +101,18 @@ def tiebreakchecker():
     if not 'output_file' in params:
             error(501, "Missing parameter --output-file")
     try:
-        with io.open(params['input_file'], mode="r", encoding = charset) as f:
-            lines = f.read()
+    #if True:
+    #with io.open(params['input_file'], mode="r", encoding = charset) as f:
+        f = io.open(params['input_file'], mode="r", encoding = charset)
+        lines = f.read()
+        f.close()
+        
+        if charset == "latin1" and lines[0] == '\xef' and lines[1] == '\xbb' and lines[2] == '\xbf' :
+            lines = lines[3:]
     except:
-            error(502, "Error when reading file: " + params['input_file'])
+        error(502, "Error when reading file: " + params['input_file'])
 
     
-
     tournament.parse_file(lines)
 
     if not 'event_number' in params:

@@ -88,15 +88,15 @@ class tiebreak:
             for key, value in scoresystem['scoreSystem'].items():
                 self.scoreList[scoresystem['listName']][key] = value
         if self.isteam:
-            self.teamscore = tournament['teamSection']['scoreSystem']
+            self.matchscore = tournament['teamSection']['scoreSystem']
             self.gamescore = tournament['playerSection']['scoreSystem']
             [self.cplayers, self.cteam] = chessevent.build_tournament_teamcompetitors(tournament)
             self.allgames = chessevent.build_all_games(tournament, self.cteam, False)    
             self.teams = self.prepare_competitors(tournament['teamSection'], 'match')
-            self.compute_score(self.teams, 'mpoints', self.teamscore, self.currentround)
+            self.compute_score(self.teams, 'mpoints', self.matchscore, self.currentround)
             self.compute_score(self.teams, 'gpoints', self.gamescore, self.currentround)
         else:
-            self.teamscore = tournament['playerSection']['scoreSystem']
+            self.matchscore = tournament['playerSection']['scoreSystem']
             self.gamescore = tournament['playerSection']['scoreSystem']
             self.players = self.prepare_competitors(tournament['playerSection'], 'game')
             self.compute_score(self.players, 'points', self.gamescore, self.currentround)            
@@ -138,7 +138,7 @@ class tiebreak:
                   }
             cmps[competitor['cid']] = cmp
         for rst in competition['results']: 
-            rounds = self.prepare_result(cmps, rst, self.teamscore, rounds)
+            rounds = self.prepare_result(cmps, rst, self.matchscore, rounds)
             if self.isteam:
                 self.prepare_teamgames(cmps, rst, self.gamescore)
         self.currentround = rounds
@@ -275,6 +275,8 @@ class tiebreak:
                 for game in gamelist:
                     if self.isteam and scoretype == 'game':
                         points = game['points']
+                        if game['played'] and game['opponent'] <= 0:  # PAB
+                            points = self.scoreList[self.gamescore]['W']
                         board = game['board'];
                         tbscore[prefix + 'bp'][board] = tbscore[prefix + 'bp'][board]  + points if board in tbscore[prefix + 'bp']  else points
                     tbscore[prefix + 'num'] += 1
@@ -326,6 +328,7 @@ class tiebreak:
                     if stop == len(ro) or currentrank !=  ro[stop]['tbval'][prefix + name]:
                         break
                 # we have a range start .. stop-1 to check for top board result
+                #print("start-stop", start, stop)
                 if ro[start]['tbval']['moreloops']:
                     if stop - start == 1:
                         moreloops = False
@@ -333,8 +336,8 @@ class tiebreak:
                     else:
                         subro = ro[start:stop] # subarray of rankorder
                         moreloops = compute_singlerun(tb,cmps, rounds, subro, loopcount) 
-                        for player in subro:
-                            player['tbval']['moreloops'] = moreloops  # 'de' rank value initial value = rank
+#                        for player in subro:
+#                            player['tbval']['moreloops'] = moreloops  # 'de' rank value initial value = rank
                         moretodo = moretodo or moreloops
                 start = stop            
             #json.dump(ro, sys.stdout, indent=2)
@@ -365,6 +368,7 @@ class tiebreak:
         if loopcount == 0:
             tb['modifiers']['points'] = points
             tb['modifiers']['scoretype'] = scoretype
+            tb['modifiers']['edechanges'] = 0
             return True
         points = tb['modifiers']['points'] 
         scoretype = tb['modifiers']['scoretype'] 
@@ -435,12 +439,13 @@ class tiebreak:
                 else:
                     subro[i]['tbval'][prefix + name] = subro[i-1]['tbval'][prefix + name]
                     unique = False
+        tb['modifiers']['edechanges'] += changes
         if changes == 0 and tb['name'] == 'EDE':
-            (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
-            if points == tb['modifiers']['points']:
-                tb['modifiers']['points'] = self.reverse_pointtype(points)
-                tb['modifiers']['scoretype'] = self.teamscore if tb['modifiers']['points'][0] == 'm' else self.gamescore
+            if tb['modifiers']['edechanges'] > 0:
+                tb['modifiers']['points'] = self.reverse_pointtype(tb['modifiers']['points'])
+                tb['modifiers']['scoretype'] = self.matchscore if tb['modifiers']['points'][0] == 'm' else self.gamescore
                 changes = 1
+                tb['modifiers']['edechanges'] = 0
         return changes > 0 and loopcount < 30
 
         
@@ -569,15 +574,28 @@ class tiebreak:
         return 'bc'
 
     def compute_singlerun_topbottomboardresult(self, tb, cmps,  rounds, ro, loopcount):
+        name = tb['name'].lower()
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         if loopcount == 0:
             for player in ro:
-                player['tbval'][prefix + 'tbr'] = 0
-                player['tbval'][prefix + 'bbe'] = player['tbval'][prefix + 'points']
+                player['tbval']['tbrval'] = 0
+                player['tbval']['bbeval'] = player['tbval']['gpoints_' + 'points']
             return True
         for player in range(0, len(ro)):
-            ro[player]['tbval'][prefix + 'tbr'] = ro[player]['tbval']['gpoints_' + 'bp'][loopcount]
-            ro[player]['tbval'][prefix + 'bbe'] -= ro[player]['tbval']['gpoints_' + 'bp'][self.maxboard - loopcount +1]
+            ro[player]['tbval']['tbrval'] = ro[player]['tbval']['gpoints_' + 'bp'][loopcount]
+            ro[player]['tbval']['bbeval'] -= ro[player]['tbval']['gpoints_' + 'bp'][self.maxboard - loopcount +1]
+        subro = sorted(ro, key=lambda p: (-p['tbval'][name + 'val'], p['cid']))
+        count = currentrank = ro[0]['tbval'][prefix + name]
+        for player in range(0, len(subro)):
+            #if subro[player]['cid'] == 27:
+            #print(loopcount)
+            #print(subro[player]['tbval'])
+            #print("<", loopcount, subro[player]['cid'], subro[player]['tbval']['mpoints_tbr'], subro[player]['tbval']['tbrval'], subro[player]['tbval']['moreloops'])
+            if subro[player]['tbval'][name + 'val'] != subro[player - 1]['tbval'][name + 'val']:
+                currentrank = count
+            subro[player]['tbval'][prefix + name] = currentrank
+            #print(">", loopcount, subro[player]['cid'], subro[player]['tbval']['mpoints_tbr'], subro[player]['tbval']['tbrval'], subro[player]['tbval']['moreloops'])
+            count += 1
         return loopcount < self.maxboard
 
     def compute_score_Strength_combination(self, tb, cmps, currentround):
@@ -591,7 +609,7 @@ class tiebreak:
                 divisor = math.floor(self.scoreList[scoretype]['W'] * currentround / self.scoreList[self.gamescore]['W'] / self.maxboard)
             elif key == 'g':
                 score = cmp['tbval']["mpoints_" + 'points']    
-                divisor = math.floor(self.scoreList[scoretype]['W'] * currentround *  self.maxboard / self.scoreList[self.teamscore]['W'])
+                divisor = math.floor(self.scoreList[scoretype]['W'] * currentround *  self.maxboard / self.scoreList[self.matchscore]['W'])
             cmp['tbval'][prefix + 'sssc'] = score + dividend / divisor
         
         return 'sssc'
@@ -630,6 +648,11 @@ class tiebreak:
             pointtype = 'mpoints'                         
         else:    
             pointtype = 'points'                         
+        if name == "MPTS":
+          pointtype = 'mpoints'
+        if name == "GPTS":
+            pointtype = 'gpoints'
+
         if len(nameparts) == 2:
             match nameparts[1].upper():
                 case 'MP':
@@ -644,7 +667,7 @@ class tiebreak:
                     pointtype = 'gmpoints'
                 case 'GG':
                     pointtype = 'ggpoints'
-        if self.primaryscore == None and name == "PTS":
+        if self.primaryscore == None and (name == "PTS" or name == "MPTS" or name == "GPTS") :
             self.primaryscore = pointtype
         #if name == 'MPVGP':
         #    name = 'PTS'
@@ -742,7 +765,7 @@ class tiebreak:
             case 'g':
                 return ["gpoints", self.gamescore, "gpoints_"]
             case 'm':
-                return ["mpoints", self.teamscore, "mpoints_"]
+                return ["mpoints", self.matchscore, "mpoints_"]
             case _:
                 return ["points", self.gamescore, "points_"]
 
@@ -751,12 +774,8 @@ class tiebreak:
         cmps = self.cmps
         order = tb['order']
         tbname = ''
-        if tb['pointtype'][0] == 'g':
-            scoretype = self.gamescore;
-        else:
-            scoretype = self.teamscore;
         match tb['name']:
-            case 'PTS':
+            case 'PTS' | 'MPTS' | 'GPTS':
                 tbname = 'points'
             case 'MPVGP':
                 tb['pointtype'] =  self.reverse_pointtype(self.primaryscore)
@@ -791,11 +810,9 @@ class tiebreak:
                 tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, self.currentround)
             case'BC':
                 tb['modifiers']['reverse'] = False
-                scoretype = self.gamescore;
                 tbname = self.compute_boardcount(tb, cmps, self.currentround)
             case'TBR' | 'BBE':
                 tb['modifiers']['reverse'] = False
-                scoretype = self.gamescore;
                 tbname = self.compute_recursive_if_tied(tb, cmps, self.currentround, self.compute_singlerun_topbottomboardresult)
             case'SSSC':
                 tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, self.currentround)

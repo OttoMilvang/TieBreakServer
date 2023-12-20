@@ -49,6 +49,7 @@ def parse_float(txt):
     txt = txt.strip()
     if len(txt) == 0:
         return 0.0;
+    txt = txt.replace(',','.')
     return float(txt)
 
 # return -1 if different

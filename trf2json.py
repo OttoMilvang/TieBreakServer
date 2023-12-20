@@ -490,7 +490,7 @@ class trf2json(chessjson.chessjson):
         with open(params['output_file'], 'w') as f:
             json.dump(self.event, f, indent=2)
         
-    def prepare_team_section(tournament):
+    def prepare_team_section(self, tournament):
         # update players in teams
         [cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
         teams = tournament['teamSection']['competitors']
