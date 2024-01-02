@@ -287,6 +287,7 @@ class ts2json(chessjson.chessjson):
         self.event['tournaments'].append(tournament)
         self.update_tournament_rating(tournament)
         self.update_tournament_teamcompetitors(tournament)
+        self.update_tournament_random(tournament, self.isteam)
         return
  
 
@@ -541,9 +542,11 @@ class ts2json(chessjson.chessjson):
                     'N'
                 case _:
                     self.print_warning('parse_ts_group_players attrib: ' + key + '=' + value + ' not matched')
+        rank = 0
         for player in players:
             if player.tag == 'Player':
-                self.parse_ts_player(player, competition)
+                rank += 1
+                self.parse_ts_player(player, competition, rank)
         return
 
 
@@ -554,9 +557,11 @@ class ts2json(chessjson.chessjson):
                     'N'
                 case _:
                     self.print_warning('parse_ts_group_teams attrib: ' + key + '=' + value + ' not matched')
+        rank = 0
         for team in teams:
             if team.tag == 'Team':
-                self.parse_ts_team(team, tournamentno)
+                rank += 1
+                self.parse_ts_team(team, tournamentno, rank)
         return
 
 # ==============================
@@ -644,7 +649,7 @@ class ts2json(chessjson.chessjson):
 #
 
 
-    def parse_ts_player(self, player, competition):
+    def parse_ts_player(self, player, competition, rank):
         profile = {
             'id': 0,
             'rating': [0,0,0,0],
@@ -658,6 +663,8 @@ class ts2json(chessjson.chessjson):
         profileid = competitor['profileId'] = self.append_profile(profile)
         if competitor['teamName'] != '':
             competitor['teamId'] = self.append_team(competitor['teamName'], profileid)
+        else:
+            competitor['rank'] = rank
         results = player[0]
         competition['competitors'].append(competitor)
         for game in results:
@@ -688,7 +695,9 @@ class ts2json(chessjson.chessjson):
                 case 'Pts':
                     competitor['gamePoints'] = helpers.parse_float(value)
                 case 'Rank':
-                    competitor['rank'] = helpers.parse_int(value)
+                    trank = helpers.parse_int(value)
+                    if trank > 0: 
+                        competitor['rank'] = trank
                 case 'Pmt':
                     '1'
                 case 'Rcpt':
@@ -826,13 +835,14 @@ class ts2json(chessjson.chessjson):
 #
 
 
-    def parse_ts_team(self, team, competition):
+    def parse_ts_team(self, team, competition, rank):
         cteam = {
             'id': 0,
             'other': {}
         }
         competitor = {
             'cid': 0,
+            'rank': rank,
             'tieBreak': []
         }
         self.parse_ts_team_attrib(team.attrib, cteam, competitor)
@@ -865,7 +875,9 @@ class ts2json(chessjson.chessjson):
                 case 'Pts':
                     competitor['matchPoints'] = helpers.parse_float(value)
                 case 'Rank':
-                    competitor['rank'] = helpers.parse_int(value)
+                    trank = helpers.parse_int(value)
+                    if trank > 0: 
+                        competitor['rank'] = trank
                 case 'Pmt':
                     '1000' 
                 case 'Rcpt':

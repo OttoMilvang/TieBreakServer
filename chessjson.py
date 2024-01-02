@@ -5,6 +5,7 @@ Created on Wed Nov  1 11:01:49 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 import sys
+import random
 import json
 import helpers
 import time
@@ -16,6 +17,7 @@ class chessjson:
     
    # constructor function    
     def __init__(self):
+        random.seed(a=None, version=2)
         self.event = {
 	    'filetype': 'Event',
 	    'version': '1.0',
@@ -295,4 +297,24 @@ class chessjson:
         return allgames
 
 
+    def update_tournament_random(self, tournament, isteam):
+        update = False
+        if isteam:
+            competitors = tournament['teamSection']['competitors']
+        else:
+            competitors = tournament['playerSection']['competitors']
+        for competitor in competitors:
+            if not 'random' in competitor:
+                competitor['random'] = random.random()
+                update = True
+        if update:
+            ro = sorted(competitors, key=lambda p: (p['random'], p['cid']))
+            rnd = 0
+            for competitor in ro:
+                rnd += 1
+                competitor['random'] = rnd
+        
+        
+
+                
 

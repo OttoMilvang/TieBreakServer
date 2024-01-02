@@ -167,6 +167,7 @@ def tiebreakchecker():
                 competitor['rank'] = cmp['rank'] = tb.cmps[startno]['rank']
                 if tb.isteam:
                     competitor['boardPoints'] = tb.cmps[startno]['tbval']['gpoints_' + 'bp']
+                competitor['calculations'] = cmp['calculations'] = tb.cmps[startno]['calculations']
                 competitor['tieBreak'] = cmp['tieBreak'] = tb.cmps[startno]['tieBreak']
                 competitors.append(competitor)
                 #print(startno, cmp['rank'], cmp['tieBreak'])
