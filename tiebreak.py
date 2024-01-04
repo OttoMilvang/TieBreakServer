@@ -717,9 +717,11 @@ class tiebreak:
         return txt
       
     def parse_tiebreak(self,  order, txt):
-        #BH@23:IP#C1-P4F
+        # BH@23:IP!C1-P4F
         txt = txt.upper()
-        comp = txt.split('#')
+        comp = txt.split('!')
+        if len(comp) == 1:
+            comp = txt.split('#')
         if len(comp) == 1:
             comp = txt.split('-')
         nameparts = comp[0].split(':')
