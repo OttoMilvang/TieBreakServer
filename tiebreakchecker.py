@@ -26,6 +26,8 @@ def error(code, txt):
     print('tiebreakchecker [options]')
     sys.exit()
 
+# read_command_line
+
 
 def read_command_line():
     parser = argparse.ArgumentParser()
@@ -156,8 +158,8 @@ def tiebreakchecker():
                 jsoncmps = tm['playerSection']['competitors']
             #with open('C:\\temp\\tm.json', 'w') as f:
             #    json.dump(tm, f, indent=2)
-            #with open('C:\\temp\\tbcmps.json', 'w') as f:
-            #    json.dump(tb.cmps, f, indent=2)
+            with open('C:\\temp\\tbcmps.json', 'w') as f:
+                json.dump(tm['teamSection'], f, indent=2)
             correct = True
             competitors = []
             for cmp in jsoncmps:

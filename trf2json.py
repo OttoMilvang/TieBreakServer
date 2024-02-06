@@ -24,8 +24,10 @@ class trf2json(chessjson.chessjson):
         self.event['origin'] = 'trf2json ver. 1.00'
         self.event['ratingLists'] = [{'listName': 'TRF'}]
         self.scorelist = []
- 
-
+        self.cteam = {}
+        self.cplayers = {}
+        self.cboard = {}
+        self.cteam[0] = 0
 
 # ==============================
 #
@@ -172,9 +174,12 @@ class trf2json(chessjson.chessjson):
                     result['wResult'] = pval
                 if result['wResult'] == 'U':
                     result['wResult'] = uval
-                points[result['white']] += self.get_score(scorename, result, 'white')
+                result['wScore'] = self.get_score(scorename, result, 'white')
+                result['bScore']  = 0
+                points[result['white']] += result['wScore']
                 if 'bResult' in result:
-                    points[result['black']] += self.get_score(scorename, result, 'black')
+                    result['bScore'] = self.get_score(scorename, result, 'black')
+                    points[result['black']] += result['bScore']
                 
                 
     def update_rr_board_number(self, roundresults, numcomp, points):
@@ -386,9 +391,10 @@ class trf2json(chessjson.chessjson):
         team = {
             'id': 0,
             'teamName': teamname,
-            'players':[]
         }
         teamid = self.append_team(team, 0)
+        players = []
+
         competitor = {
             'cid': self.numTeams,
             'teamId': teamid,
@@ -400,12 +406,16 @@ class trf2json(chessjson.chessjson):
             }
         cplayers = tournament['playerSection']['competitors']
         section['competitors'].append(competitor)
+        board = 0
         for i in range(39, linelen, 5):
+            board += 1
             pid = helpers.parse_int(line[i-3:i+1])
             competitor['cplayers'].append(pid)
-            team['players'].append(cplayers[pid-1]['profileId'])
-            cplayers[pid-1]['cteam'] = competitor['cid']
-            
+            players.append(cplayers[pid-1]['profileId'])
+            cplayers[pid-1]['teamId'] = teamid
+            self.cboard[pid] = board
+            self.cteam[pid] = competitor['cid']
+        self.cplayers[self.numTeams] = players
 
     def parse_trf_info(self, info, value):
         self.event['eventInfo'][info] = value
@@ -492,18 +502,121 @@ class trf2json(chessjson.chessjson):
         
     def prepare_team_section(self, tournament):
         # update players in teams
-        [cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
+        #[cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
+        cplayers = self.cplayers
+        cteam = self.cteam
         teams = tournament['teamSection']['competitors']
         for team in teams:
             team['gamePoints'] = 0
             team['matchPoints'] = 0
             team['result'] = []
-        gamess = tournament['playerSection']['results']    
-        
+        games = sorted(tournament['playerSection']['results'][:], key=lambda g: (g['round'])) 
+        matches = {}
+        byes = {}        
+        numboards = 0
+
+        for game in games: 
+            rnd = game['round']
+            wt = cteam[game['white']]
+            bt = cteam[game['black']] if 'black' in game and game['black'] > 0 else 0
+            if wt > bt:
+                index = str(rnd) + '-' + str(wt) + '-' + str(bt)
+            else:
+                index = str(rnd) + '-' + str(bt) + '-' + str(wt)
+            if bt > 0:
+                if not (index in matches):
+                    matches[index] = { 'games':[] }
+                matches[index]['games'].append(game)
+                if len(matches[index]['games']) > numboards:
+                    numboards = len(matches[index]['games'])
+            else:
+                if not (index in byes):
+                    byes[index] = { 'games':[] }
+                byes[index]['games'].append(game)
+        self.merge_matches(matches, byes, numboards)
+        rnd = 0 
+        board = 0
+        for key, tmatch in matches.items():
+            if tmatch['round'] != rnd:
+                rnd = tmatch['round']
+                board = 0;
+            board += 1
+            tmatch['board'] = board
+            tmatch.pop('games')
+            self. append_result(tournament['teamSection']['results'], tmatch)
             
-        
-    
-    
+    def merge_matches(self, matches, byes, numboards):
+        for key in matches.keys():
+            (rnd, p1, p2) = key.split('-')
+            arg = int(p1)
+            b1 = rnd + '-' + p1  + '-'+ '0' 
+            b2 = rnd + '-' + p2  + '-'+ '0' 
+            if b1 in byes:
+                byes.pop(b1)
+            if b2 in byes:
+                byes.pop(b2)
+        for key in byes.keys():
+            matches[key] = byes[key]
+            matches[key]['games'] = matches[key]['games'][0:numboards]
+        for key, tmatch in matches.items():
+            (rnd, p1, p2) = key.split('-')
+            arg = int(p1)
+            games = tmatch['games']
+            for i in range(0, len(games)-1):
+                for j in range(i+1, len(games)):
+                    #print(games[i])
+                    #print(games[j])
+                    #print(self.cteam[games[i]['white']], arg, (self.cteam[games[i]['white']] == arg))
+                    if self.cteam[games[i]['white']] == arg:
+                        t1 = self.cboard[games[i]['white']]
+                    else:
+                        t1 = self.cboard[games[i]['black']]
+                    if self.cteam[games[j]['white']] == arg:
+                        t2 = self.cboard[games[j]['white']]
+                    else:
+                        t2 = self.cboard[games[j]['black']]
+                    if t2 < t1:
+                        (games[i], games[j]) = (games[j], games[i])
+            scorename = self.event['tournaments'][0]['playerSection']['scoreSystem']
+            scoresystem = self.scoreList[scorename]
+            reverse = self.scoreList['_reverse']
+            white = self.cteam[games[0]['white']]
+            black = self.cteam[games[0]['black']]
+            tmatch['round'] = games[0]['round']
+            tmatch['white'] = white
+            tmatch['black'] = black
+            played = False
+            wscore = 0 
+            bscore = 0
+            for i in range(0, numboards):
+                game = games[i]
+                game['board'] = i+1
+                played = played or game['played']
+                ws = scoresystem[game['wResult']]
+                if 'bResult' in game:
+                    bs = scoresystem[game['bResult']]
+                else:
+                    bs = scoresystem[reverse[game['wResult']]] 
+                if self.cteam[game['white']] == white:
+                    wscore += ws
+                    bscore += bs
+                else:
+                    wscore += bs
+                    bscore += ws
+            tmatch['played'] = played
+            if black > 0:
+                if wscore > bscore:
+                    tmatch['wResult'] = 'W'
+                    tmatch['bResult'] = 'L'
+                elif bscore > wscore:
+                    tmatch['wResult'] = 'L'
+                    tmatch['bResult'] = 'W'
+                else:
+                    tmatch['wResult'] = 'D'
+                    tmatch['bResult'] = 'D'
+            else:
+                tmatch['wResult'] = games[0]['wResult']
+                
 #### Module test ####
 
 def dotest(name, details):

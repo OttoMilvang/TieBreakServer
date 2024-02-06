@@ -175,7 +175,7 @@ class tiebreak:
                 if 'rating' in cmps[black] and cmps[black]['rating'] > 0:
                     brating = cmps[black]['rating']
                 expscore = rating.ComputeExpectedScore(wrating, brating)
-                
+        board = rst['board'] if 'board' in rst else 0
         cmps[white]['rsts'][rnd] = {
             ptype: wPoints, 
             'rpoints': wrPoints, 
@@ -184,7 +184,7 @@ class tiebreak:
             'rated': rst['rated'] if 'rated' in rst else (rst['played'] and black > 0), 
             'opponent': black,
             'opprating': brating,
-            'board': rst['board'],
+            'board': board,
             'deltaR': (rating.ComputeDeltaR(expscore, wrPoints) if not expscore == None else None  ) 
             } 
         if (black> 0):
@@ -198,7 +198,7 @@ class tiebreak:
                 'rated': rst['rated']  if 'rated' in rst else (rst['played'] and white > 0),
                 'opponent': white,
                 'opprating': wrating,
-                'board': rst['board'],
+                'board': board,
                 'deltaR': (rating.ComputeDeltaR(1.0-expscore, brPoints) if not expscore == None else None  ) 
                 }
         return rounds
@@ -214,8 +214,9 @@ class tiebreak:
                 for game in self.allgames[rnd][competitor]:
                     white = game['white']
                     black = game['black'] if 'black' in game else 0
-                    maxboard = max(maxboard, game['board'])
-                    if self.cteam[white] == competitor:
+                    board = game['board'] if 'board' in game else 0
+                    maxboard = max(maxboard, board)
+                    if self.cteam[white] == competitor and board > 0:
                         points = self.get_score(self.gamescore, game, 'white')
                         gpoints += points
                         games.append(
@@ -227,9 +228,9 @@ class tiebreak:
                                 'rated' : game['rated'] if 'rated' in rst else (game['played'] and black > 0), 
                                 'player': white,
                                 'opponent': black,
-                                'board': game['board']
+                                'board': board
                             }) 
-                    if black > 0 and self.cteam[black] == competitor:
+                    if black > 0 and board > 0 and self.cteam[black] == competitor:
                         points = self.get_score(self.gamescore, game, 'black')
                         gpoints += points
                         games.append(
@@ -241,7 +242,7 @@ class tiebreak:
                                 'rated' : game['rated'] if 'rated' in rst else (game['played'] and black > 0), 
                                 'player': black,
                                 'opponent': white,
-                                'board': game['board']
+                                'board': board
                             })
                 cmps[competitor]['rsts'][rnd]['gpoints'] = gpoints
                 cmps[competitor]['rsts'][rnd]['games'] = games
@@ -629,21 +630,49 @@ class tiebreak:
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         name = tb['name'].lower()
         for startno, cmp in cmps.items():
-            cmp['tbval'][prefix + 'aro'] = { 'val': 0 } 
-            cmp['tbval'][prefix + 'tpr'] = { 'val': 0 }
-            cmp['tbval'][prefix + 'ptp'] = { 'val': 0 }
-            rscore = 0
+            tbscore = cmp['tbval']
+            tbscore[prefix + 'aro'] = { 'val': 0, 'cut': [] } 
+            tbscore[prefix + 'tpr'] = { 'val': 0, 'cut': [] }
+            tbscore[prefix + 'ptp'] = { 'val': 0, 'cut': [] }
             ratingopp = []
             for rnd, rst in cmp['rsts'].items():
                 if rnd <= rounds and rst['played'] and rst['opprating'] > 0:
-                    rscore += rst['rpoints']
-                    ratingopp.append(rst['opprating'])
+                    rst['rnd'] = rnd
+                    ratingopp.append(rst)
                     self.addtbval(cmp['tbval'][prefix + 'aro'], rnd, rst['opprating'])
                     self.addtbval(cmp['tbval'][prefix + 'tpr'], rnd, rst['opprating'])
                     self.addtbval(cmp['tbval'][prefix + 'ptp'], rnd, rst['opprating'])
-            cmp['tbval'][prefix + 'aro']['val'] = rating.ComputeAverageRatingOpponents(ratingopp) 
-            cmp['tbval'][prefix + 'tpr']['val'] = rating.ComputeTournamentPerformanceRating(rscore, ratingopp)
-            cmp['tbval'][prefix + 'ptp']['val'] = rating.ComputePerfectTournamentPerformance(rscore, ratingopp)
+            trounds = rounds
+            low = tb['modifiers']['low'] 
+            if low > rounds:
+                low = rounds 
+            high = tb['modifiers']['high']
+            if low + high > rounds: 
+                high = rounds - low 
+            while low > 0:
+                if trounds == len(ratingopp):
+                    newopp = sorted(ratingopp, key=lambda p: (p['opprating']))
+                    tbscore[prefix + name]['cut'].append(newopp[0]['rnd'])
+                    ratingopp = newopp[1:] 
+                trounds -= 1
+                low -= 1
+            while high > 0:
+                if trounds == len(ratingopp):
+                    newopp = sorted(ratingopp, key=lambda p: (p['opprating']))
+                    tbscore[prefix + name]['cut'].append(newopp[-1]['rnd'])
+                    ratingopp = newopp[:-1]
+                trounds -= 1
+                high -= 1
+            rscore = 0
+            ratings = []
+            for p in ratingopp:
+                rscore += p['rpoints']
+                ratings.append(p['opprating'])
+                
+                   
+            tbscore[prefix + 'aro']['val'] = rating.ComputeAverageRatingOpponents(ratings) 
+            tbscore[prefix + 'tpr']['val'] = rating.ComputeTournamentPerformanceRating(rscore, ratings)
+            tbscore[prefix + 'ptp']['val'] = rating.ComputePerfectTournamentPerformance(rscore, ratings)
         return tb['name'].lower()
 
 

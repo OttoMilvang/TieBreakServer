@@ -223,6 +223,15 @@ class chessjson:
             return [None, None]
         team_competitors = tournament['teamSection']['competitors']
         player_competitors = tournament['playerSection']['competitors']
+        with open('C:\\temp\\team.json', 'w') as f:
+            #json.dump(self.cteam, f, indent=2)
+            pass
+        with open('C:\\temp\\results.json', 'w') as f:
+            #json.dump(tournament['teamSection']['results'], f, indent=2)
+            pass
+        with open('C:\\temp\\player.json', 'w') as f:
+            #json.dump(self.cplayers, f, indent=2)
+            pass
         clookup = {}
         cplayers = {}
         cteam = {}
@@ -266,7 +275,7 @@ class chessjson:
         elif result['black'] > 0:
             res = reverse[result[color[0] + 'Result']]
         else:     
-            print("NOOOOOOOOOOOOOOOO", result)
+            #print("NOOOOOOOOOOOOOOOO", result)
             return 0.0
         while res in scoreSystem:
             if res == 'L' and result['played'] == False:
