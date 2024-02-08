@@ -295,7 +295,8 @@ class chessjson:
         else:     
             #print("NOOOOOOOOOOOOOOOO", result)
             return 0.0
-        if res == 'W' and result['black'] > 0:
+        #if res == 'W' and result['black'] > 0:  // Full point bye is not vur
+        if res == 'W':
             return False
         return True
 

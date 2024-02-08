@@ -278,6 +278,7 @@ class tiebreak:
             tbscore[prefix + 'bpg'] = { 'val' : 0 }    # number of black games played
             tbscore[prefix + 'bwg'] = { 'val' : 0 }    # number of games won with black
             tbscore[prefix + 'ge'] = { 'val' : 0 }     # number of games played + PAB
+            tbscore[prefix + 'vur'] = { 'val' : 0 }     # number of vurs (check algorithm)
             tbscore[prefix + 'lp'] =  0     # last round played 
             tbscore[prefix + 'lo'] = 0     # last round with opponent
             tbscore[prefix + 'pfp'] = 0    # points from played games
@@ -341,10 +342,14 @@ class tiebreak:
                     self.addtbval(tbscore[prefix + 'bwg'], 'val', bwg)
 
                     # number of games elected to play
-                    ge = 1 if game['played'] or (game['opponent'] > 0 and points == self.scoreList[scoretype]['W']) else 0
+                    #ge = 1 if game['played'] or (game['opponent'] > 0 and points == self.scoreList[scoretype]['W']) else 0
+                    ge = 1 if game['played'] or (points == self.scoreList[scoretype]['W']) else 0
                     self.addtbval(tbscore[prefix + 'ge'], rnd, ge)
                     self.addtbval(tbscore[prefix + 'ge'], 'val', ge)
 
+                    vur = 1 if game['vur'] else 0
+                    self.addtbval(tbscore[prefix + 'vur'], rnd, vur)
+                    self.addtbval(tbscore[prefix + 'vur'], 'val', vur)
 
 
     def compute_recursive_if_tied(self, tb, cmps, rounds, compute_singlerun):
@@ -561,6 +566,7 @@ class tiebreak:
             for rnd, rst in cmp['rsts'].items():
                 if rnd <= tbscore[oprefix + 'lo']:
                     tbscore[oprefix + 'ownbh'] += rst[opoints]
+            #print(startno, tbscore[oprefix + 'lo'])
             tbscore[oprefix + 'ownbh'] = tbscore[oprefix + 'ownbh'] + (rounds - tbscore[oprefix + 'lo']) * self.scoreList[oscoretype]['D']  # own score used for bh
             if name == 'fb' and tbscore[oprefix + 'lo'] == self.rounds:
                 tbscore[oprefix + 'ownbh'] = tbscore[oprefix + 'ownbh'] - tbscore[oprefix + 'lg'] + self.scoreList[oscoretype]['D']
@@ -914,7 +920,7 @@ class tiebreak:
                 #tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
                 tb['modifiers']['reverse'] = False
                 tbname = self.compute_recursive_if_tied(tb, cmps, self.currentround, self.compute_singlerun_direct_encounter)
-            case 'WIN' | 'WON' | 'BPG' | 'BWG' | 'GE':
+            case 'WIN' | 'WON' | 'BPG' | 'BWG' | 'GE' | 'VUR':
                 tbname = tb['name'].lower()
             case 'PS':
                 tbname = self.copmute_progressive_score(tb, cmps, self.currentround)
