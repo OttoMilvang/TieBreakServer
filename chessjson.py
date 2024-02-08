@@ -282,6 +282,24 @@ class chessjson:
                 res = 'Z'
             res = scoreSystem[res]
         return res
+
+    def is_vur(self, result, color):  #
+        reverse = self.scoreList['_reverse']
+        if result['played']:
+            return False
+
+        if color[0] + 'Result' in result:
+            res = result[color[0] + 'Result']
+        elif result['black'] > 0:
+            res = reverse[result[color[0] + 'Result']]
+        else:     
+            #print("NOOOOOOOOOOOOOOOO", result)
+            return 0.0
+        if res == 'W' and result['black'] > 0:
+            return False
+        return True
+
+
     
     # build_all_games for team
     # return a dict where where a competitors games in a list in 

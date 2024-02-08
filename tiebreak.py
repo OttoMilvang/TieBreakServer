@@ -79,6 +79,7 @@ class tiebreak:
         self.currentround = 0
         self.rounds = tournament['numRounds']
         self.get_score = chessevent.get_score
+        self.is_vur = chessevent.is_vur
         self.maxboard = 0
         self.primaryscore = None # use default
 
@@ -157,6 +158,7 @@ class tiebreak:
         white = rst['white']
         wPoints = self.get_score(scoresystem, rst, 'white')
         wrPoints = self.get_score('rating', rst, 'white')
+        wVur = self.is_vur(rst, 'white')
         wrating = 0
         brating = 0
         expscore = None
@@ -169,6 +171,7 @@ class tiebreak:
                 rst['bResult'] = self.scoreList['reverse'][rst['wResult']]
             bPoints = self.get_score(scoresystem, rst, 'black')
             brPoints = self.get_score('rating', rst, 'black')
+            bVur = self.is_vur(rst, 'black')
             if (rst['played']):
                 if 'rating' in cmps[white] and cmps[white]['rating'] > 0:
                     wrating = cmps[white]['rating']
@@ -181,6 +184,7 @@ class tiebreak:
             'rpoints': wrPoints, 
             'color': 'w', 
             'played': rst['played'], 
+            'vur': wVur,
             'rated': rst['rated'] if 'rated' in rst else (rst['played'] and black > 0), 
             'opponent': black,
             'opprating': brating,
@@ -194,7 +198,8 @@ class tiebreak:
                 ptype: bPoints, 
                 'rpoints': brPoints, 
                 'color': "b", 
-                'played': rst['played'], 
+                'played': rst['played'],
+                'vur' : bVur,
                 'rated': rst['rated']  if 'rated' in rst else (rst['played'] and white > 0),
                 'opponent': white,
                 'opprating': wrating,
@@ -565,6 +570,7 @@ class tiebreak:
             for rnd, rst in cmp['rsts'].items():
                 if rnd <= rounds:
                     opponent = rst['opponent']
+                    vur = rst['vur']
                     if opponent > 0:
                         played = True if tb['modifiers']['p4f'] else rst['played']
                         if played or not tb['modifiers']['urd']:
@@ -577,12 +583,12 @@ class tiebreak:
                         played = False
                         score = cmps[startno]['tbval'][oprefix + 'ownbh'] 
                         tbvalue = score * rst[spoints] if is_sb else score
-                    bhvalue.append({'played': played, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
+                    bhvalue.append({'played': not vur, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
             # add unplayed rounds
             for rnd in range(len(bhvalue), rounds):
                 score = tbscore[sprefix + 'ownbh'] 
                 tbvalue = 0.0 if is_sb else score
-                bhvalue.append({'played': played, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd}) 
+                bhvalue.append({'played': False, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd}) 
             tbscore = cmp['tbval']
             tbscore[oprefix + name] ={ 'val' : 0, 'cut': [] }
             for game in bhvalue:
