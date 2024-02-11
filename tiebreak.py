@@ -586,11 +586,12 @@ class tiebreak:
                             if tb['modifiers']['urd']:
                                 score = self.scoreList[oscoretype]['D']
                             else:
-                                score = cmps[startno]['tbval'][oprefix + 'ownbh']
+                                score = cmps[startno]['tbval'][oprefix + 'points']['val']
+                            #print(startno, rnd, score)
                             tbvalue = score * rst[spoints] if is_sb else score
                     else:
                         played = False
-                        score = cmps[startno]['tbval'][oprefix + 'ownbh'] 
+                        score = cmps[startno]['tbval'][oprefix + 'points']['val']
                         tbvalue = score * rst[spoints] if is_sb else score
                     bhvalue.append({'played': not vur, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
             # add unplayed rounds
