@@ -579,11 +579,14 @@ class tiebreak:
                     vur = rst['vur']
                     if opponent > 0:
                         played = True if tb['modifiers']['p4f'] else rst['played']
-                        if played or not tb['modifiers']['urd']:
+                        if played :
                             score = cmps[opponent]['tbval'][oprefix + 'ownbh']
                             tbvalue = score * rst[spoints] if is_sb else score
                         else:
-                            score = cmps[startno]['tbval'][oprefix + 'ownbh']
+                            if tb['modifiers']['urd']:
+                                score = self.scoreList[oscoretype]['D']
+                            else:
+                                score = cmps[startno]['tbval'][oprefix + 'ownbh']
                             tbvalue = score * rst[spoints] if is_sb else score
                     else:
                         played = False
@@ -758,15 +761,16 @@ class tiebreak:
         return txt
       
     def parse_tiebreak(self,  order, txt):
-        # BH@23:IP!C1-P4F
+        # BH@23:IP/C1-P4F
         txt = txt.upper()
-        comp = txt.split('!')
-        if len(comp) == 1:
-            comp = txt.split('#')
+        comp = txt.replace('!', '/').replace('#', '/').split('/')
         if len(comp) == 1:
             comp = txt.split('-')
         nameparts = comp[0].split(':')
-        name = nameparts[0]
+        nameyear = nameparts[0].split('@')
+        nameyear.append('24')
+        name = nameyear[0]
+        year = int(nameyear[1])
         scoretype = 'x'
         if self.primaryscore != None:
             pointtype = self.primaryscore    
@@ -804,6 +808,7 @@ class tiebreak:
             modifiers = comp[1].split('-')              
         tb = {'order': order,
               'name': name,
+              'year': year,
               'pointtype': pointtype,
               'modifiers': {'low': 0,
                             'high': 0,

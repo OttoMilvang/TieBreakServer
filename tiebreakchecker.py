@@ -21,13 +21,27 @@ from tiebreak import tiebreak
 def help():
     print('tiebreakchecker [options]')
     
+    
+# error
+#   print error and exit
+
 def error(code, txt):
     print('Error: ' + str(code) + ', ' + txt)
     print('tiebreakchecker [options]')
     sys.exit()
 
 # read_command_line
-
+#   options:
+#   -c = check
+#   -i = input-file
+#   -o = output-file
+#   -f = file-format    
+#   -e = event-number    
+#   -n = number-of-rounds
+#   -g = game-score
+#   -m = match-score
+#   -d = delimiter
+#   -t = tie-break
 
 def read_command_line():
     parser = argparse.ArgumentParser()
@@ -39,7 +53,6 @@ def read_command_line():
         #default='C:\\temp\\T6681.trfx',
         #default='C:\\temp\\nm_lag2022.trx',
         help="path to input file")
-    
     parser.add_argument("-o", "--output-file", required=False,
         #default='C:\\temp\\out.json',
         default='-',
@@ -54,7 +67,7 @@ def read_command_line():
     parser.add_argument("-n", "--number-of-rounds", type=int,
         default=0,
         help="Nuber of rounds, overrides file value")
-    parser.add_argument("-g", "--individual-score", required=False, nargs='*',
+    parser.add_argument("-g", "--game-score", required=False, nargs='*',
         help="Point system for matches, default W:2.0,D:1.0,L:0.0,Z:0,P:1.0,U:1.0" )
     parser.add_argument("-m", "--match-score", required=False, nargs='*',
         help="Point system for games, default W:1.0,D:0.5,L:0.0,Z:0,P:1.0,U:0.5" )
