@@ -623,7 +623,8 @@ class tiebreak:
 
             while high > 0:
                 sortall = sorted(bhvalue, key=lambda game: (-game['score'], -game['tbvalue']))
-                sortexp = sorted(bhvalue, key=lambda game: (game['played'], -game['score'], -game['tbvalue']))
+                #sortexp = sorted(bhvalue, key=lambda game: (game['played'], -game['score'], -game['tbvalue'])) // No execption on high
+                sortexp = sorted(bhvalue, key=lambda game: (-game['score'], -game['tbvalue']))
                 if tb['modifiers']['vun']:
                     bhvalue = sortall[1:]
                     tbscore[oprefix + name]['cut'].append(sortall[0]['rnd'])
