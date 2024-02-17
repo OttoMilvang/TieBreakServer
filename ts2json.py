@@ -217,6 +217,8 @@ class ts2json(chessjson.chessjson):
                     other['ClonoT_id'] = value
                 case 'ClonoTokenDate':
                     other['ClonoTokenDate'] = helpers.parse_date(value)
+                case 'CheckinAllowed':
+                    other['CheckinAllowed'] = value
                 case _:
                     self.print_warning('parse_ts_web: ' + key + ' not matched')
         return
