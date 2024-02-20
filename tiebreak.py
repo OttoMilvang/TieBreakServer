@@ -145,7 +145,7 @@ class tiebreak:
                     'rnd': rnd,
                     'tbval': {}
                   }
-            # Be sure that nissing results are replaced by 'Z' 
+            # Be sure that nissing results are replaced by 
             zero = self.scoreList[scoretype]['Z']
             for rnd in range(1, rounds+1):
                 cmp['rsts'][rnd] = {
@@ -618,7 +618,8 @@ class tiebreak:
                     else:
                         sres = rst[spoints]
                     tbvalue = score * sres if is_sb else score
-                    bhvalue.append({'vur': vur, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
+                    if  opponent >  0 or not tb['modifiers']['p4f'] :
+                        bhvalue.append({'vur': vur, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
             tbscore = cmp['tbval']
             tbscore[oprefix + name] ={ 'val' : 0, 'cut': [] }
             for game in bhvalue:
