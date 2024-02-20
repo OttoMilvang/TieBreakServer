@@ -144,13 +144,13 @@ def ComputeDeltaR(pd, score):
 def ComputeAverageRatingOpponents(ratingsopp):
     num = len(ratingsopp)
     if num == 0: return 0
-    return int(round(sum(ratingsopp) / num))
+    return int(round(sum(ratingsopp) / num + 0.000001))
     
 def ComputeTournamentPerformanceRating(score, ratingsopp):
     num = len(ratingsopp)
     if num == 0: return 0
     score100 = int(round(score*100))
-    scr = int(round(score100 / num))
+    scr = int(round(score100 / num + 0.000001))
     return(ComputeAverageRatingOpponents(ratingsopp) + ScoreToDp[scr])    
     
 

@@ -371,9 +371,9 @@ class trf2json(chessjson.chessjson):
         currentround = 0
         lastplayed = 0
         lastpaired = 0
-        for i in range(99, linelen, 10):
+        for i in range(99, linelen+1, 10):
             currentround += 1
-            game = self.parse_trf_game(section, startno, currentround, line[81 + 10 * currentround: 81 + 10 * currentround + 8], score)
+            game = self.parse_trf_game(section, startno, currentround, line[i-8: i], score)
             if game != None:
                 if game['played'] and currentround > lastplayed:
                     lastplayed = currentround
@@ -407,9 +407,9 @@ class trf2json(chessjson.chessjson):
         cplayers = tournament['playerSection']['competitors']
         section['competitors'].append(competitor)
         board = 0
-        for i in range(39, linelen, 5):
+        for i in range(40, linelen+1, 5):
             board += 1
-            pid = helpers.parse_int(line[i-3:i+1])
+            pid = helpers.parse_int(line[i-4:i])
             competitor['cplayers'].append(pid)
             players.append(cplayers[pid-1]['profileId'])
             cplayers[pid-1]['teamId'] = teamid
@@ -426,9 +426,9 @@ class trf2json(chessjson.chessjson):
         
         tournament['rounds'] = []
         currentround = 0
-        for j in range(99, linelen, 10):
+        for j in range(99, linelen+1, 10):
             currentround += 1
-            date = line[81 + 10 * currentround: 81 + 10 * currentround + 8]
+            date = line[j-8: j]
             tournament['rounds'].append( {'round': currentround,
                                          'startTime': helpers.parse_date(date)
                                          })
