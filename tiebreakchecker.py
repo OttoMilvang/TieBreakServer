@@ -82,18 +82,7 @@ def read_command_line():
     args = vars(parser.parse_args())
     return args
 
-                                 
-
-   
-def tiebreakchecker():
-    # Read command line
-    try:
-        params = read_command_line()
-        #json.dump(params, sys.stdout, indent=2)
-        #sys.exit(0)
-    except:
-        error(501, "Bad command line")
-
+def read_input_file(params):
     # Read input file
     match(params['file_format']):
         case 'JSON':
@@ -102,98 +91,37 @@ def tiebreakchecker():
         case 'TRF':
             tournament = trf2json()
             charset = "latin1"
-
+    
         case 'TS':
             tournament = ts2json()
             charset = "ascii"
         case _:
             error(503, "Error in file format: " + params['file_format'])
     
-
-
+    
+    
     if not 'input_file' in params:
         error(501, "Missing parameter --input-file")
     if not 'output_file' in params:
             error(501, "Missing parameter --output-file")
-    try:
-    #if True:
-    #with io.open(params['input_file'], mode="r", encoding = charset) as f:
-        f = io.open(params['input_file'], mode="r", encoding = charset)
-        lines = f.read()
-        f.close()
+    f = io.open(params['input_file'], mode="r", encoding = charset)
+    lines = f.read()
+    f.close()
         
-        if charset == "latin1" and lines[0] == '\xef' and lines[1] == '\xbb' and lines[2] == '\xbf' :
-            lines = lines[3:]
-    except:
-        error(502, "Error when reading file: " + params['input_file'])
-
-    
+    if charset == "latin1" and lines[0] == '\xef' and lines[1] == '\xbb' and lines[2] == '\xbf' :
+        lines = lines[3:]
     tournament.parse_file(lines)
 
-    if not 'event_number' in params:
-        error(501, "Missing parameter --event-number")
-    eventno = helpers.parse_int(params['event_number'])
-    if eventno < 0 or eventno > len(tournament.event['tournaments']):
-        error(501, "Invalid parameter --event-number")
-    
+    return(tournament)
+        
 
-    if eventno > 0:
-        # Add command line parameters
-        tournament.tournament_setvalue(eventno, 'numRounds', params['number_of_rounds'] )
-        if 'individual_score' in params and params['individual_score'] != None:    
-            for arg in params['individual_score']:
-                tournament.parse_score_system('game', arg)
-        if 'match_score' in params and params['match_score'] != None:    
-            for arg in params['match_score']:   
-                tournament.parse_score_system('match', arg)
-    
-        # run tiebreak 
-        #json.dump(tournament.__dict__, sys.stdout, indent=2)
-    
-        if tournament.get_status() == 0:
-            tb  = tiebreak(tournament, eventno)
-        if tournament.get_status() == 0:
-            tblist = params['tie_break']
-            for pos in range (0, len(tblist)):
-                mytb = tb.parse_tiebreak(pos+1, tblist[pos])
-                tb.compute_tiebreak(mytb)
-                #json.dump(tb.__dict__, sys.stdout, indent=2)
-            #print()
-            for i in range(0,len(tb.rankorder)):
-                t = tb.rankorder[i]
-                #print(t['id'], t['rank'], t['tieBreak'])
-        if tournament.get_status() == 0:
-            tm = tournament.get_tournament(eventno)
-            tm['rankOrder'] = tb.tiebreaks;
-            if 'teamTournament' in tm and tm['teamTournament']:
-                jsoncmps = tm['teamSection']['competitors']
-            else:
-                jsoncmps = tm['playerSection']['competitors']
-            #with open('C:\\temp\\tm.json', 'w') as f:
-            #    json.dump(tm, f, indent=2)
-            with open('C:\\temp\\tbcmps.json', 'w') as f:
-                json.dump(tm['teamSection'], f, indent=2)
-            correct = True
-            competitors = []
-            for cmp in jsoncmps:
-                competitor = {}
-                competitor['startno'] = startno = cmp['cid']
-                correct = correct and cmp['rank'] == tb.cmps[startno]['rank']
-                competitor['rank'] = cmp['rank'] = tb.cmps[startno]['rank']
-                if tb.isteam:
-                    competitor['boardPoints'] = tb.cmps[startno]['tbval']['gpoints_' + 'bp']
-                competitor['calculations'] = cmp['calculations'] = tb.cmps[startno]['calculations']
-                competitor['tieBreak'] = cmp['tieBreak'] = tb.cmps[startno]['tieBreak']
-                competitors.append(competitor)
-                #print(startno, cmp['rank'], cmp['tieBreak'])
-            tournament.event['status']['check'] = correct
-            tournament.event['status']['competitors'] = competitors
+def write_output_file(params, tournament, tb):
     if params['output_file'] == '-':
         f = sys.stdout
     else:
         f = open(params['output_file'], 'w')
     if params['check']:
-        tournament.event['status']['tiebreaks'] = tb.tiebreaks
+        tournament.event['status']['tiebreaks'] = tb.tiebreaks 
         res = tournament.event['status']
         if 'delimiter' in params and params['delimiter'] != None and params['delimiter'].upper() != 'JSON':
             tr = {'B': ' ', 'T': '\t', 'C': ',','S': ';'}
@@ -216,6 +144,94 @@ def tiebreakchecker():
         json.dump(tournament.event, f, indent=2)
     if not params['output_file'] == '-':
         f.close()
+
+
+def compute_tiebreaks(tournament, tb, eventno, params):                                 
+    
+    # run tiebreak 
+    #json.dump(tournament.__dict__, sys.stdout, indent=2)
+
+    if tournament.get_status() == 0:
+        tblist = params['tie_break']
+        for pos in range (0, len(tblist)):
+            mytb = tb.parse_tiebreak(pos+1, tblist[pos])
+            tb.compute_tiebreak(mytb)
+            #json.dump(tb.__dict__, sys.stdout, indent=2)
+        #print()
+        for i in range(0,len(tb.rankorder)):
+            t = tb.rankorder[i]
+            #print(t['id'], t['rank'], t['tieBreak'])
+    if tournament.get_status() == 0:
+        tm = tournament.get_tournament(eventno)
+        tm['rankOrder'] = tb.tiebreaks;
+        if 'teamTournament' in tm and tm['teamTournament']:
+            jsoncmps = tm['teamSection']['competitors']
+        else:
+            jsoncmps = tm['playerSection']['competitors']
+        #with open('C:\\temp\\tm.json', 'w') as f:
+        #    json.dump(tm, f, indent=2)
+        with open('C:\\temp\\tbcmps.json', 'w') as f:
+            json.dump(tm['teamSection'], f, indent=2)
+        correct = True
+        competitors = []
+        for cmp in jsoncmps:
+            competitor = {}
+            competitor['startno'] = startno = cmp['cid']
+            correct = correct and cmp['rank'] == tb.cmps[startno]['rank']
+            competitor['rank'] = cmp['rank'] = tb.cmps[startno]['rank']
+            if tb.isteam:
+                competitor['boardPoints'] = tb.cmps[startno]['tbval']['gpoints_' + 'bp']
+            competitor['calculations'] = cmp['calculations'] = tb.cmps[startno]['calculations']
+            competitor['tieBreak'] = cmp['tieBreak'] = tb.cmps[startno]['tieBreak']
+            competitors.append(competitor)
+            #print(startno, cmp['rank'], cmp['tieBreak'])
+        tournament.event['status']['check'] = correct
+        tournament.event['status']['competitors'] = competitors
+    #return(tb)
+
+   
+def tiebreakchecker():
+    # Read command line
+    try:
+        params = read_command_line()
+    except:
+        error(501, "Bad command line")
+
+    #try:
+    tournament = read_input_file(params)
+    #except:
+    #    error(502, "Error when reading file: " + params['input_file'])
+
+
+    if not 'event_number' in params:
+        error(501, "Missing parameter --event-number")
+    eventno = helpers.parse_int(params['event_number'])
+    if eventno < 0 or eventno > len(tournament.event['tournaments']):
+        error(501, "Invalid parameter --event-number")
+
+    # Add command line parameters
+    if 'individual_score' in params and params['individual_score'] != None:    
+        for arg in params['individual_score']:
+            tournament.parse_score_system('game', arg)
+    if 'match_score' in params and params['match_score'] != None:    
+        for arg in params['match_score']:   
+            tournament.parse_score_system('match', arg)
+    
+
+    tb = None
+    if tournament.get_status() == 0:
+        if eventno > 0:
+            tournament.tournament_setvalue(eventno, 'numRounds', params['number_of_rounds'] )
+            tb  = tiebreak(tournament, eventno)
+            compute_tiebreaks(tournament, tb, eventno, params)
+    
+
+    #try:
+    write_output_file(params, tournament, tb)
+    #except:
+    #    error(503, "Error when writing file: " + params['output_file'])
+    
+
         
 # tournament.export_trf(params)
  

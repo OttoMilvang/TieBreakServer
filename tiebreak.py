@@ -167,7 +167,8 @@ class tiebreak:
                 self.prepare_teamgames(cmps, rst, self.gamescore)
         self.currentround = rounds
         with open('C:\\temp\\cmps.json', 'w') as f:
-            json.dump(cmps, f, indent=2)
+            #json.dump(cmps, f, indent=2)
+            pass
 
         return cmps
 

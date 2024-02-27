@@ -121,12 +121,13 @@ class chessjson:
                  eq = helpers.is_equal('federation', elem, profile)
                  if eq == 1:
                      eq = 0;
-            if eq == 0:
-                eq = helpers.is_equal('firstName', elem, profile) + helpers.is_equal('lastName', elem, profile) -1
-            if eq == 1: # Found
+            #if eq == 0:
+                #eq = helpers.is_equal('firstName', elem, profile) + helpers.is_equal('lastName', elem, profile) -1
+            if eq == 1 and False: # Never
                 for key, value in profile.items():
-                    if (type(value) == type(0) and value != 0) or (type(value) == type('0') and value != ''):
-                        elem['key'] = value;
+                    #if (type(value) == type(0) and value != 0) or (type(value) == type('0') and value != ''):
+                    if key != 'id':
+                        elem[key] = value;
                 return elem['id']
         self.numProfiles += 1
         pid = profile['id'] = self.numProfiles + self.numTeams
@@ -247,9 +248,11 @@ class chessjson:
                 cplayers[clookup[teamid]].append(cid)
                 cteam[cid] = clookup[teamid]
         with open('C:\\temp\\cteam.json', 'w') as f:
-            json.dump(cteam, f, indent=2)
+            #json.dump(cteam, f, indent=2)
+            pass
         with open('C:\\temp\\cplayer.json', 'w') as f:
-            json.dump(cplayers, f, indent=2)
+            #json.dump(cplayers, f, indent=2)
+            pass
         return [cplayers, cteam]
     
     # prepare_scoresystem
@@ -275,7 +278,6 @@ class chessjson:
         elif result['black'] > 0:
             res = reverse[result[color[0] + 'Result']]
         else:     
-            #print("NOOOOOOOOOOOOOOOO", result)
             return 0.0
         while res in scoreSystem:
             if res == 'L' and result['played'] == False:
@@ -293,7 +295,6 @@ class chessjson:
         elif result['black'] > 0:
             res = reverse[result[color[0] + 'Result']]
         else:     
-            #print("NOOOOOOOOOOOOOOOO", result)
             return 0.0
         #if res == 'W' and result['black'] > 0:  // Full point bye is not vur
         if res == 'W':
