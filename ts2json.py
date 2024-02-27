@@ -312,7 +312,7 @@ class ts2json(chessjson.chessjson):
              'fideOtitle': ''
             }
         competition = tournament['teamSection'] if self.isteam else tournament['playerSection']
-        scoresystem = competition['scoreSystem']
+        scoresystem = {}
         frr = 1
         info = tournament['tournamentInfo']
         other = tournament['other']
@@ -358,16 +358,16 @@ class ts2json(chessjson.chessjson):
                     ffr = helpers.parse_int(value)
                 case 'PointsForWin': 
                     todo = 1
-                    #scoresystem['W'] = helpers.parse_float(value)
+                    scoresystem['W'] = helpers.parse_float(value)
                 case 'PointsForLoss': 
                     todo = 1
-                    #scoresystem['L'] = helpers.parse_float(value)
+                    scoresystem['L'] = helpers.parse_float(value)
                 case 'PointsForBye':
                     todo = 1
-                    #if (value == 'd'):
-                    #    scoresystem['P'] = 'D'
-                    #if (value == '+'):
-                    #    scoresystem['P'] = 'W'
+                    if (value == 'd'):
+                        scoresystem['P'] = 'D'
+                    if (value == '+'):
+                        scoresystem['P'] = 'W'
                 case 'PostponedCalcAs': 
                     todo = 1
                     #scoresystem['A'] = value
@@ -412,12 +412,16 @@ class ts2json(chessjson.chessjson):
                 case _:
                     self.print_warning('parse_ts_group attrib: ' + key + '=' + value + ' not matched')
         todo = 1
+        if (scoresystem['W'] == 3.0 and scoresystem['L'] == 1.0):
+            tournament['playerSection']['scoreSystem'] = 'children'
+        elif (scoresystem['W'] == 3.0 and scoresystem['L'] == 0.0):
+            tournament['playerSection']['scoreSystem'] = 'football'
 #        match scoresystem['W']:
 #            case 1.0:
 #                scoresystem['D'] = 0.5
-#            case 2.0:
-#                scoresystem['D'] = 1.0
-#            case 3.0:
+##            case 2.0:
+ #               scoresystem['D'] = 1.0
+ #           case 3.0:
 #                scoresystem['D'] = scoresystem['L'] + 1.0
 #        if scoresystem['P'] == '+':
 #            scoresystem['P'] = 'W'
@@ -594,6 +598,8 @@ class ts2json(chessjson.chessjson):
             lookup[profiles[nprofile]['id']] = nprofile           
         players = tournament['playerSection']['competitors']
         for player in players: 
+            #print(profiles[lookup[player['profileId']]])
+            #print()
             player['rating'] = int(profiles[lookup[player['profileId']]]['rating'][ratingindex])            
         
     def update_tournament_teamcompetitors(self, tournament):
@@ -691,7 +697,7 @@ class ts2json(chessjson.chessjson):
                 case 'Teamname': 
                     competitor['teamName'] = value
                 case 'Group': 
-                    '' 
+                    profile['other']['group'] = value
                 case 'Federation':
                     profile['federation'] = value
                 case 'Pts':
@@ -701,7 +707,7 @@ class ts2json(chessjson.chessjson):
                     if trank > 0: 
                         competitor['rank'] = trank
                 case 'Pmt':
-                    '1'
+                    profile['other']['pmt'] = value
                 case 'Rcpt':
                     'N'
                 case 'EnrSt': 
@@ -725,7 +731,8 @@ class ts2json(chessjson.chessjson):
                 case 'GPgroup': 
                     'M'
                 case 'Born':
-                    profile['birth'] = helpers.parse_date(value)
+                    birth = helpers.parse_date(value)
+                    profile['birth'] = birth if (len(birth) > 2 and birth[0:2] != '18') else '' 
                 case 'Club':
                     profile['clubName'] = value
                 case 'LocalID': 
@@ -735,7 +742,7 @@ class ts2json(chessjson.chessjson):
                 case 'LocalGames': 
                     '1483'
                 case 'FideId': 
-                    profile['localId'] = helpers.parse_int(value) 
+                    profile['fideId'] = helpers.parse_int(value) 
                 case 'FideRating': 
                     profile['rating'][1] = helpers.parse_int(value)
                 case 'FideRapidRating': 
