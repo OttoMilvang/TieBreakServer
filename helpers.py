@@ -72,7 +72,7 @@ def is_equal(txt, struct1, struct2):
 
 #
 # Sole point system    
-def solve_pointsystem(score):
+def solve_scoresystem(competition):
     res = {}
     for l in [0, 0.5, 1]:
        res['L'] = l
@@ -81,27 +81,27 @@ def solve_pointsystem(score):
             for w in [d+0.5, d+1, d+1.5, d+2, d+2.5, d+3]:
                 res['W'] = w
                 for p in ['W', 'D', 'L']:
+                    res['P'] = res[p]
                     for u in ['D', 'L', 'W']:
                         ok = True
-                        for result in score:
+                        for competitor in competition['competitors']:
+                            result = competitor['score']
                             tsum = 0
-                            if 'W' in result:
-                                tsum += result['W'] * w
-                            if 'D' in result:
-                                tsum += result['D'] * d
-                            if 'L' in result:
-                                tsum += result['L'] * l
-                            if 'P' in result:
-                                tsum += result['P'] * res[p]
-                                res['P'] = p
-                            if 'U' in result:
-                                tsum += result['U'] * res[u]
-                                res['U'] = u
-                            if 'Z' in result:
-                                res['Z'] = 0.0
+                            tsum += result['W'] * w
+                            tsum += result['D'] * d
+                            tsum += result['L'] * l
+                            tsum += result['P'] * res[p]
+                            res['P'] = p
+                            tsum += result['U'] * res[u]
+                            res['U'] = u
+                            res['Z'] = 0.0
+                            if (res['W'] == 3 and res['D'] == 2 and res['L'] == 1 and res['P'] == 'W' ):                                
+                                #print(result, tsum, result['sum'])
+                                pass
                             if tsum != result['sum']:
                                 ok = False
                         if ok:
+                            #print(res)
                             return res
     return None
         

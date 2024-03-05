@@ -218,12 +218,13 @@ def tiebreakchecker():
             tournament.parse_score_system('match', arg)
     
 
-    tb = None
     if tournament.get_status() == 0:
         if eventno > 0:
             tournament.tournament_setvalue(eventno, 'numRounds', params['number_of_rounds'] )
             tb  = tiebreak(tournament, eventno)
-            compute_tiebreaks(tournament, tb, eventno, params)
+            compute_tiebreaks(tournament, tb, eventno, params) 
+        else: 
+            tb = tiebreak(tournament, eventno)
     
 
     #try:

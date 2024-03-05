@@ -74,6 +74,8 @@ class tiebreak:
         event = chessevent.event
         tournament = chessevent.get_tournament(tournamentno)
         self.tiebreaks = []
+        if tournament == None:
+            return
         self.isteam = self.isteam = tournament['teamTournament'] if 'teamTournament' in tournament else False
         chessevent.update_tournament_random(tournament, self.isteam)
         self.currentround = 0
@@ -83,12 +85,10 @@ class tiebreak:
         self.maxboard = 0
         self.primaryscore = None # use default
 
-        self.scoreList = {}
-        for name, scoresystem in chessevent.scoreList.items():
-            self.scoreList[name] = scoresystem
+        self.scoreLists = chessevent.scoreLists
         for scoresystem in event['scoreLists']:
             for key, value in scoresystem['scoreSystem'].items():
-                self.scoreList[scoresystem['listName']][key] = value
+                self.scoreLists[scoresystem['listName']][key] = value
         if self.isteam:
             self.matchscore = tournament['teamSection']['scoreSystem']
             self.gamescore = tournament['playerSection']['scoreSystem']
@@ -146,7 +146,7 @@ class tiebreak:
                     'tbval': {}
                   }
             # Be sure that nissing results are replaced by 
-            zero = self.scoreList[scoretype]['Z']
+            zero = self.scoreLists[scoretype]['Z']
             for rnd in range(1, rounds+1):
                 cmp['rsts'][rnd] = {
                     ptype: zero, 
@@ -188,7 +188,7 @@ class tiebreak:
             black = 0
         if  black > 0:
             if not 'bResult' in rst:
-                rst['bResult'] = self.scoreList['reverse'][rst['wResult']]
+                rst['bResult'] = self.scoreLists['reverse'][rst['wResult']]
             bPoints = self.get_score(scoresystem, rst, 'black')
             brPoints = self.get_score('rating', rst, 'black')
             bVur = self.is_vur(rst, 'black')
@@ -199,18 +199,21 @@ class tiebreak:
                     brating = cmps[black]['rating']
                 expscore = rating.ComputeExpectedScore(wrating, brating)
         board = rst['board'] if 'board' in rst else 0
-        cmps[white]['rsts'][rnd] = {
-            ptype: wPoints, 
-            'rpoints': wrPoints, 
-            'color': 'w', 
-            'played': rst['played'], 
-            'vur': wVur,
-            'rated': rst['rated'] if 'rated' in rst else (rst['played'] and black > 0), 
-            'opponent': black,
-            'opprating': brating,
-            'board': board,
-            'deltaR': (rating.ComputeDeltaR(expscore, wrPoints) if not expscore == None else None  ) 
-            } 
+        if (white> 0):
+            if rnd > rounds:
+                rounds = rnd
+            cmps[white]['rsts'][rnd] = {
+                ptype: wPoints, 
+                'rpoints': wrPoints, 
+                'color': 'w', 
+                'played': rst['played'], 
+                'vur': wVur,
+                'rated': rst['rated'] if 'rated' in rst else (rst['played'] and black > 0), 
+                'opponent': black,
+                'opprating': brating,
+                'board': board,
+                'deltaR': (rating.ComputeDeltaR(expscore, wrPoints) if not expscore == None else None  ) 
+                } 
         if (black> 0):
             if rnd > rounds:
                 rounds = rnd
@@ -306,7 +309,7 @@ class tiebreak:
             tbscore[prefix + 'lp'] =  0     # last round played 
             tbscore[prefix + 'lo'] = 0     # last round without vur
             tbscore[prefix + 'pfp'] = 0    # points from played games
-            tbscore[prefix + 'lg'] = self.scoreList[scoretype]['D'] # Result of last game
+            tbscore[prefix + 'lg'] = self.scoreLists[scoretype]['D'] # Result of last game
             tbscore[prefix + 'bp'] = {}    # Boardpoints
             for rnd, rst in cmp['rsts'].items():
                 # total score
@@ -322,7 +325,7 @@ class tiebreak:
                     if self.isteam and scoretype == 'game':
                         points = game['points']
                         if game['played'] and game['opponent'] <= 0:  # PAB
-                            points = self.scoreList[self.gamescore]['W']
+                            points = self.scoreLists[self.gamescore]['W']
                         board = game['board'];
                         tbscore[prefix + 'bp'][board] = tbscore[prefix + 'bp'][board]  + points if board in tbscore[prefix + 'bp']  else points
                     
@@ -343,12 +346,12 @@ class tiebreak:
                         tbscore[prefix + 'lp'] = rnd
                         
                     # number of win
-                    win = 1 if points == self.scoreList[scoretype]['W'] else 0
+                    win = 1 if points == self.scoreLists[scoretype]['W'] else 0
                     self.addtbval(tbscore[prefix + 'win'], rnd, win)
                     self.addtbval(tbscore[prefix + 'win'], 'val', win)
 
                     # number of win played over the board
-                    won = 1 if points == self.scoreList[scoretype]['W'] and game['played'] and game['opponent'] > 0  else 0
+                    won = 1 if points == self.scoreLists[scoretype]['W'] and game['played'] and game['opponent'] > 0  else 0
                     self.addtbval(tbscore[prefix + 'won'], rnd, won)
                     self.addtbval(tbscore[prefix + 'won'], 'val', won)
 
@@ -358,13 +361,13 @@ class tiebreak:
                     self.addtbval(tbscore[prefix + 'bpg'], 'val', bpg)
                         
                     # number of win played with black
-                    bwg = 1 if game['color'] == 'b' and game['played'] and points == self.scoreList[scoretype]['W'] else 0
+                    bwg = 1 if game['color'] == 'b' and game['played'] and points == self.scoreLists[scoretype]['W'] else 0
                     self.addtbval(tbscore[prefix + 'bwg'], rnd, bwg)
                     self.addtbval(tbscore[prefix + 'bwg'], 'val', bwg)
 
                     # number of games elected to play
-                    #ge = 1 if game['played'] or (game['opponent'] > 0 and points == self.scoreList[scoretype]['W']) else 0
-                    ge = 1 if game['played'] or (points == self.scoreList[scoretype]['W']) else 0
+                    #ge = 1 if game['played'] or (game['opponent'] > 0 and points == self.scoreLists[scoretype]['W']) else 0
+                    ge = 1 if game['played'] or (points == self.scoreLists[scoretype]['W']) else 0
                     self.addtbval(tbscore[prefix + 'ge'], rnd, ge)
                     self.addtbval(tbscore[prefix + 'ge'], 'val', ge)
 
@@ -479,7 +482,7 @@ class tiebreak:
             #if not tb['modifiers']['p4f'] and de['denum'] < metmax:
             if (not tb['modifiers']['p4f'] and de['denum'] < metmax) or tb['modifiers']['sws']:
                 metall = False
-                de['demax'] = de['deval'] + (metmax - de['denum']) * self.scoreList[scoretype]['W']
+                de['demax'] = de['deval'] + (metmax - de['denum']) * self.scoreLists[scoretype]['W']
                 #print('F', metmax, de['deval'], de['demax'], de['denum'])
             else:
                 de['demax'] = de['deval']
@@ -567,7 +570,7 @@ class tiebreak:
                         oppscore = cmps[opponent]['tbval'][prefix + 'points']['val']
                         ownscore = cmp['tbval'][prefix + 'points'][rnd]
                         tbscore[prefix + 'ks'][rnd] = ownscore          
-                        if oppscore + 0.000001  >= lim * self.scoreList[scoretype]['W']*rounds / 100:
+                        if oppscore + 0.000001  >= lim * self.scoreLists[scoretype]['W']*rounds / 100:
                             ks += ownscore
                         else:
                             tbscore[prefix + 'ks']['cut'].append(rnd)
@@ -579,8 +582,8 @@ class tiebreak:
     def compute_buchholz_sonneborn_berger(self, tb, cmps, rounds):
         (opoints, oscoretype, oprefix) = self.get_scoreinfo(tb, True)
         (spoints, sscoretype, sprefix) = self.get_scoreinfo(tb, True)
-        opointsfordraw = self.scoreList[oscoretype]['D']
-        spointsfordraw = self.scoreList[sscoretype]['D']
+        opointsfordraw = self.scoreLists[oscoretype]['D']
+        spointsfordraw = self.scoreLists[sscoretype]['D']
         name = tb['name'].lower()
         if name == 'aob': 
             name = 'bh'
@@ -759,10 +762,10 @@ class tiebreak:
             key = points[0]
             if key == 'm':
                 score = cmp['tbval']["gpoints_" + 'points']['val']    
-                divisor = math.floor(self.scoreList[scoretype]['W'] * currentround / self.scoreList[self.gamescore]['W'] / self.maxboard)
+                divisor = math.floor(self.scoreLists[scoretype]['W'] * currentround / self.scoreLists[self.gamescore]['W'] / self.maxboard)
             elif key == 'g':
                 score = cmp['tbval']["mpoints_" + 'points']['val']    
-                divisor = math.floor(self.scoreList[scoretype]['W'] * currentround *  self.maxboard / self.scoreList[self.matchscore]['W'])
+                divisor = math.floor(self.scoreLists[scoretype]['W'] * currentround *  self.maxboard / self.scoreLists[self.matchscore]['W'])
             cmp['tbval'][prefix + 'sssc'] = { 'val': score + dividend / divisor }
       
         return 'sssc'

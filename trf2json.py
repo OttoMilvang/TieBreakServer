@@ -23,7 +23,6 @@ class trf2json(chessjson.chessjson):
         super().__init__()
         self.event['origin'] = 'trf2json ver. 1.00'
         self.event['ratingLists'] = [{'listName': 'TRF'}]
-        self.scorelist = []
         self.cteam = {}
         self.cplayers = {}
         self.cboard = {}
@@ -140,9 +139,17 @@ class trf2json(chessjson.chessjson):
 
         # sort results in rounds
         results = {}
-        score = helpers.solve_pointsystem(self.scorelist)
-        scorename = competition['scoreSystem']
-        scoresystem = self.get_scoresystem(self.event['scoreLists'], scorename)
+        score = helpers.solve_scoresystem(competition)
+        #print(score)
+        scorename = None
+        for name, scoreList in self.scoreLists.items():
+            if all(score[key] == scoreList[key] for key in ['W', 'D', 'L', 'Z']):
+                scorename = name
+                break
+        if scorename == None:
+            scorename = "my" + '-' + score['W'] + '-' +score['D'] + '-' + score['L'] + '-' + score['Z']  
+        competition['scoreSystem'] =  scorename
+       
         if score != None and 'P' in score :
             pval = score['P']          
         elif 'P' in scoresystem:
@@ -354,19 +361,26 @@ class trf2json(chessjson.chessjson):
     
         startno = helpers.parse_int(line[4:8])
         gamePoints = helpers.parse_float(line[80:84])
+        # score accumulates number of wins, draws and losses and will compare it to sum in order to guess score system
+        score = {
+            'sum': gamePoints,
+            'W': 0,
+            'D': 0,
+            'L': 0,
+            'P': 0,
+            'U': 0,
+            'Z': 0
+            }
         competitor = {
             'cid': startno,
             'profileId': self.numProfiles,
             'present': startno > 0,
             'gamePoints': gamePoints,
+            'score': score,
             'rank': helpers.parse_int(line[85:89]),
             'rating': helpers.parse_int(line[48:52])
             }
         section['competitors'].append(competitor)
-        score = {
-            'sum': gamePoints
-            }
-        self.scorelist.append(score)
         linelen = len(line);
         currentround = 0
         lastplayed = 0
@@ -436,7 +450,6 @@ class trf2json(chessjson.chessjson):
     
     
     def parse_trf_arbiter(self, is_ca, line):
-        global numProfiles
         linelen = len(line.rstrip())
         if (linelen == 3):
             return
@@ -455,25 +468,24 @@ class trf2json(chessjson.chessjson):
             otitle = nameparts[0]
         lastname = nameparts[ename]
         firstname = ' '.join(nameparts[sname:ename])
-        self.numProfiles += 1
         profile = {
-            'id': self.numProfiles,
+            'id': 0,
             'fideId': fideid,
             'firstName': firstname,
             'lastName': lastname,
             'fideName': lastname + ", " + firstname,
              'fideOtitle': otitle
             }
-        self.event['profiles'].append(profile)
+        pid = self.append_profile(profile)
         if (not 'arbiters' in self.event['eventInfo']):
             self.event['eventInfo']['arbiters'] = {
                 'chiefArbiter': 0,
                 'arbiters': []
                 } 
         if (is_ca):
-            self.event['eventInfo']['arbiters']['chiefArbiter'] = self.numProfiles
+            self.event['eventInfo']['arbiters']['chiefArbiter'] = pid
         else:
-            self.event['eventInfo']['arbiters']['arbiters'].append(self.numProfiles)
+            self.event['eventInfo']['arbiters']['arbiters'].append(pid)
         return
     
     def parse_trf_absent(self, tournament, line):
@@ -578,8 +590,9 @@ class trf2json(chessjson.chessjson):
                     if t2 < t1:
                         (games[i], games[j]) = (games[j], games[i])
             scorename = self.event['tournaments'][0]['playerSection']['scoreSystem']
-            scoresystem = self.scoreList[scorename]
-            reverse = self.scoreList['_reverse']
+            #print(scorename)
+            scoresystem = self.scoreLists[scorename]
+            reverse = self.scoreLists['_reverse']
             white = self.cteam[games[0]['white']]
             black = self.cteam[games[0]['black']]
             tmatch['round'] = games[0]['round']

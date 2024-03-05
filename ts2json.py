@@ -59,7 +59,10 @@ class ts2json(chessjson.chessjson):
                     for group in child:
                         if group.tag == 'Group':
                             tournamentno += 1
-                            self.parse_ts_group(group, tournamentno)
+                            tm = self.parse_ts_group(group, tournamentno)
+                            self.update_results(tm['playerSection']['results'])
+                            self.update_tournament_rating(tm)
+
         return
                     
 
@@ -287,10 +290,9 @@ class ts2json(chessjson.chessjson):
                     self.print_warning('parse_ts_group tag: ' + child.tag + ' not matched')
 
         self.event['tournaments'].append(tournament)
-        self.update_tournament_rating(tournament)
         self.update_tournament_teamcompetitors(tournament)
         self.update_tournament_random(tournament, self.isteam)
-        return
+        return tournament
  
 
 
@@ -592,15 +594,10 @@ class ts2json(chessjson.chessjson):
             if ratinglist == ratinglists[nlist]['listName']:
                 ratingindex = nlist
                 break
-        profiles = self.event['profiles']   
-        lookup = {}
-        for nprofile in range(0, len(profiles)): 
-            lookup[profiles[nprofile]['id']] = nprofile           
+        pids = self.all_pids()   
         players = tournament['playerSection']['competitors']
         for player in players: 
-            #print(profiles[lookup[player['profileId']]])
-            #print()
-            player['rating'] = int(profiles[lookup[player['profileId']]]['rating'][ratingindex])            
+            player['rating'] = int(pids[player['profileId']]['rating'][ratingindex])            
         
     def update_tournament_teamcompetitors(self, tournament):
         if not tournament['teamTournament']:

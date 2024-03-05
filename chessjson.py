@@ -32,7 +32,7 @@ class chessjson:
 	    'teams': [],
         'tournaments': []
         }
-        self.scoreList = {
+        self.scoreLists = {
             'game' : {'W': 1.0, 'D': 0.5, 'L': 0.0, 'Z': 0.0, 'A': 'D', 'U': 'Z' },
             'match' : {'W': 2.0, 'D': 1.0, 'L': 0.0, 'Z': 0.0, 'A': 'D', 'U': 'Z' },
             'children': {'W': 3.0, 'D': 2.0, 'L': 1.0, 'Z': 0.0, 'A': 'D', 'U': 'Z' },
@@ -70,15 +70,15 @@ class chessjson:
                 return tournament
         return None
 
-    def get_scoresystem(self, scorelists, name):
-        for scorelist in scorelists: 
-            if scorelist['listName'] == name:
-                return scorelist['scoreSystem']
+    def get_scoresystem(self, scoreLists, name):
+        for scoreList in scoreLists: 
+            if scoreList['listName'] == name:
+                return scoreList['scoreSystem']
         newlist = {
             'listName': name,
             'scoreSystem': {}
             }
-        scorelists.append(newlist)
+        scoreLists.append(newlist)
         return(newlist['scoreSystem'])
 
 
@@ -111,24 +111,8 @@ class chessjson:
     # if False: Add the profile to the profile list
 
     def append_profile(self, profile):
-        if 'id' in profile and profile['id'] < 0:
-            return 0
-        for elem in self.event['profiles']:
-            eq = helpers.is_equal('fideId', elem, profile)
-            if eq == 0:
-                eq = helpers.is_equal('localId', elem, profile)
-            if eq == 0:
-                 eq = helpers.is_equal('federation', elem, profile)
-                 if eq == 1:
-                     eq = 0;
-            #if eq == 0:
-                #eq = helpers.is_equal('firstName', elem, profile) + helpers.is_equal('lastName', elem, profile) -1
-            if eq == 1 and False: # Never
-                for key, value in profile.items():
-                    #if (type(value) == type(0) and value != 0) or (type(value) == type('0') and value != ''):
-                    if key != 'id':
-                        elem[key] = value;
-                return elem['id']
+        if 'id' in profile and profile['id'] != 0:
+            return max(0, profile['id'])
         self.numProfiles += 1
         pid = profile['id'] = self.numProfiles + self.numTeams
         self.event['profiles'].append(profile)
@@ -187,6 +171,13 @@ class chessjson:
         #    print('First', result)
         results.append(result)
         return rid 
+
+    def update_results(self, results):
+        for res in ['wResult', 'bResult']:
+            for elem in results:
+                if not(res in elem):
+                    elem[res] = 'Z'
+
                 
     def append_game_to_match(self, results, result):
         trace = 0
@@ -271,8 +262,8 @@ class chessjson:
 
 
     def get_score(self, name, result, color):
-        scoreSystem = self.scoreList[name]
-        reverse = self.scoreList['_reverse']
+        scoreSystem = self.scoreLists[name]
+        reverse = self.scoreLists['_reverse']
         if color[0] + 'Result' in result:
             res = result[color[0] + 'Result']
         elif result['black'] > 0:
@@ -286,7 +277,7 @@ class chessjson:
         return res
 
     def is_vur(self, result, color):  #
-        reverse = self.scoreList['_reverse']
+        reverse = self.scoreLists['_reverse']
         if result['played']:
             return False
 
@@ -307,6 +298,11 @@ class chessjson:
     # return a dict where where a competitors games in a list in 
     # allgames[round][cid] wher cid is cid for team
 
+    def all_pids(self):
+        if not hasattr(self,'pids') or len(self.event['profiles']) != len(self.pids):
+            self.pids = {elem['id']: elem for elem in self.event['profiles'] }
+        return self.pids
+        
     def build_all_games(self, tournament, cteam, makecopy):
         allgames = {}
         for game in tournament['playerSection']['results']:
