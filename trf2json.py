@@ -116,13 +116,13 @@ class trf2json(chessjson.chessjson):
  
         if tournament['teamTournament']:
             self.prepare_team_section(tournament)
-            self.update_board_number(tournament, tournament['teamSection'])
+            self.update_board_number(tournament, tournament['teamSection'], True)
         else:
-            self.update_board_number(tournament, tournament['playerSection'])
+            self.update_board_number(tournament, tournament['playerSection'], False)
             
         return        
 
-    def update_board_number(self, tournament, competition):
+    def update_board_number(self, tournament, competition, isteam):
         # is the tournament RR?
         tt = tournament['tournamentType'].upper()
         numcomp = len(competition['competitors'])
@@ -139,16 +139,29 @@ class trf2json(chessjson.chessjson):
 
         # sort results in rounds
         results = {}
-        score = helpers.solve_scoresystem(competition)
-        #print(score)
-        scorename = None
-        for name, scoreList in self.scoreLists.items():
-            if all(score[key] == scoreList[key] for key in ['W', 'D', 'L', 'Z']):
-                scorename = name
-                break
-        if scorename == None:
-            scorename = "my" + '-' + score['W'] + '-' +score['D'] + '-' + score['L'] + '-' + score['Z']  
+        if isteam:
+            score = None
+            scorename =  'match'
+        else:    
+            score = helpers.solve_scoresystem(competition)
+            #print(score)
+            scorename = None
+            for name, scoreList in self.scoreLists.items():
+                #print(scoreList)
+                if all(score[key] == scoreList[key]  for key in ['W', 'D', 'L', 'Z']):
+                    scorename = name
+                    break
+                if scorename == None:
+                    scorename = "my" + '-' + str(score['W']) + '-' + str(score['D']) + '-' + str(score['L']) + '-' + str(score['Z'])
+                    newlist = {
+                        'listName': scorename,
+                        'scoreSystem': score
+                        }
+                    self.event['scoreLists'].append(newlist)
+
         competition['scoreSystem'] =  scorename
+        scoresystem = self.scoreLists[scorename]
+
        
         if score != None and 'P' in score :
             pval = score['P']          
@@ -157,7 +170,7 @@ class trf2json(chessjson.chessjson):
         elif rr:
             pval = 'L'
         else:
-            pval = 'W'
+            pval = 'D' if isteam else 'W'
         if score != None and 'U' in score:
             uval = score['U']
         else:
@@ -241,7 +254,6 @@ class trf2json(chessjson.chessjson):
         points = 'U'
         played = False
         rated = False
-    
         match result:  # noqa
             case '1':
                 points = 'W'
@@ -376,7 +388,7 @@ class trf2json(chessjson.chessjson):
             'profileId': self.numProfiles,
             'present': startno > 0,
             'gamePoints': gamePoints,
-            'score': score,
+            'xscore': score,
             'rank': helpers.parse_int(line[85:89]),
             'rating': helpers.parse_int(line[48:52])
             }
@@ -590,8 +602,9 @@ class trf2json(chessjson.chessjson):
                     if t2 < t1:
                         (games[i], games[j]) = (games[j], games[i])
             scorename = self.event['tournaments'][0]['playerSection']['scoreSystem']
-            #print(scorename)
             scoresystem = self.scoreLists[scorename]
+            if not 'P' in scoresystem:
+                scoresystem['P'] = 'D'
             reverse = self.scoreLists['_reverse']
             white = self.cteam[games[0]['white']]
             black = self.cteam[games[0]['black']]
@@ -605,11 +618,8 @@ class trf2json(chessjson.chessjson):
                 game = games[i]
                 game['board'] = i+1
                 played = played or game['played']
-                ws = scoresystem[game['wResult']]
-                if 'bResult' in game:
-                    bs = scoresystem[game['bResult']]
-                else:
-                    bs = scoresystem[reverse[game['wResult']]] 
+                ws = self.get_score(scorename, game, 'white')
+                bs = self.get_score(scorename, game, 'black') if 'bResult' in game else 0
                 if self.cteam[game['white']] == white:
                     wscore += ws
                     bscore += bs
@@ -653,6 +663,7 @@ def module_test():
     dotest('ngpl23', '-B-Langsjakk-FIDE')
     dotest('ngpl23', '-C-Langsjakk-FIDE')
     dotest('elite19-20', '-FIDE')
+    dotest('Team-Example', '')
     #dotest('nm_lag_19')
     dotest('test-half-point', '-Langsjakk-FIDE')
     

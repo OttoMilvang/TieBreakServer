@@ -262,7 +262,8 @@ class chessjson:
 
 
     def get_score(self, name, result, color):
-        scoreSystem = self.scoreLists[name]
+        scoreSystem = self.scoreLists[name] if name in self.scoreLists else self.get_scoresystem(self.event['scoreLists'], name)
+        
         reverse = self.scoreLists['_reverse']
         if color[0] + 'Result' in result:
             res = result[color[0] + 'Result']

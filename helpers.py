@@ -74,6 +74,15 @@ def is_equal(txt, struct1, struct2):
 # Sole point system    
 def solve_scoresystem(competition):
     res = {}
+    score = {
+        'sum': 0,
+        'W': 0,
+        'D': 0,
+        'L': 0,
+        'P': 0,
+        'U': 0,
+        'Z': 0
+    }
     for l in [0, 0.5, 1]:
        res['L'] = l
        for d in [l+0.5, l+1, l+1.5, l+2]:
@@ -85,7 +94,7 @@ def solve_scoresystem(competition):
                     for u in ['D', 'L', 'W']:
                         ok = True
                         for competitor in competition['competitors']:
-                            result = competitor['score']
+                            result = competitor['xscore']
                             tsum = 0
                             tsum += result['W'] * w
                             tsum += result['D'] * d
@@ -95,13 +104,17 @@ def solve_scoresystem(competition):
                             tsum += result['U'] * res[u]
                             res['U'] = u
                             res['Z'] = 0.0
-                            if (res['W'] == 3 and res['D'] == 2 and res['L'] == 1 and res['P'] == 'W' ):                                
+                            for key, value in result.items():
+                                score[key] += value
+                            if (res['W'] == 1 and res['D'] == 0.5 and res['L'] == 0.0 and res['P'] == 'W' ) and competitor['cid'] == 12:                                
+                                #print  (competitor)
                                 #print(result, tsum, result['sum'])
                                 pass
                             if tsum != result['sum']:
                                 ok = False
                         if ok:
                             #print(res)
+                            #print(score)
                             return res
     return None
         

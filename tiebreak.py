@@ -87,8 +87,7 @@ class tiebreak:
 
         self.scoreLists = chessevent.scoreLists
         for scoresystem in event['scoreLists']:
-            for key, value in scoresystem['scoreSystem'].items():
-                self.scoreLists[scoresystem['listName']][key] = value
+            self.scoreLists[scoresystem['listName']] = scoresystem['scoreSystem']
         if self.isteam:
             self.matchscore = tournament['teamSection']['scoreSystem']
             self.gamescore = tournament['playerSection']['scoreSystem']
@@ -111,6 +110,7 @@ class tiebreak:
         
         # find tournament type
         tt = tournament['tournamentType'].upper()
+        self.teamsize = round(len(tournament['playerSection']['results'])/ len(tournament['teamSection']['results'] )) if self.isteam else 1 
         self.rr = False
         if tt.find('SWISS') >= 0:
             self.rr = False
@@ -313,12 +313,12 @@ class tiebreak:
             tbscore[prefix + 'bp'] = {}    # Boardpoints
             for rnd, rst in cmp['rsts'].items():
                 # total score
-                points = rst[pointtype]
+                points = rst[pointtype] if pointtype in rst else 0
                 tbscore[prefix + 'points'][rnd] = points
                 tbscore[prefix + 'points']['val'] += points
                 # number of games
                 if self.isteam and scoretype == 'game':
-                    gamelist = rst['games']
+                    gamelist = rst['games'] if 'games' in rst else []
                 else:
                     gamelist = [rst]
                 for game in gamelist:
@@ -488,6 +488,7 @@ class tiebreak:
                 de['demax'] = de['deval']
                 #print('T', metmax, de['deval'], de['demax'], de['denum'])
         if metall: # 6.2 All players have met
+            #print("T")
             subro = sorted(subro, key=lambda p: (-p['tbval']['deval'], p['cid']))
             crank = rank = subro[0]['tbval'][prefix + name]['val']
             val = subro[0]['tbval']['deval']
@@ -503,6 +504,7 @@ class tiebreak:
                     de[prefix + name]['val'] = crank
                 self.addtbval(de[prefix + name], loopcount, val)    
         else: # 6.2 swiss tournament
+            #print("F")
             subro = sorted(subro, key=lambda p: (-p['tbval']['deval'], -p['tbval']['demax'], p['cid']))
             crank = rank = subro[0]['tbval'][prefix + name]['val']
             val = subro[0]['tbval']['deval']
@@ -581,9 +583,9 @@ class tiebreak:
             
     def compute_buchholz_sonneborn_berger(self, tb, cmps, rounds):
         (opoints, oscoretype, oprefix) = self.get_scoreinfo(tb, True)
-        (spoints, sscoretype, sprefix) = self.get_scoreinfo(tb, True)
-        opointsfordraw = self.scoreLists[oscoretype]['D']
-        spointsfordraw = self.scoreLists[sscoretype]['D']
+        (spoints, sscoretype, sprefix) = self.get_scoreinfo(tb, False)
+        opointsfordraw = self.scoreLists[oscoretype]['D'] * (self.teamsize if opoints == 'gpoints' else 1)
+        spointsfordraw = self.scoreLists[sscoretype]['D'] * (self.teamsize if opoints == 'gpoints' else 1)
         name = tb['name'].lower()
         if name == 'aob': 
             name = 'bh'
@@ -598,8 +600,13 @@ class tiebreak:
                 tbval = rst[opoints] if rnd <= tbscore[oprefix + 'lo'] or rst['opponent'] > 0 else opointsfordraw
                 tbscore[oprefix + 'abh'][rnd] = tbval
                 tbscore[oprefix + 'abh']['val'] += tbval
+            fbscore = tbscore[oprefix + 'points']['val']
             if name == 'fb' and tbscore[oprefix + 'lo'] == self.rounds:
-                tbscore[oprefix + 'abh']['val'] = tbscore[oprefix + 'abh']['val'] - tbscore[oprefix + 'lg'] + opointsfordraw
+                #print(startno, tbscore[oprefix + 'abh']['val'], tbscore[oprefix + 'abh']['val'] - tbscore[oprefix + 'lg'] + opointsfordraw)
+                adjust = opointsfordraw - tbscore[oprefix + 'lg']
+                tbscore[oprefix + 'abh']['val'] = tbscore[oprefix + 'abh']['val'] + adjust
+                fbscore += adjust 
+            tbscore[oprefix + 'ownscore'] = fbscore
         if name == 'abh':
             return('abh')
 
@@ -615,12 +622,13 @@ class tiebreak:
                         vur = False
                         score = cmps[opponent]['tbval'][oprefix + 'abh']['val']
                     else:
-                        score = cmps[startno]['tbval'][oprefix + 'points']['val']
+                        score = cmps[startno]['tbval'][oprefix + 'ownscore']
+                        #       cmps[startno]['tbval'][oprefix + 'points']['val']
                     #print(startno, rnd, opponent,played, vur, score)
                     if tb['modifiers']['urd']:
                         sres = spointsfordraw
                     else:
-                        sres = rst[spoints]
+                        sres = rst[spoints] if spoints in rst else 0.0
                     tbvalue = score * sres if is_sb else score
                     if  opponent >  0 or not tb['modifiers']['p4f'] :
                         bhvalue.append({'vur': vur, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
@@ -893,7 +901,7 @@ class tiebreak:
             
             
 
-    def compute_average(self, tb, name, cmps, ignorezero):
+    def compute_average(self, tb, name, cmps, ignorezero, norm):
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         tbname = tb['name'].lower()
         for startno, cmp in cmps.items():
@@ -908,7 +916,7 @@ class tiebreak:
                         num += 1
                         sum += value            
                         self.addtbval(cmp['tbval'][prefix + tbname], rnd, value)
-            cmp['tbval'][prefix + tbname]['val'] = int(round(sum /num + 0.000001)) if num > 0 else 0
+            cmp['tbval'][prefix + tbname]['val'] = int(round(sum*norm /num + 0.000001))/norm if num > 0 else 0
         return tbname
  
     # get_scoreinfo(self, tb, primary)
@@ -964,15 +972,15 @@ class tiebreak:
                 tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, self.currentround)
             case 'AOB':
                 tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, self.currentround)
-                tbname = self.compute_average(tb, 'bh', cmps, True)    
+                tbname = self.compute_average(tb, 'bh', cmps, True, 100)    
             case 'ARO' | 'TPR' | 'PTP' :
                 tbname = self.compute_ratingperformance(tb, cmps, self.currentround)
             case 'APRO' :
                 tbname = self.compute_ratingperformance(tb, cmps, self.currentround)
-                tbname = self.compute_average(tb, 'tpr', cmps, True)    
+                tbname = self.compute_average(tb, 'tpr', cmps, True, 1)    
             case 'APPO':
                 tbname = self.compute_ratingperformance(tb, cmps, self.currentround)
-                tbname = self.compute_average(tb, 'ptp', cmps, True)
+                tbname = self.compute_average(tb, 'ptp', cmps, True, 1)
             case 'ESB':
                 tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, self.currentround)
             case'BC':
