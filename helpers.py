@@ -71,8 +71,13 @@ def is_equal(txt, struct1, struct2):
     
 
 #
-# Sole point system    
-def solve_scoresystem(competition):
+# Solve point system    
+# Input array of equations:
+# sum = w * W + d * D + l * L + p * P + u * U + z * Z
+# Solve w, d, l, p, u, z for variables where W, D, L, P, U and Z present in equautins
+#
+
+def solve_scoresystem(equations):
     res = {}
     score = {
         'sum': 0,
@@ -93,8 +98,7 @@ def solve_scoresystem(competition):
                     res['P'] = res[p]
                     for u in ['D', 'L', 'W']:
                         ok = True
-                        for competitor in competition['competitors']:
-                            result = competitor['xscore']
+                        for result in equations:
                             tsum = 0
                             tsum += result['W'] * w
                             tsum += result['D'] * d
@@ -106,15 +110,18 @@ def solve_scoresystem(competition):
                             res['Z'] = 0.0
                             for key, value in result.items():
                                 score[key] += value
-                            if (res['W'] == 1 and res['D'] == 0.5 and res['L'] == 0.0 and res['P'] == 'W' ) and competitor['cid'] == 12:                                
-                                #print  (competitor)
+                            if (res['W'] == 1 and res['D'] == 0.5 and res['L'] == 0.0 and res['P'] == 'W' ):                                
                                 #print(result, tsum, result['sum'])
                                 pass
                             if tsum != result['sum']:
                                 ok = False
                         if ok:
-                            #print(res)
+                            ret = {key: value for key, value in res.items() if score[key] != 0}
+                            for key in ['P', 'U']:
+                                if key in ret and res[key] in ['W', 'D', 'L', 'Z'] and ret[key] not in ret:
+                                    ret[res[key]] = res[res[key]]
                             #print(score)
-                            return res
+                            #print(ret)
+                            return ret
     return None
         

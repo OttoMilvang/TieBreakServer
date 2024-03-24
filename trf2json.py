@@ -59,6 +59,8 @@ class trf2json(chessjson.chessjson):
                'scoreSystem': 'match'
                }        
             });
+        self.gamescores = [] # used to calculate scoresystem
+        self.teamscores = [] # used to calculate scoresystem
         lines = alines.replace('\r', '\n').split('\n')
         tournament = self.get_tournament(1)
         lineno = 0
@@ -143,16 +145,15 @@ class trf2json(chessjson.chessjson):
             score = None
             scorename =  'match'
         else:    
-            score = helpers.solve_scoresystem(competition)
+            score = helpers.solve_scoresystem(self.gamescores)
             #print(score)
             scorename = None
             for name, scoreList in self.scoreLists.items():
-                #print(scoreList)
-                if all(score[key] == scoreList[key]  for key in ['W', 'D', 'L', 'Z']):
+                if all(key not in score or score[key] == scoreList[key]  for key in ['W', 'D', 'L', 'Z']):
                     scorename = name
                     break
                 if scorename == None:
-                    scorename = "my" + '-' + str(score['W']) + '-' + str(score['D']) + '-' + str(score['L']) + '-' + str(score['Z'])
+                    scorename = "my" + '-' + (str(score['W'])  if 'W' in score else 0.0) + '-' + (str(score['D'])  if 'D' in score else 0.0) + '-' + (str(score['L'])  if 'L' in score else 0.0) + '-' + (str(score['Z'] if 'Z' in score else 0.0))
                     newlist = {
                         'listName': scorename,
                         'scoreSystem': score
@@ -161,6 +162,7 @@ class trf2json(chessjson.chessjson):
 
         competition['scoreSystem'] =  scorename
         scoresystem = self.scoreLists[scorename]
+        #print(scorename)
 
        
         if score != None and 'P' in score :
@@ -388,10 +390,10 @@ class trf2json(chessjson.chessjson):
             'profileId': self.numProfiles,
             'present': startno > 0,
             'gamePoints': gamePoints,
-            'xscore': score,
             'rank': helpers.parse_int(line[85:89]),
             'rating': helpers.parse_int(line[48:52])
             }
+        self.gamescores.append(score)
         section['competitors'].append(competitor)
         linelen = len(line);
         currentround = 0
@@ -666,4 +668,5 @@ def module_test():
     dotest('Team-Example', '')
     #dotest('nm_lag_19')
     dotest('test-half-point', '-Langsjakk-FIDE')
+    dotest('test-half-point2', '-Langsjakk-FIDE')
     

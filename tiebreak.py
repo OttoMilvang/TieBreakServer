@@ -545,15 +545,17 @@ class tiebreak:
         for startno, cmp in cmps.items():
             tbscore = cmp['tbval']
             ps = 0
+            ssf = 0 # Sum so far
             tbscore[prefix + 'ps'] = { 'val': ps, 'cut': []}
             for rnd in range(1, rounds+1):
                 p = cmp['rsts'][rnd][points] if rnd in cmp['rsts'] else 0.0
-                p = p * (rounds+1-rnd)
-                tbscore[prefix + 'ps'][rnd] = p
+                ssf += p
+                #p = p * (rounds+1-rnd) 
+                tbscore[prefix + 'ps'][rnd] = ssf
                 if rnd <= low:
                     tbscore[prefix + 'ps']['cut'].append(rnd)
                 else:                    
-                    ps += p
+                    ps += ssf
             tbscore[prefix + 'ps']['val'] = ps
         return 'ps'
               
@@ -687,14 +689,17 @@ class tiebreak:
             tbscore[prefix + 'tpr'] = { 'val': 0, 'cut': [] }
             tbscore[prefix + 'ptp'] = { 'val': 0, 'cut': [] }
             ratingopp = []
+            trounds = 0
             for rnd, rst in cmp['rsts'].items():
+                if rnd <= rounds and rst['played'] and rst['opponent'] > 0:
+                    trounds += 1
                 if rnd <= rounds and rst['played'] and rst['opprating'] > 0:
                     rst['rnd'] = rnd
                     ratingopp.append(rst)
                     self.addtbval(cmp['tbval'][prefix + 'aro'], rnd, rst['opprating'])
                     self.addtbval(cmp['tbval'][prefix + 'tpr'], rnd, rst['opprating'])
                     self.addtbval(cmp['tbval'][prefix + 'ptp'], rnd, rst['opprating'])
-            trounds = rounds
+            #trounds = rounds  // This is correct only if unplayed gmes are cut.
             low = tb['modifiers']['low'] 
             if low > rounds:
                 low = rounds 
@@ -702,16 +707,18 @@ class tiebreak:
             if low + high > rounds: 
                 high = rounds - low 
             while low > 0:
-                if trounds == len(ratingopp):
+                if trounds == len(ratingopp):  
                     newopp = sorted(ratingopp, key=lambda p: (p['opprating']))
-                    tbscore[prefix + name]['cut'].append(newopp[0]['rnd'])
+                    if len(newopp) > 0:
+                        tbscore[prefix + name]['cut'].append(newopp[0]['rnd'])
                     ratingopp = newopp[1:] 
                 trounds -= 1
                 low -= 1
             while high > 0:
                 if trounds == len(ratingopp):
                     newopp = sorted(ratingopp, key=lambda p: (p['opprating']))
-                    tbscore[prefix + name]['cut'].append(newopp[-1]['rnd'])
+                    if len(newopp) > 0:
+                        tbscore[prefix + name]['cut'].append(newopp[-1]['rnd'])
                     ratingopp = newopp[:-1]
                 trounds -= 1
                 high -= 1
