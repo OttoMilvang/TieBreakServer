@@ -413,6 +413,8 @@ class tiebreak:
                         moretodo = moretodo or moreloops
                 start = stop            
             #json.dump(ro, sys.stdout, indent=2)
+            moreloops = compute_singlerun(tb,cmps, rounds, [], loopcount)
+            moretodo = moretodo or moreloops
             ro = sorted(ro, key=lambda p: (p['rank'], p['tbval'][prefix + name]['val'], p['cid']))
         #print('L=' + str(loopcount))
         # reorder 'tb' 
@@ -433,18 +435,12 @@ class tiebreak:
 
            
 
-
-    def compute_singlerun_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
+    def compute_basic_direct_encounter(self, tb, cmps, rounds, subro, loopcount, points, scoretype, prefix):
         name = tb['name'].lower()
-        (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
-        if loopcount == 0:
-            tb['modifiers']['points'] = points
-            tb['modifiers']['scoretype'] = scoretype
-            tb['modifiers']['edechanges'] = 0
-            return True
-        points = tb['modifiers']['points'] 
-        scoretype = tb['modifiers']['scoretype'] 
+        (xpoints, xscoretype, prefix) = self.get_scoreinfo(tb, True)
         changes = 0
+        rpos = loopcount - tb['modifiers']['swap']   # Report pos
+        postfix =  ' ' + scoretype[0] if tb['name'] == 'EDE' else '' 
         currentrank = subro[0]['tbval'][prefix + name]['val']
         metall = True          # Met all opponents on same range
         metmax = len(subro)-1  # Max number of opponents
@@ -482,7 +478,7 @@ class tiebreak:
             #if not tb['modifiers']['p4f'] and de['denum'] < metmax:
             if (not tb['modifiers']['p4f'] and de['denum'] < metmax) or tb['modifiers']['sws']:
                 metall = False
-                de['demax'] = de['deval'] + (metmax - de['denum']) * self.scoreLists[scoretype]['W']
+                de['demax'] = de['deval'] + (metmax - de['denum']) * self.scoreLists[scoretype]['W'] * (self.teamsize if points == 'gpoints' else 1)
                 #print('F', metmax, de['deval'], de['demax'], de['denum'])
             else:
                 de['demax'] = de['deval']
@@ -492,7 +488,7 @@ class tiebreak:
             subro = sorted(subro, key=lambda p: (-p['tbval']['deval'], p['cid']))
             crank = rank = subro[0]['tbval'][prefix + name]['val']
             val = subro[0]['tbval']['deval']
-            self.addtbval(subro[0]['tbval'][prefix + name],loopcount, val)    
+            self.addtbval(subro[0]['tbval'][prefix + name], rpos, str(val) + postfix)    
             for i in range(1, len(subro)):
                 rank += 1
                 de = subro[i]['tbval']
@@ -502,14 +498,14 @@ class tiebreak:
                     changes += 1
                 else:
                     de[prefix + name]['val'] = crank
-                self.addtbval(de[prefix + name], loopcount, val)    
+                self.addtbval(de[prefix + name], rpos, str(val) + postfix)    
         else: # 6.2 swiss tournament
             #print("F")
             subro = sorted(subro, key=lambda p: (-p['tbval']['deval'], -p['tbval']['demax'], p['cid']))
             crank = rank = subro[0]['tbval'][prefix + name]['val']
             val = subro[0]['tbval']['deval']
             maxval = subro[0]['tbval']['demax']
-            self.addtbval(subro[0]['tbval'][prefix + name],loopcount, str(val) + '/' + str(maxval))    
+            self.addtbval(subro[0]['tbval'][prefix + name], rpos, str(val) + '/' + str(maxval) + postfix)    
             unique = True
             for i in range(1, len(subro)):
                 rank += 1
@@ -524,17 +520,53 @@ class tiebreak:
                     maxval = de['demax']
                     de[prefix + name]['val'] = crank
                     unique = False
-                self.addtbval(de[prefix + name],loopcount, str(val) + '/' + str(maxval))    
-        tb['modifiers']['edechanges'] += changes
-        if changes == 0 and tb['name'] == 'EDE':
-            if tb['modifiers']['edechanges'] > 0:
-                tb['modifiers']['points'] = self.reverse_pointtype(tb['modifiers']['points'])
-                tb['modifiers']['scoretype'] = self.matchscore if tb['modifiers']['points'][0] == 'm' else self.gamescore
-                changes = 1
-                tb['modifiers']['edechanges'] = 0
+                self.addtbval(de[prefix + name], rpos,  str(val) + '/' + str(maxval) + postfix)    
+        #print(loopcount, scoretype, changes)
+        return changes
+
+
+    def compute_singlerun_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
+        (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
+        tb['modifiers']['swap'] = 0
+        changes = 1 if loopcount == 0 else 0
+        if loopcount > 0 and len(subro) > 0:
+            changes = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scoretype, prefix)
+        return changes                
+
+    def compute_singlerun_ext_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
+        name = tb['name'].lower()
+        (points, scoretype, prefix) = self.get_scoreinfo(tb, loopcount == 0 or tb['modifiers']['primary'])
+        changes = 0
+        if loopcount == 0:
+            tb['modifiers']['primary'] = True
+            tb['modifiers']['points'] = points
+            (spoints, secondary, sprefix) = self.get_scoreinfo(tb, False)
+            tb['modifiers']['loopcount'] = 0
+            tb['modifiers']['edechanges'] = {scoretype: 0, secondary: 1 }
+            tb['modifiers']['swap'] = 0
+            return True
+        if tb['modifiers']['loopcount'] != loopcount:
+            #print(scoretype)
+            tb['modifiers']['loopcount'] = loopcount
+            tb['modifiers']['changes'] = 0
+        if len(subro) == 0: 
+            if tb['modifiers']['changes'] == 0:
+                tb['modifiers']['primary'] = not tb['modifiers']['primary']
+                tb['modifiers']['edechanges'][scoretype] = 0
+                tb['modifiers']['swap'] += 1
                 ro = self.rankorder
                 for player in ro:
                     player['tbval']['moreloops'] = True  # 'de' rank value initial value = rank
+            else:
+                (spoints, secondary, sprefix) = self.get_scoreinfo(tb, not tb['modifiers']['primary'])
+                tb['modifiers']['edechanges'][secondary] = 1
+            retsum = tb['modifiers']['edechanges']['match'] + tb['modifiers']['edechanges']['game']
+            #print('E', loopcount, tb['modifiers']['changes'], retsum, tb['modifiers']['edechanges'])
+            return retsum > 0  and loopcount < 30
+        changes = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scoretype, prefix)
+        tb['modifiers']['changes'] += changes
+        #print(loopcount, tb['modifiers']['scoretype'], tb['modifiers']['edechanges'], changes)
+        #print(len(subro),loopcount, changes, tb['modifiers']['edechanges'], scoretype)
         return changes > 0 and loopcount < 30
 
         
@@ -755,6 +787,8 @@ class tiebreak:
                 player['tbval']['tbrval'] = 0
                 player['tbval']['bbeval'] = player['tbval']['gpoints_' + 'points']['val']
             return True
+        if len(ro) == 0:
+            return False
         for player in range(0, len(ro)):
             ro[player]['tbval']['tbrval'] = ro[player]['tbval']['gpoints_' + 'bp'][loopcount]
             ro[player]['tbval']['bbeval'] -= ro[player]['tbval']['gpoints_' + 'bp'][self.maxboard - loopcount +1]
@@ -941,7 +975,7 @@ class tiebreak:
                 key = 'm'
             elif (key == 'm'):
                 key = 'g'
-        match tb['pointtype'][pos]:
+        match key:
             case 'g':
                 return ["gpoints", self.gamescore, "gpoints_"]
             case 'm':
@@ -965,10 +999,14 @@ class tiebreak:
                 tbname = tb['name'].lower()
             case 'DF':
                 tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
-            case 'DE' | 'EDE':
+            case 'DE':
                 #tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
                 tb['modifiers']['reverse'] = False
                 tbname = self.compute_recursive_if_tied(tb, cmps, self.currentround, self.compute_singlerun_direct_encounter)
+            case 'EDE':
+                #tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
+                tb['modifiers']['reverse'] = False
+                tbname = self.compute_recursive_if_tied(tb, cmps, self.currentround, self.compute_singlerun_ext_direct_encounter)
             case 'WIN' | 'WON' | 'BPG' | 'BWG' | 'GE' | 'VUR':
                 tbname = tb['name'].lower()
             case 'PS':
