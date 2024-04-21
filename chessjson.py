@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Nov  1 11:01:49 2023
+Copyright 2024, Otto Milvang
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+Created on Wed Nov  1 11:01:49 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 import sys
@@ -153,18 +157,18 @@ class chessjson:
     # if False: Add the result to the result list
 
     def append_result(self, results, result):
-        trace = 0
-        for elem in results:
-            if elem['round'] == result['round'] and elem['white'] == result['white']:
-                if not('wResult' in elem) and ('wResult' in result):
-                    elem['wResult'] = result['wResult']
-                    #if (result['white'] == trace or result['black'] == trace):
-                    #    print('Update white', elem)
-                if not('bResult' in elem) and ('bResult' in result):
-                    elem['bResult'] = result['bResult']
-                    #if (result['white'] == trace or result['black'] == trace):
-                    #    print('Update black', elem)
-                return elem['id']
+        gamelist = list(filter(lambda elem: elem['round'] == result['round'] and elem['white'] == result['white'], results))
+        if len(gamelist) > 0:
+            elem = gamelist[0]
+            if not('wResult' in elem) and ('wResult' in result):
+                elem['wResult'] = result['wResult']
+                #if (result['white'] == trace or result['black'] == trace):
+                #    print('Update white', elem)
+            if not('bResult' in elem) and ('bResult' in result):
+                elem['bResult'] = result['bResult']
+                #if (result['white'] == trace or result['black'] == trace):
+                #    print('Update black', elem)
+            return elem['id']
         self.numResults += 1
         rid = result['id'] = self.numResults
         #if (result['white'] == trace or result['black'] == trace):
@@ -226,7 +230,7 @@ class chessjson:
             pass
         clookup = {}
         cplayers = {}
-        cteam = {}
+        cteam = {0: 0}
         for team in team_competitors:
             cid = team['cid'] 
             cplayers[cid] = []
@@ -323,6 +327,9 @@ class chessjson:
         return allgames
 
 
+    # update_tournament_random
+    # Update all competitors with random value 
+
     def update_tournament_random(self, tournament, isteam):
         update = False
         if isteam:
@@ -341,6 +348,10 @@ class chessjson:
                 competitor['random'] = rnd
         
         
-
+    # update_chessjson_format
+    # Remove  'teamSection' and 'playerSection'
+    
+    def update_chessjson_format(self, tournament, isteam):
+        pass
                 
 

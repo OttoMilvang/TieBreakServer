@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 # noqa
 """
-Created on Mon Aug  7 16:48:53 2023
+Copyright 2024, Otto Milvang
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+Created on Mon Aug  7 16:48:53 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 import argparse
@@ -42,6 +46,8 @@ def error(code, txt):
 #   -m = match-score
 #   -d = delimiter
 #   -t = tie-break
+#   -x = expirimental
+
 
 def read_command_line():
     parser = argparse.ArgumentParser()
@@ -78,6 +84,8 @@ def read_command_line():
         default=['PTS', 'BH#C2-p'],
         #default=['PTS', 'DE'],
         help="Delimiter in output text" )
+    parser.add_argument("-x", "--experimental", required=False, action='store_true',
+        help="Add experimental stuff")
 
     args = vars(parser.parse_args())
     return args
@@ -226,9 +234,10 @@ def tiebreakchecker():
         else: 
             tb = tiebreak(tournament, eventno)
     
-
     #try:
     write_output_file(params, tournament, tb)
+    if params['experimental']:
+        tournament.dumpresults()
     #except:
     #    error(503, "Error when writing file: " + params['output_file'])
     
