@@ -74,7 +74,7 @@ class tiebreak:
     
 
     # constructor function    
-    def __init__(self, chessevent, tournamentno):
+    def __init__(self, chessevent, tournamentno, currentround):
         event = chessevent.event
         tournament = chessevent.get_tournament(tournamentno)
         self.tiebreaks = []
@@ -82,8 +82,8 @@ class tiebreak:
             return
         self.isteam = self.isteam = tournament['teamTournament'] if 'teamTournament' in tournament else False
         chessevent.update_tournament_random(tournament, self.isteam)
-        self.currentround = 0
         self.rounds = tournament['numRounds']
+        self.currentround = currentround if currentround > 0 else self.rounds
         self.get_score = chessevent.get_score
         self.is_vur = chessevent.is_vur
         self.maxboard = 0
@@ -109,9 +109,6 @@ class tiebreak:
         numcomp = len(self.cmps)
         self.rankorder = list(self.cmps.values()) 
 
-        if 'currentRound' in tournament:
-            self.currentround = tournament['currentRound']
-        
         # find tournament type
         tt = tournament['tournamentType'].upper()
         self.teamsize = round(len(tournament['playerSection']['results'])/ len(tournament['teamSection']['results'] )) if self.isteam else 1 
@@ -129,9 +126,10 @@ class tiebreak:
     
     def prepare_competitors(self, competition, scoretype):
         rounds = self.rounds
-        for rst in competition['results']: 
-            rounds = max(rounds, rst['round'])
-        self.rounds = rounds
+        #for rst in competition['results']: 
+        #    rounds = max(rounds, rst['round'])
+        #self.rounds = rounds
+        #print(rounds)
         ptype = 'mpoints' if self.isteam else 'points'
         #scoresystem = self.scoresystem['match']
         # Fill competition structure, replaze unplayed games with played=Fales, points=0.0    
@@ -165,18 +163,18 @@ class tiebreak:
                     'deltaR': 0 
                     } 
             cmps[competitor['cid']] = cmp
-        for rst in competition['results']: 
-            rounds = self.prepare_result(cmps, rst, self.matchscore, rounds)
-            if self.isteam:
-                self.prepare_teamgames(cmps, rst, self.gamescore)
-        self.currentround = rounds
+        for rst in competition['results']:
+            if rst['round'] <= self.currentround:
+                self.prepare_result(cmps, rst, self.matchscore)
+                if self.isteam:
+                    self.prepare_teamgames(cmps, rst, self.gamescore)
         with open('C:\\temp\\cmps.json', 'w') as f:
             #json.dump(cmps, f, indent=2)
             pass
 
         return cmps
 
-    def prepare_result(self, cmps, rst, scoresystem, rounds):
+    def prepare_result(self, cmps, rst, scoresystem):
         ptype = 'mpoints' if self.isteam else 'points'
         rnd = rst['round']
         white = rst['white']
@@ -204,8 +202,6 @@ class tiebreak:
                 expscore = rating.ComputeExpectedScore(wrating, brating)
         board = rst['board'] if 'board' in rst else 0
         if (white> 0):
-            if rnd > rounds:
-                rounds = rnd
             cmps[white]['rsts'][rnd] = {
                 ptype: wPoints, 
                 'rpoints': wrPoints, 
@@ -219,8 +215,6 @@ class tiebreak:
                 'deltaR': (rating.ComputeDeltaR(expscore, wrPoints) if not expscore == None else None  ) 
                 } 
         if (black> 0):
-            if rnd > rounds:
-                rounds = rnd
             cmps[black]['rsts'][rnd] = {
                 ptype: bPoints, 
                 'rpoints': brPoints, 
@@ -233,7 +227,7 @@ class tiebreak:
                 'board': board,
                 'deltaR': (rating.ComputeDeltaR(1.0-expscore, brPoints) if not expscore == None else None  ) 
                 }
-        return rounds
+        return
 
     def prepare_teamgames(self, cmps, rst, scoresystem):
         maxboard = 0

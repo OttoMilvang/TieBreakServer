@@ -102,6 +102,12 @@ class chessjson:
         self.event = json.loads(lines)
 
 
+    def tournament_getvalue(self, tournamentno, key):
+        tournament = self.get_tournament(tournamentno)
+        if tournament == None:
+            return None
+        return(tournament[key])
+
     def tournament_setvalue(self, tournamentno, key, value):
         tournament = self.get_tournament(tournamentno)
         if tournament == None:
@@ -219,15 +225,12 @@ class chessjson:
             return [None, None]
         team_competitors = tournament['teamSection']['competitors']
         player_competitors = tournament['playerSection']['competitors']
-        with open('C:\\temp\\team.json', 'w') as f:
+        #with open('C:\\temp\\team.json', 'w') as f:
             #json.dump(self.cteam, f, indent=2)
-            pass
-        with open('C:\\temp\\results.json', 'w') as f:
+        #with open('C:\\temp\\results.json', 'w') as f:
             #json.dump(tournament['teamSection']['results'], f, indent=2)
-            pass
-        with open('C:\\temp\\player.json', 'w') as f:
+        #with open('C:\\temp\\player.json', 'w') as f:
             #json.dump(self.cplayers, f, indent=2)
-            pass
         clookup = {}
         cplayers = {}
         cteam = {0: 0}
@@ -242,12 +245,10 @@ class chessjson:
             if teamid in clookup:
                 cplayers[clookup[teamid]].append(cid)
                 cteam[cid] = clookup[teamid]
-        with open('C:\\temp\\cteam.json', 'w') as f:
+        #with open('C:\\temp\\cteam.json', 'w') as f:
             #json.dump(cteam, f, indent=2)
-            pass
-        with open('C:\\temp\\cplayer.json', 'w') as f:
+        #with open('C:\\temp\\cplayer.json', 'w') as f:
             #json.dump(cplayers, f, indent=2)
-            pass
         return [cplayers, cteam]
     
     # prepare_scoresystem

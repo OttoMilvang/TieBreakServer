@@ -139,13 +139,13 @@ def write_output_file(params, tournament, tb):
                 delimiter = params['delimiter']
             code = res['code'] if 'code' in res else 500
             check = res['check'] if 'check' in res else False
-            print(str(code) + delimiter + str(check))
+            f.write(str(code) + delimiter + str(check) + '\n')
             if code == 0:
                 for competitor in res['competitors']:
                     line = str(competitor['startno']) + delimiter + str(competitor['rank'])
                     for val in competitor['tieBreak']:
                         line += delimiter + str(val)
-                    print (line)
+                    f.write(line + '\n')
         else:    
             json.dump(res, f, indent=2)
     else:
@@ -178,8 +178,8 @@ def compute_tiebreaks(tournament, tb, eventno, params):
             jsoncmps = tm['playerSection']['competitors']
         #with open('C:\\temp\\tm.json', 'w') as f:
         #    json.dump(tm, f, indent=2)
-        with open('C:\\temp\\tbcmps.json', 'w') as f:
-            json.dump(tm['teamSection'], f, indent=2)
+        #with open('C:\\temp\\tbcmps.json', 'w') as f:
+        #    json.dump(tm['teamSection'], f, indent=2)
         correct = True
         competitors = []
         for cmp in jsoncmps:
@@ -204,9 +204,8 @@ def tiebreakchecker():
         params = read_command_line()
     except:
         error(501, "Bad command line")
-
     #try:
-    tournament = read_input_file(params)
+    chessfile = read_input_file(params)
     #except:
     #    error(502, "Error when reading file: " + params['input_file'])
 
@@ -214,30 +213,29 @@ def tiebreakchecker():
     if not 'event_number' in params:
         error(501, "Missing parameter --event-number")
     eventno = helpers.parse_int(params['event_number'])
-    if eventno < 0 or eventno > len(tournament.event['tournaments']):
+    if eventno < 0 or eventno > len(chessfile.event['tournaments']):
         error(501, "Invalid parameter --event-number")
 
     # Add command line parameters
     if 'individual_score' in params and params['individual_score'] != None:    
         for arg in params['individual_score']:
-            tournament.parse_score_system('game', arg)
+            chessfile.parse_score_system('game', arg)
     if 'match_score' in params and params['match_score'] != None:    
         for arg in params['match_score']:   
-            tournament.parse_score_system('match', arg)
+            chessfile.parse_score_system('match', arg)
     
 
-    if tournament.get_status() == 0:
+    if chessfile.get_status() == 0:
         if eventno > 0:
-            tournament.tournament_setvalue(eventno, 'numRounds', params['number_of_rounds'] )
-            tb  = tiebreak(tournament, eventno)
-            compute_tiebreaks(tournament, tb, eventno, params) 
+            tb  = tiebreak(chessfile, eventno, params['number_of_rounds'])
+            compute_tiebreaks(chessfile, tb, eventno, params) 
         else: 
-            tb = tiebreak(tournament, eventno)
+            tb = tiebreak(chessfile, eventno, params['number_of_rounds'])
     
     #try:
-    write_output_file(params, tournament, tb)
+    write_output_file(params, chessfile, tb)
     if params['experimental']:
-        tournament.dumpresults()
+        chessfile.dumpresults()
     #except:
     #    error(503, "Error when writing file: " + params['output_file'])
     
