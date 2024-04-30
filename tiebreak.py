@@ -310,72 +310,74 @@ class tiebreak:
             tbscore[prefix + 'lg'] = self.scoreLists[scoretype]['D'] # Result of last game
             tbscore[prefix + 'bp'] = {}    # Boardpoints
             for rnd, rst in cmp['rsts'].items():
-                # total score
-                points = rst[pointtype] if pointtype in rst else 0
-                tbscore[prefix + 'points'][rnd] = points
-                tbscore[prefix + 'points']['val'] += points
-                # number of games
-                if self.isteam and scoretype == 'game':
-                    gamelist = rst['games'] if 'games' in rst else []
-                else:
-                    gamelist = [rst]
-                for game in gamelist:
+                if rnd <= rounds:
+
+                    # total score
+                    points = rst[pointtype] if pointtype in rst else 0
+                    tbscore[prefix + 'points'][rnd] = points
+                    tbscore[prefix + 'points']['val'] += points
+                    # number of games
                     if self.isteam and scoretype == 'game':
-                        points = game['points']
-                        if game['played'] and game['opponent'] <= 0:  # PAB
-                            points = self.scoreLists[self.gamescore]['W']
-                        board = game['board'];
-                        tbscore[prefix + 'bp'][board] = tbscore[prefix + 'bp'][board]  + points if board in tbscore[prefix + 'bp']  else points
-                    
-                    self.addtbval(tbscore[prefix + 'num'], rnd, 1)
-                    self.addtbval(tbscore[prefix + 'num'], 'val', 1)
-
-
-                    # result in last game
-                    if rnd == self.rounds and game['opponent'] > 0:
-                        tbscore[prefix + 'lg'] = points 
-
-                    # points from played games    
-                    if game['played'] and game['opponent'] > 0:
-                        tbscore[prefix + 'pfp'] += points
-
-                    # last played game (or PAB)
-                    if rnd > tbscore[prefix + 'lp'] and game['played']:
-                        tbscore[prefix + 'lp'] = rnd
+                        gamelist = rst['games'] if 'games' in rst else []
+                    else:
+                        gamelist = [rst]
+                    for game in gamelist:
+                        if self.isteam and scoretype == 'game':
+                            points = game['points']
+                            if game['played'] and game['opponent'] <= 0:  # PAB
+                                points = self.scoreLists[self.gamescore]['W']
+                            board = game['board'];
+                            tbscore[prefix + 'bp'][board] = tbscore[prefix + 'bp'][board]  + points if board in tbscore[prefix + 'bp']  else points
                         
-                    # number of win
-                    win = 1 if points == self.scoreLists[scoretype]['W'] else 0
-                    self.addtbval(tbscore[prefix + 'win'], rnd, win)
-                    self.addtbval(tbscore[prefix + 'win'], 'val', win)
-
-                    # number of win played over the board
-                    won = 1 if points == self.scoreLists[scoretype]['W'] and game['played'] and game['opponent'] > 0  else 0
-                    self.addtbval(tbscore[prefix + 'won'], rnd, won)
-                    self.addtbval(tbscore[prefix + 'won'], 'val', won)
-
-                    # number of games played with black
-                    bpg = 1 if game['color'] == 'b' and game['played'] else 0
-                    self.addtbval(tbscore[prefix + 'bpg'], rnd, bpg)
-                    self.addtbval(tbscore[prefix + 'bpg'], 'val', bpg)
-                        
-                    # number of win played with black
-                    bwg = 1 if game['color'] == 'b' and game['played'] and points == self.scoreLists[scoretype]['W'] else 0
-                    self.addtbval(tbscore[prefix + 'bwg'], rnd, bwg)
-                    self.addtbval(tbscore[prefix + 'bwg'], 'val', bwg)
-
-                    # number of games elected to play
-                    #ge = 1 if game['played'] or (game['opponent'] > 0 and points == self.scoreLists[scoretype]['W']) else 0
-                    ge = 1 if game['played'] or (points == self.scoreLists[scoretype]['W']) else 0
-                    self.addtbval(tbscore[prefix + 'ge'], rnd, ge)
-                    self.addtbval(tbscore[prefix + 'ge'], 'val', ge)
-
-                    vur = 1 if game['vur'] else 0
-                    self.addtbval(tbscore[prefix + 'vur'], rnd, vur)
-                    self.addtbval(tbscore[prefix + 'vur'], 'val', vur)
-
-                    # last round with opponent, pab or fpb (16.2.1, 16.2.2, 16.2.3 and 16.2.4)
-                    if rnd > tbscore[prefix + 'lo'] and (vur == 0):
-                        tbscore[prefix + 'lo'] = rnd
+                        self.addtbval(tbscore[prefix + 'num'], rnd, 1)
+                        self.addtbval(tbscore[prefix + 'num'], 'val', 1)
+    
+    
+                        # result in last game
+                        if rnd == self.rounds and game['opponent'] > 0:
+                            tbscore[prefix + 'lg'] = points 
+    
+                        # points from played games    
+                        if game['played'] and game['opponent'] > 0:
+                            tbscore[prefix + 'pfp'] += points
+    
+                        # last played game (or PAB)
+                        if rnd > tbscore[prefix + 'lp'] and game['played']:
+                            tbscore[prefix + 'lp'] = rnd
+                            
+                        # number of win
+                        win = 1 if points == self.scoreLists[scoretype]['W'] else 0
+                        self.addtbval(tbscore[prefix + 'win'], rnd, win)
+                        self.addtbval(tbscore[prefix + 'win'], 'val', win)
+    
+                        # number of win played over the board
+                        won = 1 if points == self.scoreLists[scoretype]['W'] and game['played'] and game['opponent'] > 0  else 0
+                        self.addtbval(tbscore[prefix + 'won'], rnd, won)
+                        self.addtbval(tbscore[prefix + 'won'], 'val', won)
+    
+                        # number of games played with black
+                        bpg = 1 if game['color'] == 'b' and game['played'] else 0
+                        self.addtbval(tbscore[prefix + 'bpg'], rnd, bpg)
+                        self.addtbval(tbscore[prefix + 'bpg'], 'val', bpg)
+                            
+                        # number of win played with black
+                        bwg = 1 if game['color'] == 'b' and game['played'] and points == self.scoreLists[scoretype]['W'] else 0
+                        self.addtbval(tbscore[prefix + 'bwg'], rnd, bwg)
+                        self.addtbval(tbscore[prefix + 'bwg'], 'val', bwg)
+    
+                        # number of games elected to play
+                        #ge = 1 if game['played'] or (game['opponent'] > 0 and points == self.scoreLists[scoretype]['W']) else 0
+                        ge = 1 if game['played'] or (points == self.scoreLists[scoretype]['W']) else 0
+                        self.addtbval(tbscore[prefix + 'ge'], rnd, ge)
+                        self.addtbval(tbscore[prefix + 'ge'], 'val', ge)
+    
+                        vur = 1 if game['vur'] else 0
+                        self.addtbval(tbscore[prefix + 'vur'], rnd, vur)
+                        self.addtbval(tbscore[prefix + 'vur'], 'val', vur)
+    
+                        # last round with opponent, pab or fpb (16.2.1, 16.2.2, 16.2.3 and 16.2.4)
+                        if rnd > tbscore[prefix + 'lo'] and (vur == 0):
+                            tbscore[prefix + 'lo'] = rnd
 
 
     def compute_recursive_if_tied(self, tb, cmps, rounds, compute_singlerun):
@@ -629,9 +631,10 @@ class tiebreak:
             tbscore[oprefix + 'abh'] = { 'val' : 0 }     # Adjusted score for BH (check algorithm)
             # 16.3.2    Unplayed rounds of category 16.2.5 are evaluated as draws.
             for rnd, rst in cmp['rsts'].items():
-                tbval = rst[opoints] if rnd <= tbscore[oprefix + 'lo'] or rst['opponent'] > 0 else opointsfordraw
-                tbscore[oprefix + 'abh'][rnd] = tbval
-                tbscore[oprefix + 'abh']['val'] += tbval
+                if rnd <= rounds:
+                    tbval = rst[opoints] if rnd <= tbscore[oprefix + 'lo'] or rst['opponent'] > 0 else opointsfordraw
+                    tbscore[oprefix + 'abh'][rnd] = tbval
+                    tbscore[oprefix + 'abh']['val'] += tbval
             fbscore = tbscore[oprefix + 'points']['val']
             if name == 'fb' and tbscore[oprefix + 'lo'] == self.rounds:
                 #print(startno, tbscore[oprefix + 'abh']['val'], tbscore[oprefix + 'abh']['val'] - tbscore[oprefix + 'lg'] + opointsfordraw)
