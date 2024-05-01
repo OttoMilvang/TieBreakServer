@@ -73,7 +73,7 @@ class trf2json(chessjson.chessjson):
         lineno = 0
         for line in lines:
             lineno += 1
-            if True:
+            try:
                 trfkey = line[0:3]
                 trfvalue =line[4:] 
                 match trfkey: # noqa
@@ -145,11 +145,9 @@ class trf2json(chessjson.chessjson):
                         pass
                     
 
-            #except:
-            #    print("Error in trffile, line " + str(lineno) + ", " + line)
-                
-            #    self.put_status(401, "Error in trffile, line " + str(lineno) + ", " + line)
-
+            except:
+                self.put_status(401, "Error in trf-file, line " + str(lineno) + ", " + line)
+                return
  
         if tournament['teamTournament']:
             self.prepare_team_section(tournament)

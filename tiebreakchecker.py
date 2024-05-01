@@ -30,8 +30,16 @@ def help():
 #   print error and exit
 
 def error(code, txt):
-    print('Error: ' + str(code) + ', ' + txt)
-    print('tiebreakchecker [options]')
+    event = {
+	    'filetype': 'Error',
+	    'version': '1.0',
+	    'origin': 'tiebreakchecker ver. 1.00',
+	    'published': '',
+	    'status': {'code': 0, 'error': []}
+    }
+    event['status']['code'] = code
+    event['status']['error'].append(txt)
+    json.dump(event, sys.stdout, indent=2)
     sys.exit()
 
 # read_command_line
@@ -128,7 +136,7 @@ def write_output_file(params, tournament, tb):
         f = sys.stdout
     else:
         f = open(params['output_file'], 'w')
-    if params['check']:
+    if params['check'] and tb != None:
         tournament.event['status']['tiebreaks'] = tb.tiebreaks 
         res = tournament.event['status']
         if 'delimiter' in params and params['delimiter'] != None and params['delimiter'].upper() != 'JSON':
@@ -204,10 +212,10 @@ def tiebreakchecker():
         params = read_command_line()
     except:
         error(501, "Bad command line")
-    #try:
-    chessfile = read_input_file(params)
-    #except:
-    #    error(502, "Error when reading file: " + params['input_file'])
+    try:
+        chessfile = read_input_file(params)
+    except (RuntimeError, TypeError, NameError):
+        error(502, "Error when reading file: " + params['input_file'])
 
 
     if not 'event_number' in params:
@@ -224,7 +232,7 @@ def tiebreakchecker():
         for arg in params['match_score']:   
             chessfile.parse_score_system('match', arg)
     
-
+    tb = None
     if chessfile.get_status() == 0:
         if eventno > 0:
             tb  = tiebreak(chessfile, eventno, params['number_of_rounds'])
