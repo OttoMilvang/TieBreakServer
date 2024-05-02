@@ -194,7 +194,12 @@ class trf2json(chessjson.chessjson):
                     self.event['scoreLists'].append(newlist)
 
         competition['scoreSystem'] =  scorename
-        scoresystem = self.scoreLists[scorename]
+        if scorename in self.scoreLists:
+            scoresystem = self.scoreLists[scorename]
+        else:
+            scorelist = list(filter(lambda ss: ss['listName'] == scorename, self.event['scoreLists']))
+            scoresystem = scorelist[0]['scoreSystem']
+
         #print(scorename)
 
        
