@@ -13,6 +13,7 @@ import argparse
 import json
 import io
 import sys
+import datetime
 import codecs
 import helpers
 from chessjson import chessjson
@@ -34,13 +35,14 @@ def error(code, txt):
 	    'filetype': 'Error',
 	    'version': '1.0',
 	    'origin': 'tiebreakchecker ver. 1.00',
-	    'published': '',
+	    'published': str(datetime.datetime.now())[0:19],
 	    'status': {'code': 0, 'error': []}
     }
     event['status']['code'] = code
     event['status']['error'].append(txt)
     json.dump(event, sys.stdout, indent=2)
-    sys.exit()
+    if code >= 400:
+        sys.exit()
 
 # read_command_line
 #   options:
@@ -131,43 +133,52 @@ def read_input_file(params):
     return(tournament)
         
 
-def write_output_file(params, tournament, tb):
+def write_output_file(params, chessfile, tb):
     if params['output_file'] == '-':
         f = sys.stdout
     else:
         f = open(params['output_file'], 'w')
     if params['check'] and tb != None:
-        tournament.event['status']['tiebreaks'] = tb.tiebreaks 
-        res = tournament.event['status']
+        status = chessfile.event['status']
+        result = chessfile.result
+        event = {
+	        'filetype': 'TieBreak',
+	        'version': '1.0',
+	        'origin': 'tiebreakchecker ver. 1.00',
+	        'published': str(datetime.datetime.now())[0:19],
+	        'status': status,
+            'result': result
+        }
+
         if 'delimiter' in params and params['delimiter'] != None and params['delimiter'].upper() != 'JSON':
             tr = {'B': ' ', 'T': '\t', 'C': ',','S': ';'}
             if params['delimiter'].upper() in tr:
                 delimiter = tr[params['delimiter'].upper()]
             else:
                 delimiter = params['delimiter']
-            code = res['code'] if 'code' in res else 500
-            check = res['check'] if 'check' in res else False
+            code = status['code'] if 'code' in status else 500
+            check = result['check'] if 'check' in result else False
             f.write(str(code) + delimiter + str(check) + '\n')
             if code == 0:
-                for competitor in res['competitors']:
+                for competitor in result['competitors']:
                     line = str(competitor['startno']) + delimiter + str(competitor['rank'])
                     for val in competitor['tieBreak']:
                         line += delimiter + str(val)
                     f.write(line + '\n')
         else:    
-            json.dump(res, f, indent=2)
+            json.dump(event, f, indent=2)
     else:
-        json.dump(tournament.event, f, indent=2)
+        json.dump(chessfile.event, f, indent=2)
     if not params['output_file'] == '-':
         f.close()
 
 
-def compute_tiebreaks(tournament, tb, eventno, params):                                 
+def compute_tiebreaks(chessfile, tb, eventno, params):                                 
     
     # run tiebreak 
-    #json.dump(tournament.__dict__, sys.stdout, indent=2)
+    #json.dump(chessfile.__dict__, sys.stdout, indent=2)
 
-    if tournament.get_status() == 0:
+    if chessfile.get_status() == 0:
         tblist = params['tie_break']
         for pos in range (0, len(tblist)):
             mytb = tb.parse_tiebreak(pos+1, tblist[pos])
@@ -177,8 +188,8 @@ def compute_tiebreaks(tournament, tb, eventno, params):
         for i in range(0,len(tb.rankorder)):
             t = tb.rankorder[i]
             #print(t['id'], t['rank'], t['tieBreak'])
-    if tournament.get_status() == 0:
-        tm = tournament.get_tournament(eventno)
+    if chessfile.get_status() == 0:
+        tm = chessfile.get_tournament(eventno)
         tm['rankOrder'] = tb.tiebreaks;
         if 'teamTournament' in tm and tm['teamTournament']:
             jsoncmps = tm['teamSection']['competitors']
@@ -197,12 +208,15 @@ def compute_tiebreaks(tournament, tb, eventno, params):
             competitor['rank'] = cmp['rank'] = tb.cmps[startno]['rank']
             if tb.isteam:
                 competitor['boardPoints'] = tb.cmps[startno]['tbval']['gpoints_' + 'bp']
-            competitor['calculations'] = cmp['calculations'] = tb.cmps[startno]['calculations']
+            competitor['calculations'] = tb.cmps[startno]['calculations']
             competitor['tieBreak'] = cmp['tieBreak'] = tb.cmps[startno]['tieBreak']
             competitors.append(competitor)
             #print(startno, cmp['rank'], cmp['tieBreak'])
-        tournament.event['status']['check'] = correct
-        tournament.event['status']['competitors'] = competitors
+        chessfile.result = {
+            'check': correct,
+            'tiebreaks': tb.tiebreaks, 
+            'competitors': competitors
+        }
     #return(tb)
 
    
