@@ -11,6 +11,7 @@ Created on Thu Oct 19 11:55:32 2023
 
 import sys
 import json
+from decimal import *
 import xml.etree.ElementTree as ET
 import chessjson
 import helpers
@@ -23,6 +24,9 @@ class ts2json(chessjson.chessjson):
         super().__init__()
         self.debug = True
         self.event['origin'] = 'ts2json ver. 1.00'
+        self.pcompetitors = {} # pointer to player section competitors
+        self.bcompetitors = {} # pointer to team competitors via 1st board player
+        self.tcompetitors = {} # pointer to team section competitors
         self.event['ratingLists'] = [{ 'listName': 'Local',
                           'listDescription': 'Local rating'
                         },{
@@ -35,6 +39,7 @@ class ts2json(chessjson.chessjson):
                           'listName': 'FIDEblitz',
                           'listDescription': 'FIDE blitz rating'
                         }]
+                            
         self.isteam = False
                             
 
@@ -43,12 +48,12 @@ class ts2json(chessjson.chessjson):
 #
 # Read TS file
 
-    def parse_file(self, lines):
-        tournament = ET.fromstring(lines)
-        if tournament.tag != 'Tournament':
+    def parse_file(self, lines, verbose):
+        event = ET.fromstring(lines)
+        if event.tag != 'Tournament':
             return 1  # Not a TS file 
-        self.parse_ts_tournament_attrib(tournament.attrib)
-        for child in tournament:
+        self.parse_ts_tournament_attrib(event.attrib)
+        for child in event:
             match child.tag:
                 case 'Web':
                     self.parse_ts_web(child.attrib)
@@ -63,9 +68,15 @@ class ts2json(chessjson.chessjson):
                     for group in child:
                         if group.tag == 'Group':
                             tournamentno += 1
-                            tm = self.parse_ts_group(group, tournamentno)
-                            self.update_results(tm['playerSection']['results'])
-                            self.update_tournament_rating(tm)
+                            tournament = self.parse_ts_group(group, tournamentno)
+                            if self.isteam:
+                                self.prepare_team_section(tournament)
+                            else:
+                                self.prepare_player_section(tournament)
+                            self.update_results(tournament['gameList'])
+                            self.update_tournament_rating(tournament)
+                            self.update_tournament_teamcompetitors(tournament)
+                            self.update_tournament_random(tournament, self.isteam)
 
         return
                     
@@ -78,7 +89,9 @@ class ts2json(chessjson.chessjson):
             'firstName': '',
             'lastName': '',
             'fideName': '',
-             'fideOtitle': ''
+            'sex': 'u',
+            'federation': '',
+            'fideOTitle': ''
             }
         da = {
             'id': -1,
@@ -86,7 +99,9 @@ class ts2json(chessjson.chessjson):
             'firstName': '',
             'lastName': '',
             'fideName': '',
-             'fideOtitle': ''
+            'sex': 'u',
+            'federation': '',
+            'fideOTitle': ''
             }        
         org = {
             'id': -1,
@@ -94,7 +109,9 @@ class ts2json(chessjson.chessjson):
             'firstName': '',
             'lastName': '',
             'fideName': '',
-             'fideOtitle': ''
+            'sex': 'u',
+            'federation': '',
+            'fideOTitle': ''
             }        
         other = self.event['eventInfo']['other'] = {}
         for key, value in attrib.items(): 
@@ -175,7 +192,7 @@ class ts2json(chessjson.chessjson):
             if not 'arbiters' in self.event['eventInfo']:
                 self.event['eventInfo']['arbiters'] = {
                     'chiefArbiter': self.append_profile(ca),
-                    'deputyChiefArbiters': self.append_profile(da),
+                    'deputyChiefArbiters': [ self.append_profile(da) ],
                     'ratingOfficer': 0,
                     'arbiters': []
                     }
@@ -253,19 +270,12 @@ class ts2json(chessjson.chessjson):
                 'order': 1,
                 'name': 'PTS'
                 }],
-            'playerSection': {
-                'type': 'playerSection',
-                'competitors': [],
-                'results': [],
-                'scoreSystem': "game"
-                },
-           'teamSection': {
-               'type': 'teamSection',
-               'competitors': [],
-               'results': [],
-               'scoreSystem': "match"
-               },
-           'other': {}
+            'competitors': [],
+            'gameScoreSystem': 'game',
+            'matchScoreSystem': 'match',
+            'gameList': [],
+            'matchList': [],
+            'other': {}
         };
 
         
@@ -287,15 +297,13 @@ class ts2json(chessjson.chessjson):
                 case 'Reportsettings':
                     self.parse_ts_group_report(child, tournamentno)
                 case 'Players':
-                    self.parse_ts_group_players(child, tournament['playerSection'])
+                    self.parse_ts_group_players(child, tournament)
                 case 'Teams':
-                    self.parse_ts_group_teams(child, tournament['teamSection'])
+                    self.parse_ts_group_teams(child, tournament)
                 case _:
                     self.print_warning('parse_ts_group tag: ' + child.tag + ' not matched')
 
         self.event['tournaments'].append(tournament)
-        self.update_tournament_teamcompetitors(tournament)
-        self.update_tournament_random(tournament, self.isteam)
         return tournament
  
 
@@ -307,17 +315,21 @@ class ts2json(chessjson.chessjson):
             'firstName': '',
             'lastName': '',
             'fideName': '',
-             'fideOtitle': ''
-            }
+            'sex': 'u',
+            'federation': '',
+            'fideOTitle': ''
+           }
         da = {
             'id': -1,
             'fideId': 0,
             'firstName': '',
             'lastName': '',
             'fideName': '',
-             'fideOtitle': ''
-            }
-        competition = tournament['teamSection'] if self.isteam else tournament['playerSection']
+            'sex': 'u',
+            'federation': '',
+            'fideOTitle': ''
+           }
+        #competition = tournament['teamSection'] if self.isteam else tournament['playerSection']
         scoresystem = {}
         frr = 1
         info = tournament['tournamentInfo']
@@ -353,9 +365,9 @@ class ts2json(chessjson.chessjson):
                     tournament['maxMeet'] = helpers.parse_int(value)
                 case 'PairingAccellerated': 
                     if value == 'Y':
-                        tournament['accellerated'] = 'BAKU2016'
+                        tournament['accelerated'] = 'BAKU2016'
                     else:
-                        tournament['accellerated'] = ''
+                        tournament['accelerated'] = ''
                 case 'AccelleratedLastGaSn': 
                     other['accelleratedLastGaSn'] = helpers.parse_int(value)
                 case 'Pairing': 
@@ -410,7 +422,7 @@ class ts2json(chessjson.chessjson):
                 case 'SeniorFee': 
                     '0'
                 case 'NumBoards':
-                    tournament['numBoards'] = helpers.parse_int(value)
+                    tournament['teamSize'] = helpers.parse_int(value)
                 case 'HomeGuestNaming':
                     'Y'
                 case 'Clr':
@@ -418,9 +430,9 @@ class ts2json(chessjson.chessjson):
                 case _:
                     self.print_warning('parse_ts_group attrib: ' + key + '=' + value + ' not matched')
         todo = 1
-        if (scoresystem['W'] == 3.0 and scoresystem['L'] == 1.0):
+        if (scoresystem['W'] == Decimal('3.0') and scoresystem['L'] == Decimal('1.0')):
             tournament['playerSection']['scoreSystem'] = 'children'
-        elif (scoresystem['W'] == 3.0 and scoresystem['L'] == 0.0):
+        elif (scoresystem['W'] == Decimal('3.0') and scoresystem['L'] == Decimal('0.0')):
             tournament['playerSection']['scoreSystem'] = 'football'
 #        match scoresystem['W']:
 #            case 1.0:
@@ -441,7 +453,7 @@ class ts2json(chessjson.chessjson):
             if not 'arbiters' in info:
                 info['arbiters'] = {
                     'chiefArbiter': self.append_profile(ca),
-                    'deputyChiefArbiters': self.append_profile(da),
+                    'deputyChiefArbiters': [ self.append_profile(da) ],
                     'ratingOfficer': 0,
                     'arbiters': []
                     }
@@ -455,7 +467,7 @@ class ts2json(chessjson.chessjson):
         for child in rounds:
             roundno += 1
             cround = {
-                'round': roundno,
+                'roundNo': roundno,
                 'timeControl': {
                 'defaultTime': 0,
                 'periods': []
@@ -545,7 +557,7 @@ class ts2json(chessjson.chessjson):
         return
 
 
-    def parse_ts_group_players(self, players, competition):
+    def parse_ts_group_players(self, players, tournament):
         for key, value in players.attrib.items():
             match key:
                 case 'Num':
@@ -558,11 +570,11 @@ class ts2json(chessjson.chessjson):
         for player in players:
             if player.tag == 'Player':
                 rank += 1
-                self.parse_ts_player(player, competition, rank)
+                self.parse_ts_player(player, tournament, rank)
         return
 
 
-    def parse_ts_group_teams(self, teams, tournamentno):
+    def parse_ts_group_teams(self, teams, tournament):
         for key, value in teams.attrib.items():
             match key:
                 case 'SeparateFile':
@@ -573,7 +585,7 @@ class ts2json(chessjson.chessjson):
         for team in teams:
             if team.tag == 'Team':
                 rank += 1
-                self.parse_ts_team(team, tournamentno, rank)
+                self.parse_ts_team(team, tournament, rank)
         return
 
 # ==============================
@@ -587,8 +599,8 @@ class ts2json(chessjson.chessjson):
         roundno = 0
         ratinglist = tournament['ratingList']
         for tround in tournament['rounds']:
-            if tround['round'] <= tournament['currentRound'] and tround['round'] > roundno and tround['ratingList'] != 'Undefined':
-                roundno = tround['round']
+            if tround['roundNo'] <= tournament['currentRound'] and tround['roundNo'] > roundno and tround['ratingList'] != 'Undefined':
+                roundno = tround['roundNo']
                 cround = tround
         if cround != None:
             ratinglist =  cround['ratingList']
@@ -599,23 +611,23 @@ class ts2json(chessjson.chessjson):
                 ratingindex = nlist
                 break
         pids = self.all_pids()   
-        players = tournament['playerSection']['competitors']
-        for player in players: 
+        competitors = tournament['competitors']
+        for key, player in self.pcompetitors.items():
             player['rating'] = int(pids[player['profileId']]['rating'][ratingindex])            
         
     def update_tournament_teamcompetitors(self, tournament):
         if not tournament['teamTournament']:
             return
         [cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
-        competitors = tournament['teamSection']['competitors']
+        competitors = tournament['competitors']
         allgames = self.build_all_games(tournament, cteam, False)
-        pscore = tournament['playerSection']['scoreSystem']
-        tscore = tournament['teamSection']['scoreSystem']
+        pscore = tournament['gameScoreSystem']
+        tscore = tournament['matchScoreSystem']
 
         for competitor in competitors:
             competitor['matchPoints'] = 0
             competitor['gamePoints'] = 0
-        for game in tournament['teamSection']['results']:
+        for game in tournament['matchList']:
             rnd = game['round']
             gpoints = {}
             played = False
@@ -658,7 +670,7 @@ class ts2json(chessjson.chessjson):
 #
 
 
-    def parse_ts_player(self, player, competition, rank):
+    def parse_ts_player(self, player, tournament, rank):
         profile = {
             'id': 0,
             'rating': [0,0,0,0],
@@ -675,12 +687,14 @@ class ts2json(chessjson.chessjson):
         else:
             competitor['rank'] = rank
         results = player[0]
-        competition['competitors'].append(competitor)
+        playerno = competitor['cid'] if 'cid' in competitor else 0
+
+        self.pcompetitors[competitor['cid']] = competitor
+        #competition['competitors'].append(competitor)
         for game in results:
             match game.tag:
                 case 'Game':
-                    playerno = competitor['cid']
-                    self.parse_ts_game(game, competition['results'], playerno, False)
+                    self.parse_ts_game(game, tournament['gameList'], playerno, False)
                 case _:
                     self.print_warning('parse_ts player, result key: ' + key + ' not matched')
         
@@ -845,43 +859,44 @@ class ts2json(chessjson.chessjson):
 #
 
 
-    def parse_ts_team(self, team, competition, rank):
-        cteam = {
+    def parse_ts_team(self, team, tournament, rank):
+        teamProfile = {
             'id': 0,
             'other': {}
         }
         competitor = {
             'cid': 0,
             'rank': rank,
-            'tieBreak': []
+            'cplayers' : []
         }
-        self.parse_ts_team_attrib(team.attrib, cteam, competitor)
-        teamid = competitor['teamId'] = self.append_team(cteam, 0)
-        competition['competitors'].append(competitor)
+        self.parse_ts_team_attrib(team.attrib, teamProfile, competitor)
+        teamid = competitor['teamId'] = self.append_team(teamProfile, 0)
+        tournament['competitors'].append(competitor)
+        self.tcompetitors[teamProfile['teamName']] = competitor
         results = team[0]
         for game in results:
             match game.tag:
                 case 'Game':
                     teamno = competitor['cid']
-                    self.parse_ts_game(game, competition['results'], teamno, True)
+                    self.parse_ts_game(game, tournament['matchList'], teamno, True)
                 case _:
                     self.print_warning('parse_ts team, result key: ' + key + ' not matched')
         
         return
 
-    def parse_ts_team_attrib(self, attrib, team, competitor):
+    def parse_ts_team_attrib(self, attrib, teamProfile, competitor):
         for key, value in attrib.items(): 
             match key:
                 case 'StartNo':
                     competitor['cid'] = helpers.parse_int(value)
                 case 'Available':
-                    team['present'] = value == 'Y'
+                    teamProfile['present'] = value == 'Y'
                 case 'Teamname':
-                    team['teamName'] = value
+                    teamProfile['teamName'] = value
                 case 'Group':
                     '' 
                 case 'Federation':
-                    team['federation'] = value
+                    teamProfile['federation'] = value
                 case 'Pts':
                     competitor['matchPoints'] = helpers.parse_float(value)
                 case 'Rank':
@@ -901,7 +916,7 @@ class ts2json(chessjson.chessjson):
                 case 'Custom2':
                     '0' 
                 case 'Info':
-                    team['other']['info'] = value
+                    teamProfile['other']['info'] = value
                 case 'TeamLeader':
                     captain = {
                         'id': -1,
@@ -909,11 +924,13 @@ class ts2json(chessjson.chessjson):
                         'firstName': '',
                         'lastName': '',
                         'fideName': '',
-                        'fideOtitle': ''
+                        'sex': 'u',
+                        'federation': '',
+                        'fideOTitle': ''
                     }
                     if value != '':
                         self.parse_ts_arbiter(captain, value)
-                        team['captain'] = self.append_profile(captain)
+                        teamProfile['captain'] = self.append_profile(captain)
                 case _:
                     self.print_warning('parse_ts_team attrib: ' + key + ' not matched')
         return
@@ -928,20 +945,33 @@ class ts2json(chessjson.chessjson):
     def parse_ts_arbiter(self, arbiter, name):
         line = name.rstrip()
         if line[0:3] == 'IA ' or line[0:3] == 'FA ':
-            arbiter['fideOtitle'] = line[0:2]
+            arbiter['fideOTitle'] = line[0:2]
             arbiter['arbiter'] = line[0:2]
             line = line[3:]
         nameparts = line.split(',', 1)
         if len(nameparts) > 1:
             arbiter['lastName'] = nameparts[0].strip()
-            arbiter['FirstName'] = nameparts[1].strip()
+            arbiter['firstName'] = nameparts[1].strip()
         else:
             nameparts = line.split(' ')
             arbiter['lastName'] = nameparts[-1:]
-            arbiter['FirstName'] = ' '.join(nameparts[0:-1])
+            arbiter['firstName'] = ' '.join(nameparts[0:-1])
         arbiter['id'] = 0
         return
 
+
+    def prepare_player_section(self, tournament):
+        tournament['competitors'] = sorted(list(self.pcompetitors.values()), key=lambda g: (g['cid']))
+
+    def prepare_team_section(self, tournament):
+        competitors = tournament['competitors']
+        for key,competitor in self.pcompetitors.items():
+            self.tcompetitors[competitor['teamName']]['cplayers'].append(competitor)
+            competitor.pop('teamName')
+
+ 
+                
+        
 
 #### Module test ####
 
@@ -954,8 +984,7 @@ def dotest(name):
 
     tournament = ts2json()
     tournament.parse_file(lines)
-    with open(root + name + '\\' + name + '.jch', 'w') as f:
-        json.dump(tournament.event, f, indent=2)
+    helpers.json_output(root + name + '\\' + name + '.jch', tournament.event)
 
 def module_test():
     dotest('escc2018')

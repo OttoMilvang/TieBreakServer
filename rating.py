@@ -9,6 +9,8 @@ Created on Fri Aug 18 08:28:13 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 
+from decimal import *
+
 # Tables from FIDE Handbook
 
 ScoreToDp = [ -800,
@@ -112,7 +114,7 @@ DiffToPd = [50,                                     # 0
 # Exact computation on integers (pd*100)
 #
 
-def ComputeExpectedScore100(ratingPlayer, ratingOpponent):
+def ComputeExpectedScore(ratingPlayer, ratingOpponent):
     if ratingPlayer == 0 or ratingOpponent == 0:
         return None
     diff = ratingOpponent - ratingPlayer
@@ -127,16 +129,16 @@ def ComputeExpectedScore100(ratingPlayer, ratingOpponent):
     pd = DiffToPd[diff]
     if sign > 0:
         pd = 100 - pd
-    return pd
+    return Decimal(pd)/100
 
-def ComputeSumExpectedScore100(ratingPlayer, ratingOpponents):
+def ComputeSumExpectedScore(ratingPlayer, ratingOpponents):
     sum = 0
     for opponent in ratingOpponents:
-        sum += ComputeExpectedScore100(ratingPlayer, opponent)
+        sum += ComputeExpectedScore(ratingPlayer, opponent)
     return sum
 
 
-def ComputeExpectedScore(ratingPlayer, ratingOpponent):
+def xxComputeExpectedScore(ratingPlayer, ratingOpponent):
     ces = ComputeExpectedScore100(ratingPlayer, ratingOpponent)
     if ces == None:
         return None
@@ -164,7 +166,7 @@ def ComputePerfectTournamentPerformance(score, ratingsopp):
     # exception for score == 0 
     if len(ratingsopp) == 0:
         return 0
-    if score < 0.01:
+    if score == Decimal('0.0'):
         return min(ratingsopp) - 800
     # avoid infinite loop on illegal input
     if score > len(ratingsopp):
@@ -173,26 +175,26 @@ def ComputePerfectTournamentPerformance(score, ratingsopp):
     # when high-low == 1 then ptp = high
     num = len(ratingsopp)
     if num == 0: return 0
-    score100 = int(round(score*100))
+    #score100 = Decimal(int(round(score*100))) / 100
     start = ComputeTournamentPerformanceRating(score, ratingsopp)
-    initstep = step = 16   #  Seems to be a good start value
-    expscore100 = ComputeSumExpectedScore100(start, ratingsopp)
-    if expscore100 >= score100:
+    step = 16   #  Seems to be a good start value
+    expscore = ComputeSumExpectedScore(start, ratingsopp)
+    if expscore >= score:
         high = start
-        while ComputeSumExpectedScore100(start-step, ratingsopp) >= score100:
+        while ComputeSumExpectedScore(start-step, ratingsopp) >= score:
             high = start -step
             step *= 2 
         low = start- step
     else:         
         low = start
-        while ComputeSumExpectedScore100(start+step, ratingsopp) < score100:
+        while ComputeSumExpectedScore(start+step, ratingsopp) < score:
             low = start +step
             step *= 2
         high = start + step
     step = high - low
     while high-low > 1:
         step = step//2
-        if ComputeSumExpectedScore100(low+step, ratingsopp) >= score100:
+        if ComputeSumExpectedScore(low+step, ratingsopp) >= score:
             high = high - step
         else:
             low = low + step

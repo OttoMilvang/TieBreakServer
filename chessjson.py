@@ -13,6 +13,7 @@ import random
 import json
 import helpers
 import time
+from decimal import *
 
 
 class chessjson:
@@ -37,11 +38,11 @@ class chessjson:
         'tournaments': []
         }
         self.scoreLists = {
-            'game' : {'W': 1.0, 'D': 0.5, 'L': 0.0, 'Z': 0.0, 'A': 'D', 'U': 'Z' },
-            'match' : {'W': 2.0, 'D': 1.0, 'L': 0.0, 'Z': 0.0, 'A': 'D', 'U': 'Z' },
-            'children': {'W': 3.0, 'D': 2.0, 'L': 1.0, 'Z': 0.0, 'A': 'D', 'U': 'Z' },
-            'football': {'W': 3.0, 'D': 1.0, 'L': 0.0, 'Z': 0.0, 'A': 'D', 'U': 'Z' },
-            'rating' : {'W': 1.0, 'D': 0.5, 'L': 0.0, 'Z': 0.0, 'A': 'Z', 'U': 'Z' },
+            'game' : {'W': Decimal('1.0'), 'D': Decimal('0.5'), 'L': Decimal('0.0'), 'Z': Decimal('0.0'), 'A': 'D', 'U': 'Z' },
+            'match' : {'W': Decimal('2.0'), 'D': Decimal('1.0'), 'L': Decimal('0.0'), 'Z': Decimal('0.0'), 'A': 'D', 'U': 'Z' },
+            'children': {'W': Decimal('3.0'), 'D': Decimal('2.0'), 'L': Decimal('1.0'), 'Z': Decimal('0.0'), 'A': 'D', 'U': 'Z' },
+            'football': {'W': Decimal('3.0'), 'D': Decimal('1.0'), 'L': Decimal('0.0'), 'Z': Decimal('0.0'), 'A': 'D', 'U': 'Z' },
+            'rating' : {'W': Decimal('1.0'), 'D': Decimal('0.5'), 'L': Decimal('0.0'), 'Z': Decimal('0.0'), 'A': 'Z', 'U': 'Z' },
             '_reverse': {'W': 'L', 'D': 'D', 'L': 'W', 'Z': 'W', 'A': 'A', 'U': 'U' }
            }
         self.numProfiles = 0
@@ -97,7 +98,7 @@ class chessjson:
             self.put_status(402, "Error in score system, " + str(txt))        
    
     
-    def parse_file(self, lines):
+    def parse_file(self, lines, verbose):
         now = time.time()
         self.event = json.loads(lines)
 
@@ -202,14 +203,17 @@ class chessjson:
                     #if (result['white'] == trace or result['black'] == trace):
                     #    print('Update black', elem)
                 return elem['id']
-        self.numResults += 1
-        rid = result['id'] = self.numResults
+        rid = result['id'] = next_game()
         #if (result['white'] == trace or result['black'] == trace):
         #    print('First', result)
         results.append(result)
         return rid 
             
-
+    def next_game(self):
+        self.numResults += 1
+        return self.numResults
+    
+    
 # ==============================
 #
 # Common function to build help structures
@@ -223,8 +227,8 @@ class chessjson:
     def build_tournament_teamcompetitors(self, tournament):
         if not tournament['teamTournament']:
             return [None, None]
-        team_competitors = tournament['teamSection']['competitors']
-        player_competitors = tournament['playerSection']['competitors']
+        team_competitors = tournament['competitors']
+        #player_competitors = tournament['playerSection']['competitors']
         #with open('C:\\temp\\team.json', 'w') as f:
             #json.dump(self.cteam, f, indent=2)
         #with open('C:\\temp\\results.json', 'w') as f:
@@ -239,12 +243,12 @@ class chessjson:
             cplayers[cid] = []
             teamid = team['teamId']
             clookup[teamid] = cid
-        for player in player_competitors:
-            cid = player['cid']
-            teamid = player['teamId']
-            if teamid in clookup:
-                cplayers[clookup[teamid]].append(cid)
-                cteam[cid] = clookup[teamid]
+            for player in team['cplayers']:
+                pcid = player['cid']
+                teamid = player['teamId']
+                if teamid in clookup:
+                    cplayers[clookup[teamid]].append(cid)
+                cteam[pcid] = cid   #clookup[teamid]
         #with open('C:\\temp\\cteam.json', 'w') as f:
             #json.dump(cteam, f, indent=2)
         #with open('C:\\temp\\cplayer.json', 'w') as f:
@@ -309,9 +313,14 @@ class chessjson:
             self.pids = {elem['id']: elem for elem in self.event['profiles'] }
         return self.pids
         
+    def all_tids(self):
+        if not hasattr(self,'tids') or len(self.event['teams']) != len(self.tids):
+            self.tids = {elem['id']: elem for elem in self.event['teams'] }
+        return self.tids
+
     def build_all_games(self, tournament, cteam, makecopy):
         allgames = {}
-        for game in tournament['playerSection']['results']:
+        for game in tournament['gameList']:
             rnd = game['round']
             if not rnd in allgames:
                 allgames[rnd] = {}
@@ -333,10 +342,7 @@ class chessjson:
 
     def update_tournament_random(self, tournament, isteam):
         update = False
-        if isteam:
-            competitors = tournament['teamSection']['competitors']
-        else:
-            competitors = tournament['playerSection']['competitors']
+        competitors = tournament['competitors']
         for competitor in competitors:
             if not 'random' in competitor:
                 competitor['random'] = random.random()

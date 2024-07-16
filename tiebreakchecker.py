@@ -34,7 +34,7 @@ def error(code, txt):
     event = {
 	    'filetype': 'Error',
 	    'version': '1.0',
-	    'origin': 'tiebreakchecker ver. 1.00',
+	    'origin': 'tiebreakchecker ver. 1.03',
 	    'published': str(datetime.datetime.now())[0:19],
 	    'status': {'code': 0, 'error': []}
     }
@@ -42,7 +42,7 @@ def error(code, txt):
     event['status']['error'].append(txt)
     json.dump(event, sys.stdout, indent=2)
     if code >= 400:
-        sys.exit()
+        sys.exit(code)
 
 # read_command_line
 #   options:
@@ -52,10 +52,14 @@ def error(code, txt):
 #   -f = file-format    
 #   -e = event-number    
 #   -n = number-of-rounds
+#   -p = use rules for tournament with pre-determined pairing (Round Robin)
+#   -s = use rules for swiss tournament
 #   -g = game-score
 #   -m = match-score
 #   -d = delimiter
+#   -r = sort on rank order
 #   -t = tie-break
+#   -v = verbose and debug
 #   -x = expirimental
 
 
@@ -65,9 +69,9 @@ def read_command_line():
         help="Shall we add checkflag to json file")
     parser.add_argument("-i", "--input-file", required=False,
         #default='C:\\temp\\ngpl23.trx',
-        default='C:\\temp\\ngpl23-A-Langsjakk-FIDE.txt',
+        #default='C:\\temp\\ngpl23-A-Langsjakk-FIDE.txt',
         #default='C:\\temp\\T6681.trfx',
-        #default='C:\\temp\\nm_lag2022.trx',
+        default='-',
         help="path to input file")
     parser.add_argument("-o", "--output-file", required=False,
         #default='C:\\temp\\out.json',
@@ -83,6 +87,10 @@ def read_command_line():
     parser.add_argument("-n", "--number-of-rounds", type=int,
         default=0,
         help="Nuber of rounds, overrides file value")
+    parser.add_argument("-p", "--pre-determined", required=False, action='store_true',
+        help="Use rules for tournament with pre-determined pairing")
+    parser.add_argument("-s", "--swiss", required=False, action='store_true',
+        help="Use rules for swiss tournament")
     parser.add_argument("-g", "--game-score", required=False, nargs='*',
         help="Point system for matches, default W:2.0,D:1.0,L:0.0,Z:0,P:1.0,U:1.0" )
     parser.add_argument("-m", "--match-score", required=False, nargs='*',
@@ -90,28 +98,53 @@ def read_command_line():
     parser.add_argument("-d", "--delimiter", required=False,
 #        default=' ',
         help="Delimiter in output text" )
+    parser.add_argument("-r", "--rank", required=False, action='store_true',
+        help="Sort on rank order")
     parser.add_argument("-t", "--tie-break", required=False, nargs='*',
         default=['PTS', 'BH#C2-p'],
         #default=['PTS', 'DE'],
         help="Delimiter in output text" )
     parser.add_argument("-x", "--experimental", required=False, action='store_true',
         help="Add experimental stuff")
+    parser.add_argument("-v", "--verbose", required=False, action='store_true',
+        help="Verbose and debug")
 
-    args = vars(parser.parse_args())
-    return args
+    params = vars(parser.parse_args())
+   
+    # Parse game-score and match-score
+    for scoretype in ['game', 'match']:
+        if scoretype + '_score' in params and params[scoretype + '_score'] != None:
+            scoresystem = {}
+            for arg in params[scoretype +  '_score']:
+                for param in arg.split(','):
+                    param = param.replace('=', ':')
+                    args = param.split(':')
+                    scoresystem[args[0]] = helpers.parse_float(args[1])
+            params[scoretype + '_score'] = scoresystem
+
+    # Set pre-determined or swiss
+    params['is_rr'] = None
+    if params['pre_determined']:
+        params['is_rr'] = True
+    if params['swiss']:
+        params['is_rr'] = False
+    
+    return params
+
+
 
 def read_input_file(params):
     # Read input file
     match(params['file_format']):
         case 'JSON':
-            tournament = chessjson()
+            chessfile = chessjson()
             charset = "utf-8"
         case 'TRF':
-            tournament = trf2json()
+            chessfile = trf2json()
             charset = "latin1"
     
         case 'TS':
-            tournament = ts2json()
+            chessfile = ts2json()
             charset = "ascii"
         case _:
             error(503, "Error in file format: " + params['file_format'])
@@ -122,56 +155,83 @@ def read_input_file(params):
         error(501, "Missing parameter --input-file")
     if not 'output_file' in params:
             error(501, "Missing parameter --output-file")
-    f = io.open(params['input_file'], mode="r", encoding = charset)
+    if params['input_file'] == '-':
+        sys.stdin.reconfigure(encoding = charset)
+        f = sys.stdin
+    else:
+        f = io.open(params['input_file'], mode="r", encoding = charset)
     lines = f.read()
     f.close()
         
     if charset == "latin1" and lines[0] == '\xef' and lines[1] == '\xbb' and lines[2] == '\xbf' :
         lines = lines[3:]
-    tournament.parse_file(lines)
-
-    return(tournament)
+    is_rr = None
+    if params['pre_determined']:
+        is_rr = True
+    if params['swiss']:
+        is_rr = False
+    chessfile.parse_file(lines,  params['verbose'])
+    
+    return(chessfile )
         
 
 def write_output_file(params, chessfile, tb):
+    status = chessfile.event['status']
+    code = status['code'] if 'code' in status else 500
+    if code == 0 and hasattr(chessfile, 'result'):
+        result = chessfile.result
+        check = result['check'] if 'check' in result else False
+        code = 0 if check else 1
+
     if params['output_file'] == '-':
         f = sys.stdout
     else:
         f = open(params['output_file'], 'w')
     if params['check'] and tb != None:
-        status = chessfile.event['status']
-        result = chessfile.result
         event = {
 	        'filetype': 'TieBreak',
 	        'version': '1.0',
 	        'origin': 'tiebreakchecker ver. 1.00',
 	        'published': str(datetime.datetime.now())[0:19],
 	        'status': status,
-            'result': result
+            'tieBreakResult': result
         }
 
+
         if 'delimiter' in params and params['delimiter'] != None and params['delimiter'].upper() != 'JSON':
+            printcheckstatus = 1 if params['delimiter'][0] == '@' else 0
+            delimiter = params['delimiter'][printcheckstatus:]
             tr = {'B': ' ', 'T': '\t', 'C': ',','S': ';'}
-            if params['delimiter'].upper() in tr:
-                delimiter = tr[params['delimiter'].upper()]
-            else:
-                delimiter = params['delimiter']
-            code = status['code'] if 'code' in status else 500
-            check = result['check'] if 'check' in result else False
-            f.write(str(code) + delimiter + str(check) + '\n')
-            if code == 0:
-                for competitor in result['competitors']:
-                    line = str(competitor['startno']) + delimiter + str(competitor['rank'])
+            if delimiter.upper() in tr:
+                delimiter = tr[delimiter.upper()]
+            if printcheckstatus:
+                f.write(str(code) + (delimiter + str(check) if len(delimiter) > 0  else '')  + '\n')
+            if code == 0 or code == 1 and len(delimiter) > 0:
+                if params['rank']:
+                    sortorder = sorted(result['competitors'], key=lambda cmp: (cmp['rank'], cmp['startno']))
+                    header = ['Rank', 'StartNo']
+                else:
+                    sortorder = result['competitors']
+                    header = ['StartNo', 'Rank']
+                line = header[0] + delimiter + header[1]
+                for arg in params['tie_break']:
+                    line += delimiter + arg
+                f.write(line + '\n')
+                for competitor in sortorder:
+                    line = str(competitor[header[0].lower()]) + delimiter + str(competitor[header[1].lower()])
                     for val in competitor['tieBreak']:
-                        line += delimiter + str(val)
+                        if '.' in str(val):
+                            line += delimiter + str(val)
+                        else:
+                            line += delimiter + str(val)
                     f.write(line + '\n')
         else:    
-            json.dump(event, f, indent=2)
+            helpers.json_output(f, event)
     else:
-        json.dump(chessfile.event, f, indent=2)
+        helpers.json_output(f, chessfile.event)
     if not params['output_file'] == '-':
         f.close()
-
+    return code
 
 def compute_tiebreaks(chessfile, tb, eventno, params):                                 
     
@@ -191,10 +251,10 @@ def compute_tiebreaks(chessfile, tb, eventno, params):
     if chessfile.get_status() == 0:
         tm = chessfile.get_tournament(eventno)
         tm['rankOrder'] = tb.tiebreaks;
-        if 'teamTournament' in tm and tm['teamTournament']:
-            jsoncmps = tm['teamSection']['competitors']
-        else:
-            jsoncmps = tm['playerSection']['competitors']
+        #if 'teamTournament' in tm and tm['teamTournament']:
+        #    jsoncmps = tm['competitors']
+        #else:
+        jsoncmps = tm['competitors']
         #with open('C:\\temp\\tm.json', 'w') as f:
         #    json.dump(tm, f, indent=2)
         #with open('C:\\temp\\tbcmps.json', 'w') as f:
@@ -229,6 +289,8 @@ def tiebreakchecker():
     try:
         chessfile = read_input_file(params)
     except (RuntimeError, TypeError, NameError):
+        if params['verbose']:
+            raise
         error(502, "Error when reading file: " + params['input_file'])
 
 
@@ -239,12 +301,10 @@ def tiebreakchecker():
         error(501, "Invalid parameter --event-number")
 
     # Add command line parameters
-    if 'individual_score' in params and params['individual_score'] != None:    
-        for arg in params['individual_score']:
-            chessfile.parse_score_system('game', arg)
-    if 'match_score' in params and params['match_score'] != None:    
-        for arg in params['match_score']:   
-            chessfile.parse_score_system('match', arg)
+    for score in ['game', 'match']:
+        if score + '_score' in params and params[score +'_score'] != None:    
+            for arg in params[score +  '_score']:
+                chessfile.parse_score_system(score, arg)
     
     tb = None
     if chessfile.get_status() == 0:
@@ -254,16 +314,19 @@ def tiebreakchecker():
         else: 
             tb = tiebreak(chessfile, eventno, params['number_of_rounds'])
     
-    #try:
-    write_output_file(params, chessfile, tb)
-    if params['experimental']:
-        chessfile.dumpresults()
-    #except:
-    #    error(503, "Error when writing file: " + params['output_file'])
-    
+    try:
+        code = write_output_file(params, chessfile, tb)
+        if params['experimental']:
+            chessfile.dumpresults()
+    except:
+        if params['verbose']:
+            raise
+        error(503, "Error when writing file: " + params['output_file'])
+    return(code) 
 
         
 # tournament.export_trf(params)
  
 # run program
-tiebreakchecker()
+code = tiebreakchecker()
+sys.exit(code)

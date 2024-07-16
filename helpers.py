@@ -9,6 +9,12 @@ Created on Tue Oct 31 13:57:55 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 
+import math
+import sys
+import json
+from decimal import *
+
+
 # ==============================
 #
 #  Helpers
@@ -54,7 +60,7 @@ def parse_float(txt):
     if len(txt) == 0:
         return 0.0
     txt = txt.replace(',','.')
-    return float(txt)
+    return Decimal(txt)
 
 # return -1 if different
 # return 1 if equal
@@ -81,10 +87,10 @@ def is_equal(txt, struct1, struct2):
 # Solve w, d, l, p, u, z for variables where W, D, L, P, U and Z present in equautins
 #
 
-def solve_scoresystem(equations):
-    res = {}
+def solve_scoresystem_p(equations, pab):
+    #print(equations) 
     score = {
-        'sum': 0,
+        'sum': Decimal('0.0'),
         'W': 0,
         'D': 0,
         'L': 0,
@@ -92,40 +98,95 @@ def solve_scoresystem(equations):
         'U': 0,
         'Z': 0
     }
-    for l in [0, 0.5, 1]:
+    #print ('PAB:', pab)
+    res = {}
+    for l in [Decimal('0.0'), Decimal('0.5'), Decimal('1.0')]:
        res['L'] = l
-       for d in [l+0.5, l+1, l+1.5, l+2]:
+       for d in [l+Decimal('0.5'), l+Decimal('1.0'), l+Decimal('1.5'), l+Decimal('2.0')]:
             res['D'] = d
-            for w in [d+0.5, d+1, d+1.5, d+2, d+2.5, d+3]:
+            for w in [d+d-l, d+d-l+1, d+d-l+Decimal('0.5'), d+d-l+Decimal('1.0'), d+d-l+Decimal('1.5'), d+d-l+Decimal('2.0')]:
                 res['W'] = w
-                for p in ['W', 'D', 'L']:
-                    res['P'] = res[p]
-                    for u in ['D', 'L', 'W']:
-                        ok = True
-                        for result in equations:
-                            tsum = 0
-                            tsum += result['W'] * w
-                            tsum += result['D'] * d
-                            tsum += result['L'] * l
-                            tsum += result['P'] * res[p]
-                            res['P'] = p
-                            tsum += result['U'] * res[u]
-                            res['U'] = u
-                            res['Z'] = 0.0
-                            for key, value in result.items():
+                for u in ['D', 'L', 'W']:
+                    res['U'] = res[u]
+                    ok = True
+                    #if l != 0.0 or d != 0.5 or w != 1.0 or u != 'D':
+                    #    continue
+                    for result in equations:
+                        tsum = 0
+                        tsum += result['W'] * w
+                        tsum += result['D'] * d
+                        tsum += result['L'] * l
+                        tsum += result['U'] * res[u]
+                        res['U'] = u
+                        res['Z'] = 0.0
+                        for key, value in result.items():
+                            if key != 'pab' and key != 'pres':
                                 score[key] += value
-                            if (res['W'] == 1 and res['D'] == 0.5 and res['L'] == 0.0 and res['P'] == 'W' ):                                
-                                #print(result, tsum, result['sum'])
-                                pass
-                            if tsum != result['sum']:
-                                ok = False
-                        if ok:
-                            ret = {key: value for key, value in res.items() if score[key] != 0}
-                            for key in ['P', 'U']:
-                                if key in ret and res[key] in ['W', 'D', 'L', 'Z'] and ret[key] not in ret:
-                                    ret[res[key]] = res[res[key]]
-                            #print(score)
-                            #print(ret)
-                            return ret
-    return None
-        
+                        pok = False
+                        if result['P'] > 0:
+                            for p in pab:
+                                #print(tsum, result['P'], res[p],  tsum + result['P'] * res[p], result['sum'])
+                                if tsum + result['P'] * res[p] == result['sum']:
+                                    #print('TRUE', result['sum'])
+                                    pok = True
+                                    result['pres'] = p
+                                    res['P'] = res[p]
+                        else:
+                            #print(tsum, result['P'], result['sum'])
+                            pok = tsum == result['sum']
+                        ok = ok and pok
+
+                    if ok:
+                        ret = {key: value for key, value in res.items() if score[key] != 0}
+                        for key in ['X', 'U']:
+                            if key in ret and res[key] in ['W', 'D', 'L', 'Z'] and ret[key] not in ret:
+                                ret[res[key]] = res[res[key]]
+                                
+                        for eq in equations:
+                            #print(eq)
+                            if 'pab' in eq:
+                                #print(eq)
+                                eq['pab']['wResult'] = eq['pres']
+                                res.pop('P', None) 
+                                
+                        #print(equations)
+                        #print('Score:', score)
+                        #print('Ret = ',  ret)
+                        return ret
+    #print('none')
+    #return None
+
+def solve_scoresystem(equations):
+    res = False
+    res = res or solve_scoresystem_p(equations, ['W'])
+    res = res or solve_scoresystem_p(equations, ['D'])
+    res = res or solve_scoresystem_p(equations, ['L'])
+    res = res or solve_scoresystem_p(equations, ['W', 'D'])
+    res = res or solve_scoresystem_p(equations, ['D', 'L'])
+    res = res or solve_scoresystem_p(equations, ['W', 'D','L'])
+
+    return(res)
+    #print(equations) 
+    
+# =================
+#
+# Json output
+#
+#
+
+def decimal_serializer(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+        return '_jpre_'+ str(obj) + '_jpost_'
+    raise TypeError("Type not serializable")
+    
+    
+def json_output(file, obj):
+    if isinstance(file, str):
+        f = sys.stdout if file == '-' else open(file, 'w')
+    else:
+        f = file
+    jsonout = json.dumps(obj, indent=2, default=decimal_serializer) 
+    f.write(jsonout.replace('"_jpre_', '').replace('_jpost_"', '') + '\n')
+    if isinstance(file, str) and  file != '-':
+        f.close()
