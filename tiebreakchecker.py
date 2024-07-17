@@ -194,7 +194,7 @@ def write_output_file(params, chessfile, tb):
 	        'origin': 'tiebreakchecker ver. 1.00',
 	        'published': str(datetime.datetime.now())[0:19],
 	        'status': status,
-            'tieBreakResult': result
+            'tiebreakResult': result
         }
 
 
