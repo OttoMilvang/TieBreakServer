@@ -145,8 +145,8 @@ class tiebreak:
                     'orgrank': competitor['rank'],
                     'rank': 1,
                     'rating': (competitor['rating'] if 'rating' in competitor else 0),
-                    'tieBreak': [],
-                    'calculations': [],
+                    'tiebreakScore': [],
+                    'tiebreakDetails': [],
                     'rnd': rnd,
                     'tbval': {}
                   }
@@ -973,8 +973,8 @@ class tiebreak:
         precision = 0
         for startno, cmp in cmps.items():
             #print(prefix, scoretype, cmp['tbval'])
-            cmp['tieBreak'].append(cmp['tbval'][prefix + value]['val'])
-            cmp['calculations'].append(cmp['tbval'][prefix + value])
+            cmp['tiebreakScore'].append(cmp['tbval'][prefix + value]['val'])
+            cmp['tiebreakDetails'].append(cmp['tbval'][prefix + value])
             if isinstance(cmp['tbval'][prefix + value]['val'], Decimal):
                 (s,n,e) = cmp['tbval'][prefix + value]['val'].as_tuple()
                 precision = min(precision, e)
@@ -1088,15 +1088,15 @@ class tiebreak:
         self.addval(cmps, tb, tbname)
         reverse = 1 if 'reverse' in tb['modifiers'] and not tb['modifiers']['reverse'] else -1
         #for cmp in self.rankorder:
-        #    print(index, cmp['tieBreak'][index])
-        self.rankorder = sorted(self.rankorder, key=lambda cmp: (cmp['rank'], cmp['tieBreak'][index]*reverse, cmp['cid']))
+        #    print(index, cmp['tiebreakScore'][index])
+        self.rankorder = sorted(self.rankorder, key=lambda cmp: (cmp['rank'], cmp['tiebreakScore'][index]*reverse, cmp['cid']))
         rank = 1
-        val = self.rankorder[0]['tieBreak'][index]
+        val = self.rankorder[0]['tiebreakScore'][index]
         for i in range(1, len(self.rankorder)):
             rank += 1
-            if (self.rankorder[i]['rank'] == rank or self.rankorder[i]['tieBreak'][index] != val):
+            if (self.rankorder[i]['rank'] == rank or self.rankorder[i]['tiebreakScore'][index] != val):
                 self.rankorder[i]['rank'] = rank
-                val = self.rankorder[i]['tieBreak'][index]
+                val = self.rankorder[i]['tiebreakScore'][index]
             else:
                 self.rankorder[i]['rank'] = self.rankorder[i-1]['rank']
         #for i in range(0,len(self.rankorder)):

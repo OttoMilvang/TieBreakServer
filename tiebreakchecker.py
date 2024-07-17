@@ -189,7 +189,7 @@ def write_output_file(params, chessfile, tb):
         f = open(params['output_file'], 'w')
     if params['check'] and tb != None:
         event = {
-	        'filetype': 'TieBreak',
+	        'filetype': 'tiebreak',
 	        'version': '1.0',
 	        'origin': 'tiebreakchecker ver. 1.00',
 	        'published': str(datetime.datetime.now())[0:19],
@@ -208,18 +208,20 @@ def write_output_file(params, chessfile, tb):
                 f.write(str(code) + (delimiter + str(check) if len(delimiter) > 0  else '')  + '\n')
             if code == 0 or code == 1 and len(delimiter) > 0:
                 if params['rank']:
-                    sortorder = sorted(result['competitors'], key=lambda cmp: (cmp['rank'], cmp['startno']))
+                    sortorder = sorted(result['competitors'], key=lambda cmp: (cmp['rank'], cmp['cid']))
                     header = ['Rank', 'StartNo']
+                    field = ['rank', 'cid']
                 else:
                     sortorder = result['competitors']
                     header = ['StartNo', 'Rank']
+                    field = ['cid', 'rank']
                 line = header[0] + delimiter + header[1]
                 for arg in params['tie_break']:
                     line += delimiter + arg
                 f.write(line + '\n')
                 for competitor in sortorder:
-                    line = str(competitor[header[0].lower()]) + delimiter + str(competitor[header[1].lower()])
-                    for val in competitor['tieBreak']:
+                    line = str(competitor[field[0]]) + delimiter + str(competitor[field[1]])
+                    for val in competitor['tiebreakScore']:
                         if '.' in str(val):
                             line += delimiter + str(val)
                         else:
@@ -247,7 +249,7 @@ def compute_tiebreaks(chessfile, tb, eventno, params):
         #print()
         for i in range(0,len(tb.rankorder)):
             t = tb.rankorder[i]
-            #print(t['id'], t['rank'], t['tieBreak'])
+            #print(t['id'], t['rank'], t['tiebreak'])
     if chessfile.get_status() == 0:
         tm = chessfile.get_tournament(eventno)
         tm['rankOrder'] = tb.tiebreaks;
@@ -263,15 +265,15 @@ def compute_tiebreaks(chessfile, tb, eventno, params):
         competitors = []
         for cmp in jsoncmps:
             competitor = {}
-            competitor['startno'] = startno = cmp['cid']
+            competitor['cid'] = startno = cmp['cid']
             correct = correct and cmp['rank'] == tb.cmps[startno]['rank']
             competitor['rank'] = cmp['rank'] = tb.cmps[startno]['rank']
             if tb.isteam:
                 competitor['boardPoints'] = tb.cmps[startno]['tbval']['gpoints_' + 'bp']
-            competitor['calculations'] = tb.cmps[startno]['calculations']
-            competitor['tieBreak'] = cmp['tieBreak'] = tb.cmps[startno]['tieBreak']
+            competitor['tiebreakDetails'] = tb.cmps[startno]['tiebreakDetails']
+            competitor['tiebreakScore'] = cmp['tiebreakScore'] = tb.cmps[startno]['tiebreakScore']
             competitors.append(competitor)
-            #print(startno, cmp['rank'], cmp['tieBreak'])
+            #print(startno, cmp['rank'], cmp['tiebreakScore'])
         chessfile.result = {
             'check': correct,
             'tiebreaks': tb.tiebreaks, 
