@@ -490,7 +490,8 @@ class tiebreak:
                                                              'score': rst[points]
                                                             }
             #if not tb['modifiers']['p4f'] and de['denum'] < metmax:
-            if (not tb['modifiers']['p4f'] and de['denum'] < metmax) or tb['modifiers']['sws']:
+            #if (not tb['modifiers']['p4f'] and de['denum'] < metmax) or tb['modifiers']['sws']:
+            if (not self.rr and de['denum'] < metmax) or tb['modifiers']['sws']:
                 metall = False
                 de['demax'] = de['deval'] + (metmax - de['denum']) * self.scoreLists[scoretype]['W'] * (self.teamsize if points == 'gpoints' else 1)
                 #print('F', metmax, de['deval'], de['demax'], de['denum'])

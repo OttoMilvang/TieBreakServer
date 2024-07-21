@@ -1229,10 +1229,10 @@ class trf2json(chessjson.chessjson):
  
            
             print('{0:2}'.format(cid) + '  - ' + country)                 
-            eq = competitor['matchPoints'] == tcmps[cid]['calculations'][0]['val'] and competitor['gamePoints'] == tcmps[cid]['calculations'][1]['val']
+            eq = competitor['matchPoints'] == tcmps[cid]['tiebreakDetails'][0]['val'] and competitor['gamePoints'] == tcmps[cid]['calculations'][1]['val']
             print('TSE:', '{0:4.1f}'.format(competitor['matchPoints']), '{0:5.1f}'.format(competitor['gamePoints']))
             print('001:', '{0:4}'.format(' '), '{0:5.1f}'.format(sgp))
-            print('TBS:', '{0:4.1f}'.format(tcmps[cid]['calculations'][0]['val']), '{0:5.1f}'.format(tcmps[cid]['calculations'][1]['val']), '' if eq else '*****'  )
+            print('TBS:', '{0:4.1f}'.format(tcmps[cid]['tiebreakDetails'][0]['val']), '{0:5.1f}'.format(tcmps[cid]['calculations'][1]['val']), '' if eq else '*****'  )
             print('Org:')
             for player in competitor['cplayers']:
                 trf = self.o001[player]
@@ -1246,13 +1246,13 @@ class trf2json(chessjson.chessjson):
             line = '{0:89}'.format(' ')
             for i in range(99, linelen+1, 10):
                 currentround += 1
-                line += '{0:10.1f}'.format(tcmps[cid]['calculations'][0][currentround])
+                line += '{0:10.1f}'.format(tcmps[cid]['tiebreakDetails'][0][currentround])
             print(line)
             currentround = 0
             line = '{0:89}'.format(' ')
             for i in range(99, linelen+1, 10):
                 currentround += 1
-                line += '{0:10.1f}'.format(tcmps[cid]['calculations'][1][currentround])
+                line += '{0:10.1f}'.format(tcmps[cid]['tiebreakDetails'][1][currentround])
             print(line)
  
         print()
