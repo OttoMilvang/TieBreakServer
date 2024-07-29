@@ -108,6 +108,8 @@ class trf2json(chessjson.chessjson):
                     case '132':
                         self.parse_trf_dates(tournament, line)
                     case 'XXR':
+                        self.parse_trf_numbrounds(tournament, line)
+                    case 'XXZ':
                         self.parse_trf_absent(tournament, line)
                     case 'XXS':
                         self.parse_trf_points(tournament, line)
@@ -117,6 +119,8 @@ class trf2json(chessjson.chessjson):
                         self.parse_trf_accellerated(tournament, line)
                         tt = tournament['tournamentType'].upper()
 ## Roberto
+                    case 'ACC':
+                        self.parse_trf_acc(tournament, line)
                     case 'TSE':
                         self.parse_trf_tse(tournament, line)
                     case 'xxBBB':
@@ -574,8 +578,14 @@ class trf2json(chessjson.chessjson):
             self.event['eventInfo']['arbiters']['arbiters'].append(pid)
         return
     
+    def parse_trf_numbrounds(self, tournament, line):
+        tournament['numRounds'] = helpers.parse_int(line[4:].rstrip())
+        
     def parse_trf_absent(self, tournament, line):
-        # TODO
+        for elem in line[4:].replace(',', ' ').replace('/', ' ').split(' '):
+            num = helpers.parse_int(elem)
+            if num > 0:
+                self.pcompetitors[num]['present'] = False
         return
     
     def parse_trf_points(self, tournament, line):
@@ -583,11 +593,49 @@ class trf2json(chessjson.chessjson):
         return
     
     def parse_trf_configuration(self, tournament, line):
-        # TODO
+        # TODO+4
         return
     
     def parse_trf_accellerated(self, tournament, line):
-        # TODO
+        linelen = len(line)
+        if 'acceleration' not in tournament:
+            acc = {
+                'name': 'Acc',
+                'values': []
+                }
+            tournament['acceleration'] = acc
+        scorename = tournament['matchScoreSystem'] if tournament['teamTournament'] else tournament['gameScoreSystem'] 
+        scoresystem = self.scoreLists[scorename]
+        competitor = helpers.parse_int(line[4:8])
+        groups = { 'W': [], 'D': [], 'L': [], 'Z': [] } 
+        currentround = 0
+        lastplayed = 0
+        lastpaired = 0
+        for i in range(9, linelen-3, 5):
+            currentround += 1
+            points = helpers.parse_float(line[i:i+4])
+            score = 'Z'
+            for s in groups.keys():
+                if scoresystem[s] == points:
+                    score = s
+            groups[score].append(currentround)
+        for s in ['W', 'D', 'L']:
+            start = 0
+            cgroup = groups[s]
+            clen = len(cgroup)
+            while start < clen:
+                stop = start
+                while stop < clen and cgroup[stop] - cgroup[start] == stop - start:
+                    stop +=1
+                value = {
+                    'score': s,
+                    'firstRound': cgroup[start],
+                    'lastRound' : cgroup[stop-1],
+                    'firstCompetitor': competitor,
+                    'lastCompetitor': competitor
+                }
+                tournament['acceleration']['values'].append(value)
+                start = stop
         return
         
 # Exprimental 
@@ -620,6 +668,33 @@ class trf2json(chessjson.chessjson):
                 #print(team)
                 #sys.exit(0)
             
+
+    def parse_trf_acc(self, tournament, line):
+        if 'acceleration' not in tournament:
+            acc = {
+                'name': 'Acc',
+                'values': []
+                }
+            tournament['acceleration'] = acc
+        points = helpers.parse_float(line[4:8])
+        firstround = helpers.parse_int(line[9:12])
+        lastround = helpers.parse_int(line[13:16])
+        firstcompetitor = helpers.parse_int(line[17:21])
+        lastcompetitor = helpers.parse_int(line[22:26])
+        scorename = tournament['matchScoreSystem'] if tournament['teamTournament'] else tournament['gameScoreSystem'] 
+        scoresystem = self.scoreLists[scorename]
+        score = 'U'
+        for s in ['W', 'D', 'L','Z']:
+            if scoresystem[s] == points:
+                score = s
+        value = {
+            'score': score,
+            'firstRound': firstround,
+            'lastRound' : lastround,
+            'firstCompetitor': firstcompetitor,
+            'lastCompetitor': lastcompetitor
+            }
+        tournament['acceleration']['values'].append(value)
             
     def parse_trf_tse(self, tournament, line):
         #print(line)
@@ -1157,8 +1232,6 @@ class trf2json(chessjson.chessjson):
                     else:
                         game = games[0]
                 game['board'] = ind
-                if ind == 5:
-                    raise
                 if preres == None:
                     preres = game['wResult']
                 played = played or game['played']

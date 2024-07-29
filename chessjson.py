@@ -86,6 +86,7 @@ class chessjson:
         scoreLists.append(newlist)
         return(newlist['scoreSystem'])
 
+            
 
     def parse_score_system(self, name, txt):
         scoresystem = self.get_scoresystem(self.event['scoreLists'], name)

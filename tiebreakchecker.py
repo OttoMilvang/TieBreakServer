@@ -85,7 +85,7 @@ def read_command_line():
         default='1',
         help="tournament number")
     parser.add_argument("-n", "--number-of-rounds", type=int,
-        default=0,
+        default=-1,
         help="Nuber of rounds, overrides file value")
     parser.add_argument("-p", "--pre-determined", required=False, action='store_true',
         help="Use rules for tournament with pre-determined pairing")
