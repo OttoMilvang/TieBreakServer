@@ -76,7 +76,7 @@ class tiebreak:
     
 
     # constructor function    
-    def __init__(self, chessevent, tournamentno, currentround):
+    def __init__(self, chessevent, tournamentno, currentround, is_rr):
         event = chessevent.event
         tournament = chessevent.get_tournament(tournamentno)
         self.tiebreaks = []
@@ -117,15 +117,16 @@ class tiebreak:
         tt = tournament['tournamentType'].upper()
         #self.teamsize = round(len(tournament['playerSection']['results'])/ len(tournament['teamSection']['results'] )) if self.isteam else 1 
         self.teamsize = tournament['teamSize'] if 'teamSize' in tournament else 1 
-        self.rr = False
-        if tt.find('SWISS') >= 0:
-            self.rr = False
-        elif tt.find('RR') >= 0 or tt.find('ROBIN') >= 0 or tt.find('BERGER') >= 0: 
-            self.rr = True
-        elif numcomp == self.rounds + 1 or numcomp == self.rounds:
+        self.rr = is_rr
+        if is_rr == None:
+            if tt.find('SWISS') >= 0:
+                self.rr = False
+            elif tt.find('RR') >= 0 or tt.find('ROBIN') >= 0 or tt.find('BERGER') >= 0: 
                 self.rr = True
-        elif numcomp == (self.rounds + 1)*2 or numcomp == self.rounds * 2:
-            self.rr = True
+            elif numcomp == self.rounds + 1 or numcomp == self.rounds:
+                self.rr = True
+            elif numcomp == (self.rounds + 1)*2 or numcomp == self.rounds * 2:
+                self.rr = True
     
     def prepare_competitors(self, tournament, scoretype):
         rounds = self.currentround
@@ -348,7 +349,8 @@ class tiebreak:
                                 points = self.scoreLists[self.gamescore]['W']
                             board = game['board'];
                             tbscore[prefix + 'bp'][board] = tbscore[prefix + 'bp'][board]  + points if board in tbscore[prefix + 'bp']  else points
-                        
+                            #tbscore[prefix + 'bp']['val'] += tbscore[prefix + 'bp'][board]
+
                         self.addtbval(tbscore[prefix + 'cnt'], rnd, 1)   
                         self.addtbval(tbscore[prefix + 'cnt'], 'val', 1)
     
@@ -377,8 +379,9 @@ class tiebreak:
                             # last played game (or PAB)
                             if rnd > tbscore[prefix + 'lp']:
                                 tbscore[prefix + 'lp'] = rnd
+                        elif game['points'] == self.scoreLists[scoretype]['W']:
+                            self.addtbval(tbscore[prefix + 'num'], rnd, 0)
                             
-
                         # number of win
                         win = 1 if points == self.scoreLists[scoretype]['W'] else 0
                         self.addtbval(tbscore[prefix + 'win'], rnd, win)
@@ -842,8 +845,10 @@ class tiebreak:
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         if loopcount == 0:
             for player in ro:
-                player['tbval']['tbrval'] = 0
-                player['tbval']['bbeval'] = player['tbval']['gpoints_' + 'points']['val']
+                player['tbval']['tbrval'] = Decimal('0.0')
+                player['tbval']['bbeval'] = Decimal('0.0')
+                for val, points in player['tbval']['gpoints_' + 'bp'].items():
+                    player['tbval']['bbeval'] += points
             return True
         if len(ro) == 0:
             return False
@@ -971,6 +976,16 @@ class tiebreak:
                     tbscore[prefix + 'rfp'][rnd] = val
             tbscore[prefix + 'rfp']['val'] = val
         return 'rfp'
+
+    def compute_top(self, tb, cmps, rounds):
+        (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
+        last = self.rounds -1
+        lim = self.scoreLists[scoretype]['W']* last * (self.teamsize if points == 'gpoints' else 1)/ Decimal('2.0')
+        for startno, cmp in cmps.items():
+            tbscore = cmp['tbval']
+            val = (rounds >= last) and tbscore[prefix + 'acc'][last] > lim 
+            tbscore[prefix + 'top'] = {'val': val }
+        return 'top'
 
 
     def reverse_pointtype(self, txt):
@@ -1208,6 +1223,9 @@ class tiebreak:
                 tbname = self.compute_flt(tb, cmps, self.currentround)
             case 'RFP':
                 tbname = self.compute_rfp(tb, cmps, self.currentround)
+            case 'TOP':
+                tbname = self.compute_acc(tb, cmps, self.currentround)
+                tbname = self.compute_top(tb, cmps, self.currentround)
             case _:
                 tbname = None
                 return

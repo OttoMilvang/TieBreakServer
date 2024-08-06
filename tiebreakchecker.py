@@ -101,7 +101,7 @@ def read_command_line():
     parser.add_argument("-r", "--rank", required=False, action='store_true',
         help="Sort on rank order")
     parser.add_argument("-t", "--tie-break", required=False, nargs='*',
-        default=['PTS', 'BH#C2-p'],
+        default=['PTS', 'BH/C2/p'],
         #default=['PTS', 'DE'],
         help="Delimiter in output text" )
     parser.add_argument("-x", "--experimental", required=False, action='store_true',
@@ -165,11 +165,6 @@ def read_input_file(params):
         
     if charset == "latin1" and lines[0] == '\xef' and lines[1] == '\xbb' and lines[2] == '\xbf' :
         lines = lines[3:]
-    is_rr = None
-    if params['pre_determined']:
-        is_rr = True
-    if params['swiss']:
-        is_rr = False
     chessfile.parse_file(lines,  params['verbose'])
     
     return(chessfile )
@@ -311,10 +306,10 @@ def tiebreakchecker():
     tb = None
     if chessfile.get_status() == 0:
         if eventno > 0:
-            tb  = tiebreak(chessfile, eventno, params['number_of_rounds'])
+            tb  = tiebreak(chessfile, eventno, params['number_of_rounds'], params['is_rr'])
             compute_tiebreaks(chessfile, tb, eventno, params) 
         else: 
-            tb = tiebreak(chessfile, eventno, params['number_of_rounds'])
+            tb = tiebreak(chessfile, eventno, params['number_of_rounds'], params['is_rr'])
     
     try:
         code = write_output_file(params, chessfile, tb)

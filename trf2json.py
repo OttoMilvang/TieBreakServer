@@ -822,10 +822,6 @@ class trf2json(chessjson.chessjson):
         for i in range(0, glen):
             num = pnums[i]
             game = list(filter(lambda game: game['white'] == num or game['black'] == num, pgames))
-            if debug:
-                print(num)
-                print( game)
-        
         return
         games = []
         #steam = 0                       # secondary tesm
