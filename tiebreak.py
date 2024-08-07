@@ -361,7 +361,7 @@ class tiebreak:
                             #if startno == 1:
                             #    print(pointtype, points, tbscore[prefix + 'lg'])
     
-                        # points from played games    
+                        # points from played games
                         if game['played']:
                             self.addtbval(tbscore[prefix + 'num'], rnd, game['opponent'])                                 
                             if game['opponent'] > 0:
@@ -379,7 +379,7 @@ class tiebreak:
                             # last played game (or PAB)
                             if rnd > tbscore[prefix + 'lp']:
                                 tbscore[prefix + 'lp'] = rnd
-                        elif game['points'] == self.scoreLists[scoretype]['W']:
+                        elif 'points' in game and game['points'] == self.scoreLists[scoretype]['W']:
                             self.addtbval(tbscore[prefix + 'num'], rnd, 0)
                             
                         # number of win
