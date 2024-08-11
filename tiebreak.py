@@ -76,7 +76,7 @@ class tiebreak:
     
 
     # constructor function    
-    def __init__(self, chessevent, tournamentno, currentround, is_rr):
+    def __init__(self, chessevent, tournamentno, currentround, params):
         event = chessevent.event
         tournament = chessevent.get_tournament(tournamentno)
         self.tiebreaks = []
@@ -117,8 +117,8 @@ class tiebreak:
         tt = tournament['tournamentType'].upper()
         #self.teamsize = round(len(tournament['playerSection']['results'])/ len(tournament['teamSection']['results'] )) if self.isteam else 1 
         self.teamsize = tournament['teamSize'] if 'teamSize' in tournament else 1 
-        self.rr = is_rr
-        if is_rr == None:
+        self.rr = params['is_rr']
+        if params['is_rr'] == None:
             if tt.find('SWISS') >= 0:
                 self.rr = False
             elif tt.find('RR') >= 0 or tt.find('ROBIN') >= 0 or tt.find('BERGER') >= 0: 
@@ -127,6 +127,7 @@ class tiebreak:
                 self.rr = True
             elif numcomp == (self.rounds + 1)*2 or numcomp == self.rounds * 2:
                 self.rr = True
+        self.unrated = int(params['unrated'])
     
     def prepare_competitors(self, tournament, scoretype):
         rounds = self.currentround
@@ -786,12 +787,13 @@ class tiebreak:
             for rnd, rst in cmp['rsts'].items():
                 if rnd <= rounds and rst['played'] and rst['opponent'] > 0:
                     trounds += 1
-                if rnd <= rounds and rst['played'] and rst['opprating'] > 0:
-                    rst['rnd'] = rnd
-                    ratingopp.append(rst)
-                    self.addtbval(cmp['tbval'][prefix + 'aro'], rnd, rst['opprating'])
-                    self.addtbval(cmp['tbval'][prefix + 'tpr'], rnd, rst['opprating'])
-                    self.addtbval(cmp['tbval'][prefix + 'ptp'], rnd, rst['opprating'])
+                    if (rst['opprating'] > 0 or tb['modifiers']['unr'] > 0):
+                        rst['rnd'] = rnd
+                        rst['adjrating'] = rtng = rst['opprating'] if rst['opprating'] > 0 else tb['modifiers']['unr']
+                        ratingopp.append(rst)
+                        self.addtbval(cmp['tbval'][prefix + 'aro'], rnd, rtng)
+                        self.addtbval(cmp['tbval'][prefix + 'tpr'], rnd, rtng)
+                        self.addtbval(cmp['tbval'][prefix + 'ptp'], rnd, rtng)
             #trounds = rounds  // This is correct only if unplayed gmes are cut.
             low = tb['modifiers']['low'] 
             if low > rounds:
@@ -801,7 +803,7 @@ class tiebreak:
                 high = rounds - low 
             while low > 0:
                 if trounds == len(ratingopp):  
-                    newopp = sorted(ratingopp, key=lambda p: (p['opprating']))
+                    newopp = sorted(ratingopp, key=lambda p: (p['adjrating']))
                     if len(newopp) > 0:
                         tbscore[prefix + name]['cut'].append(newopp[0]['rnd'])
                     ratingopp = newopp[1:] 
@@ -809,7 +811,7 @@ class tiebreak:
                 low -= 1
             while high > 0:
                 if trounds == len(ratingopp):
-                    newopp = sorted(ratingopp, key=lambda p: (p['opprating']))
+                    newopp = sorted(ratingopp, key=lambda p: (p['adjrating']))
                     if len(newopp) > 0:
                         tbscore[prefix + name]['cut'].append(newopp[-1]['rnd'])
                     ratingopp = newopp[:-1]
@@ -819,7 +821,7 @@ class tiebreak:
             ratings = []
             for p in ratingopp:
                 rscore += p['rpoints']
-                ratings.append(p['opprating'])
+                ratings.append(p['adjrating'])
                 
                    
             tbscore[prefix + 'aro']['val'] = rating.ComputeAverageRatingOpponents(ratings) 
@@ -1055,6 +1057,7 @@ class tiebreak:
                             'high': 0,
                             'plim': Decimal('50.0'),
                             'nlim' : Decimal('0.0'),
+                            'unr': self.unrated,
                             'urd': False,
                             'p4f': False,
                             'sws': False,
@@ -1087,8 +1090,10 @@ class tiebreak:
                     case 'K':
                         if mf[1:].isdigit():
                             tb['modifiers']['nlim'] = Decimal(mf[1:])
-                    case 'U':
+                    case 'D':
                         tb['modifiers']['urd'] = True;    
+                    case 'U':
+                        tb['modifiers']['unr'] = int(mf[1:]);    
                     case 'P':
                         tb['modifiers']['p4f'] = True;    
                     case 'F':

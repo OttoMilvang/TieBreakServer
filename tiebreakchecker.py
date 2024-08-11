@@ -58,6 +58,7 @@ def error(code, txt):
 #   -m = match-score
 #   -d = delimiter
 #   -r = sort on rank order
+#   -u = set rating for unrated players
 #   -t = tie-break
 #   -v = verbose and debug
 #   -x = expirimental
@@ -100,6 +101,9 @@ def read_command_line():
         help="Delimiter in output text" )
     parser.add_argument("-r", "--rank", required=False, action='store_true',
         help="Sort on rank order")
+    parser.add_argument("-u", "--unrated", required=False,
+        default=0,
+        help="rating for unrated players")
     parser.add_argument("-t", "--tie-break", required=False, nargs='*',
         default=['PTS', 'BH/C2/p'],
         #default=['PTS', 'DE'],
@@ -306,10 +310,10 @@ def tiebreakchecker():
     tb = None
     if chessfile.get_status() == 0:
         if eventno > 0:
-            tb  = tiebreak(chessfile, eventno, params['number_of_rounds'], params['is_rr'])
+            tb  = tiebreak(chessfile, eventno, params['number_of_rounds'], params)
             compute_tiebreaks(chessfile, tb, eventno, params) 
         else: 
-            tb = tiebreak(chessfile, eventno, params['number_of_rounds'], params['is_rr'])
+            tb = tiebreak(chessfile, eventno, params['number_of_rounds'], params)
     
     try:
         code = write_output_file(params, chessfile, tb)

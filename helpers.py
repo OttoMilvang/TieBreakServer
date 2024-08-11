@@ -62,6 +62,10 @@ def parse_float(txt):
     txt = txt.replace(',','.')
     return Decimal(txt)
 
+def to_base36(num):
+    b36 = min(abs(int(num * Decimal('2.0'))),35)
+    return '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'[b36]
+
 # return -1 if different
 # return 1 if equal
 # return 0 if dont know
@@ -168,6 +172,11 @@ def solve_scoresystem(equations):
     return(res)
     #print(equations) 
     
+
+def sortval(x):
+    return x['val']
+    
+    
 # =================
 #
 # Json output
@@ -190,3 +199,7 @@ def json_output(file, obj):
     f.write(jsonout.replace('"_jpre_', '').replace('_jpost_"', '') + '\n')
     if isinstance(file, str) and  file != '-':
         f.close()
+        
+        
+        
+        
