@@ -117,8 +117,8 @@ class tiebreak:
         tt = tournament['tournamentType'].upper()
         #self.teamsize = round(len(tournament['playerSection']['results'])/ len(tournament['teamSection']['results'] )) if self.isteam else 1 
         self.teamsize = tournament['teamSize'] if 'teamSize' in tournament else 1 
-        self.rr = params['is_rr']
-        if params['is_rr'] == None:
+        self.rr = params['is_rr'] if params != None and 'is_rr' in params else False
+        if self.rr == None:
             if tt.find('SWISS') >= 0:
                 self.rr = False
             elif tt.find('RR') >= 0 or tt.find('ROBIN') >= 0 or tt.find('BERGER') >= 0: 
@@ -127,7 +127,7 @@ class tiebreak:
                 self.rr = True
             elif numcomp == (self.rounds + 1)*2 or numcomp == self.rounds * 2:
                 self.rr = True
-        self.unrated = int(params['unrated'])
+        self.unrated = int(params['unrated']) if params != None and 'unrated' in params else 0
     
     def prepare_competitors(self, tournament, scoretype):
         rounds = self.currentround
@@ -298,7 +298,8 @@ class tiebreak:
         
     def compute_score(self, cmps, pointtype, scoretype, norounds):
         #scoresystem = self.scoresystem[scoretype]
-        prefix = pointtype + "_" 
+        prefix = pointtype + "_"
+        other ={'w': 'b', 'b': 'w', ' ': ' ' }  
         for startno, cmp in cmps.items():
             tbscore = cmp['tbval']
             tbscore[prefix + 'sno'] = { 'val': startno }
@@ -313,8 +314,9 @@ class tiebreak:
             tbscore[prefix + 'ge'] = { 'val' : 0 }     # number of games played + PAB
             tbscore[prefix + 'rep'] = { 'val' : 0 }    # number of rounds elected to play (same as GE)
             tbscore[prefix + 'vur'] = { 'val' : 0 }    # number of vurs (check algorithm)
-            tbscore[prefix + 'cop'] = { 'val' : '' }   # color preference (for pairing)
+            tbscore[prefix + 'cop'] = { 'val' : '  ' } # color preference (for pairing)
             tbscore[prefix + 'cod'] = { 'val' : 0 }    # color difference (for pairing)
+            tbscore[prefix + 'csq'] = { 'val' : '' }   # color sequence (for pairing)
             tbscore[prefix + 'num'] = { 'val' : 0 }    # number of games played (for pairing)
             tbscore[prefix + 'lp'] =  0     # last round played 
             tbscore[prefix + 'lo'] = 0     # last round without vur
@@ -327,6 +329,8 @@ class tiebreak:
             #for rnd, rst in cmp['rsts'].items():
                 #print(rnd, cmp['rsts'])
             #    if rnd <= norounds:
+            pcol = ' '   # Previous color
+            csq = ''
             for rnd in range(1, norounds+1):
                 if rnd in cmp['rsts']:
                     rst = cmp['rsts'][rnd]
@@ -368,12 +372,23 @@ class tiebreak:
                             if game['opponent'] > 0:
                                 self.addtbval(tbscore[prefix + 'num'], 'val', 1)                                 
                                 tbscore[prefix + 'pfp'] += points
-                                ocol = game['color']
-                                ncol = ocol.upper() if ocol.upper() == tbscore[prefix + 'cop']['val'].upper() else ocol
+                                ocol = ncol = game['color']
                                 pf = 1 if ocol == 'w' else -1
                                 self.addtbval(tbscore[prefix + 'cod'], rnd, pf)
                                 self.addtbval(tbscore[prefix + 'cod'], 'val', pf)
-   
+                                pf = tbscore[prefix + 'cod']['val']
+                                ncol = (other[ocol] + 'bbbbwwww')[pf]
+                                ncol += (str(abs(pf)) if ocol != pcol else '2')   
+                                #if ocod > -2 and ocod < 2:
+                                #    ncol = 'w' if ocol == 'b' else 'b'
+                                #    ncol = ncol.upper() if ncol.upper() == tbscore[prefix + 'cop']['val'].upper() else ncol
+
+        
+                                csq += ocol
+                                pcol = ocol
+                                self.addtbval(tbscore[prefix + 'csq'], rnd, ocol)
+                                self.addtbval(tbscore[prefix + 'csq'], 'val', ocol)
+
                                 self.addtbval(tbscore[prefix + 'cop'], rnd, ncol)
                                 tbscore[prefix + 'cop']['val'] = ncol
     
@@ -618,7 +633,7 @@ class tiebreak:
 
         
 
-    def copmute_progressive_score(self, tb, cmps, rounds):
+    def compute_progressive_score(self, tb, cmps, rounds):
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         low = tb['modifiers']['low'] 
         for startno, cmp in cmps.items():
@@ -639,7 +654,7 @@ class tiebreak:
         return 'ps'
               
 
-    def copmute_koya(self, tb, cmps, rounds):
+    def compute_koya(self, tb, cmps, rounds):
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         plim = tb['modifiers']['plim'] 
         nlim = tb['modifiers']['nlim'] 
@@ -969,11 +984,11 @@ class tiebreak:
             for rnd in range(1, rounds+2):
                 val = True
                 if rnd in cmp['rsts']:
-                    val = cmp['rsts'][rnd]['played'] or (cmp['rsts'][rnd]['opponent'] > 0)
+                    val = str(cmp['rsts'][rnd]['opponent'])+ cmp['rsts'][rnd]['color'] if cmp['rsts'][rnd]['played'] or (cmp['rsts'][rnd]['opponent'] > 0) else ''
                 elif rnd > self.lastplayedround:
-                    val = cmp['present']
+                    val = 'Y' if cmp['present'] else ''
                 else: 
-                    val = False
+                    val = ''
                 if rnd <= rounds:
                     tbscore[prefix + 'rfp'][rnd] = val
             tbscore[prefix + 'rfp']['val'] = val
@@ -1189,12 +1204,12 @@ class tiebreak:
                 #tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
                 tb['modifiers']['reverse'] = False
                 tbname = self.compute_recursive_if_tied(tb, cmps, self.currentround, self.compute_singlerun_ext_direct_encounter)
-            case 'WIN' | 'WON' | 'BPG' | 'BWG' | 'GE' |  'REP' | 'VUR' | 'NUM' | 'COP' | 'COD':
+            case 'WIN' | 'WON' | 'BPG' | 'BWG' | 'GE' |  'REP' | 'VUR' | 'NUM' | 'COP' | 'COD' | 'CSQ':
                 tbname = tb['name'].lower()
             case 'PS':
-                tbname = self.copmute_progressive_score(tb, cmps, self.currentround)
+                tbname = self.compute_progressive_score(tb, cmps, self.currentround)
             case 'KS':
-                tbname = self.copmute_koya(tb, cmps, self.currentround)
+                tbname = self.compute_koya(tb, cmps, self.currentround)
             case 'BH' | 'FB' | 'SB' | 'ABH' | 'AFB':
                 tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, self.currentround)
             case 'AOB':

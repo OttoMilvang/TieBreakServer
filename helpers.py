@@ -176,6 +176,8 @@ def solve_scoresystem(equations):
 def sortval(x):
     return x['val']
     
+def sortnum(x):
+    return x['num']
     
 # =================
 #
