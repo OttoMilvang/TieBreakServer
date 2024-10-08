@@ -22,73 +22,146 @@ Created on Sun Nov 12 15:50:51 2023
 ##   2-dim - 1 .. n/2 is [pair_number]
 ##   3-dim - {'white', 'black'} - players numbered 1 .. n 
 ## rr = bergertables(n)
-## # In round 6, pair 2:
-## white = rr[6][2]['white']
-## black = rr[6][2]['black']
+## # In round 6, board 2:
+## white = rr['parining'][6][2]['white']
+## black = rr['parining'][6][2]['black']
 
 
-def bergertables(n):
-    if (n % 2) == 1:
-        n += 1
-    nhalf = n//2
-    bergertab = { 'players': n };
-    pairing = {} 
-    for pair in range(1, nhalf+1):
-        pairing[pair] = { 'white': pair, 'black': n-pair+1 }
-    bergertab[1] = pairing; # First round
-    for round in range(2, n):
-        newpairing = {}
-        if (round%2) == 0:
-            newpairing[1] = {
-                'white': pairing[1]['black'],
-                'black': pairing[nhalf]['black']
-                }
+def bergertables(nplayers):
+    nplayers += (nplayers % 2)
+    pairs = nplayers//2
+    bergertable = { 'players': nplayers, 'parining': {} }
+    bergertable['parining'][1] = pairing =  { boardno: {'white': boardno, 'black': nplayers - boardno + 1} for boardno in range(1, pairs + 1) } # First round
+    (wp, wc, bp, bc) = (1, 'white', pairs, 'black')
+    for rnd in range(2, nplayers):
+        bergertable['parining'][rnd] = newpairing = {}
+        newpairing[1] = { 'white': pairing[wp]['black'], 'black': pairing[bp][bc] }
+        for board in range(2, pairs):
+            newpairing[board] = {'white': pairing[pairs-board+1]['black'], 'black': pairing[pairs-board+2]['white']}
+        newpairing[pairs] = {'white': pairing[1][wc], 'black': pairing[2]['white'] }
+        pairing = newpairing
+        (wp, wc, bp, bc) = (bp, bc, wp, wc)
+    return bergertable
+
+
+
+"""
+The generic BergerTable follows the description in the paper "Berger explained". 
+Its made generic,  so its should be easy to translate it into other programming languages.
+https://www.milvang.no/berger/BergerExplained.pdf
+"""
+
+def bergertablesGeneric(nplayers):
+    # Let N be the number of players (or number of players + 1 if the number of players are odd)
+    # The players are assigned a pairing number 1 to N. The number of boards is B = N/2. 
+    nplayers += (nplayers % 2)
+    pairs = nplayers//2
+    bergertable = { 'players': nplayers, 'parining': {} }
+    
+    # In the first round the lowest half will have white and the highest half black. 
+    # In general, on board b, where b is in the range 1 ... B,  player m shall have white against player N-m+1.  
+    pairing =  {}
+    for board in range(1, pairs + 1):
+        pairing[board] = {'white': board, 'black': nplayers - board + 1}
+    bergertable['parining'][1] = pairing
+    
+    # nplayeriswhite is a flag to alternate color for player N
+    nplayeriswhite = False
+    for rnd in range(2, nplayers):
+        # Step 1: 
+        # Sort the players 1 … N-1 according to their pair number in the 
+        # previous round and then white before black. 
+        playerlist = []
+        for board in range(1, pairs+1):
+            for color in ['white', 'black']:
+                if pairing[board][color] < nplayers:
+                    playerlist.append(pairing[board][color])
+        # We dont need longer need pairing for the previous round. Resuse for this round                    
+        pairing = {}
+        # On the first board player N shall meet the last player in sorted list. 
+        # Remove this player from the list and pair him against player N. 
+        # Player N shall alternate color. This other player will be white if 
+        # his pairing number is in the range 1 … B, and black otherwise.  
+        firstboard = playerlist.pop()
+        if nplayeriswhite:
+            pairing[1] = {'white': firstboard, 'black': nplayers}
         else:
-            newpairing[1] = {
-                'white': pairing[nhalf]['black'],
-                'black': pairing[1]['white']
-                }
-        for pair in range(2, nhalf):
-            newpairing[pair] = {
-                'white': pairing[nhalf-pair+1]['black'], 
-                'black': pairing[nhalf-pair+2]['white']
-                }
-        if (round%2) == 0:
-            newpairing[nhalf] = {
-                'white': pairing[1]['white'], 
-                'black': pairing[2]['white']
-                }
-        else:
-            newpairing[nhalf] = {
-               'white': pairing[1]['black'], 
-               'black': pairing[2]['white']
-               }
-        bergertab[round] = newpairing;
-        pairing = newpairing;
-    return bergertab;
+            pairing[1] = {'white': nplayers, 'black': firstboard}
+        nplayeriswhite = not nplayeriswhite
+        # From the end of the list, make a pair with white as the penultimate 
+        # player in the list, and black as the last player in the list and 
+        # remove these players from the list.  Repeat this until the list is empty.  
+        for board in range(2, pairs+1):
+            black = playerlist.pop()
+            white = playerlist.pop()
+            pairing[board] = {'white': white, 'black': black}
+        bergertable['parining'][rnd] = pairing
+        # Repeat from step 1 until all rounds are paired. 
+    return bergertable
+
+
+
 
 ## 
-## lookupbergerpairing(bergertable, white, black) return round and board number, 
+## bergerpairing(bergertable, round, board) return round and board number, 
+## bergertable is a structure returned by bergertables(n)
+## rnd is the current round
+## board is current board
+## returns a tuple { 'white': white, 'black': black } 
+
+def bergerpairing(bergertable, rnd, board):
+    if rnd in bergertable['parining'] and board in bergertable['parining'][rnd]:
+        return bergertable['parining'][rnd][board]
+    return None
+
+
+## 
+## bergerlookup(bergertable, white, black) return round and board number, 
 ## bergertable is a structure returned by bergertables(n)
 ## white is the start number of the white-player
 ## black is the start number of the blcck-player
-## returns a tuple [round, pair] 
+## returns a tuple { 'round': round, 'board': board } 
 
-def lookupbergerpairing(bergertable, white, black):
-    n = bergertable['players']
-    if not 'rnd' in bergertable:
-        bergertable['rnd'] = [0] * n * n
-        bergertable['pair'] = [0] * n * n
-        for rnd in range(1, n):
-            for pair in range(1, n//2 +1):
-                w = bergertable[rnd][pair]['white']
-                b = bergertable[rnd][pair]['black']
-                bergertable['rnd'][(w-1)*n+b-1] = rnd
-                bergertable['rnd'][(b-1)*n+w-1] = rnd + n - 1
-                bergertable['pair'][(w-1)*n+b-1] = pair
-                bergertable['pair'][(b-1)*n+w-1] = pair
-    return [bergertable['rnd'][(white-1)*n+black-1], bergertable['pair'][(white-1)*n+black-1]]
-        
-#json.dump(roundrobinpairing(12), sys.stdout, indent=2)
+def bergercrosstables(bergertable):
+    nplayers = bergertable['players']
+    pairs = nplayers//2
+    bergertable['crosstable'] = crosstable = { wplayer : {} for wplayer in range(1, nplayers + 1)  }
+    for rnd in range(1, nplayers):
+        for board in range(1, pairs +1):
+            w = bergertable['parining'][rnd][board]['white']
+            b = bergertable['parining'][rnd][board]['black']
+            crosstable[w][b] = {'round': rnd, 'board': board }
+            crosstable[b][w] = {'round': rnd + nplayers - 1, 'board': board }
+    return bergertable
+
+
+def bergerlookup(bergertable, white, black):
+    if 'crosstable' not in bergertable:
+        bergercrosstables(bergertable)
+    if white in bergertable['crosstable'] and black in bergertable['crosstable'][white]:
+        return bergertable['crosstable'][white][black]
+    return None
+
+
+def print_bergertable(n):
+    roundrobin = bergertables(n)
+    n = roundrobin['players']
+    pairs = n//2
+    print(str(n-1) + ' and ' + str(n) + ' players:')
+    for rnd in range (1, n):
+        txt = 'Rd ' + str(rnd) + ': '
+        for board in range(1, pairs+1):
+            pair =  bergerpairing(roundrobin, rnd, board)
+            white = str(pair['white'])
+            black = str(pair['black'])
+            txt += '  ' + white +' - ' + black
+        print(txt) 
+
+#### Module test ####
+
+def module_test():
+    for n in  [6, 10, 25]:
+        print_bergertable(n)
+        print()
           
           
