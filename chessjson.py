@@ -23,20 +23,23 @@ class chessjson:
    # constructor function    
     def __init__(self):
         random.seed(a=None, version=2)
-        self.event = {
+        self.chessjson = {
 	    'filetype': 'Event',
 	    'version': '1.0',
 	    'origin': 'chessjson ver. 1.00',
 	    'published': '',
 	    'status': {'code': 0, 'error': []},
-	    'eventName': '',
-	    'eventInfo': {},
-	    'ratingLists': [{'listName': 'Rating'}],
-	    'scoreLists': [],
-	    'profiles': [],
-	    'teams': [],
-        'tournaments': []
+        'event' : {
+	        'eventName': '',
+	        'eventInfo': {},
+	        'ratingLists': [{'listName': 'Rating'}],
+	        'scoreLists': [],
+	        'profiles': [],
+	        'teams': [],
+            'tournaments': []
+            }
         }
+        self.event = self.chessjson['event']
         self.scoreLists = {
             'game' : {'W': Decimal('1.0'), 'D': Decimal('0.5'), 'L': Decimal('0.0'), 'Z': Decimal('0.0'), 'A': 'D', 'U': 'Z' },
             'match' : {'W': Decimal('2.0'), 'D': Decimal('1.0'), 'L': Decimal('0.0'), 'Z': Decimal('0.0'), 'A': 'D', 'U': 'Z' },
@@ -49,24 +52,25 @@ class chessjson:
         self.numTeams = 0
         self.numResults = 0
         if sys.version_info[0] < 3 or sys.version_info[0] == 3 and sys.version_info[1]  <10:
-            self.event['status']['code'] = 500
-            self.event['result']['error'].append('Python version must be at least ver. 3.10')
+            self.chessjson['status']['code'] = 500
+            self.chessjson['result']['error'].append('Python version must be at least ver. 3.10')
  
     def print_warning(self, line):
         if self.debug:
-            print(line)
+            #print(line)
+            pass
         return
 
 
     def get_status(self):
-        return self.event['status']['code']
+        return self.chessjson['status']['code']
 
     def put_status(self, code, msg):
-        self.event['status']['code'] = code
+        self.chessjson['status']['code'] = code
         if code == 0:
-            self.event['status']['info'] = msg
+            self.chessjson['status']['info'] = msg
         else:
-            self.event['status']['error'].append(msg) 
+            self.chessjson['status']['error'].append(msg) 
 
 
     def get_tournament(self, tournamentno):
@@ -101,7 +105,7 @@ class chessjson:
     
     def parse_file(self, lines, verbose):
         now = time.time()
-        self.event = json.loads(lines)
+        self.chessjson = json.loads(lines)
 
 
     def tournament_getvalue(self, tournamentno, key):
@@ -359,6 +363,17 @@ class chessjson:
     # update_chessjson_format
     # Remove  'teamSection' and 'playerSection'
     
+    
+    def points2score(self, tournament, match, points):
+        scorename = tournament['matchScoreSystem'] if match else tournament['gameScoreSystem']
+        scoresystem = self.scoreLists[scorename]
+        score = 'U'
+        for s in ['W', 'D', 'L','Z']:
+            if scoresystem[s] == points:
+                score = s
+        return score            
+
+
     def update_chessjson_format(self, tournament, isteam):
         pass
                 

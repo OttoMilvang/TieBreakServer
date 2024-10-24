@@ -128,6 +128,50 @@ class tiebreak:
             elif numcomp == (self.rounds + 1)*2 or numcomp == self.rounds * 2:
                 self.rr = True
         self.unrated = int(params['unrated']) if params != None and 'unrated' in params else 0
+        
+    """
+    compute_tiebreaks(self, chessfile, eventno, params)
+    chessfile - Chessfile structure
+    eventno - which tournament to calculate
+    params - Parameters from core
+    """        
+
+    def compute_tiebreaks(self, chessfile, eventno, params):                                 
+        
+        # run tiebreak 
+        #json.dump(chessfile.__dict__, sys.stdout, indent=2)
+    
+        if chessfile.get_status() == 0:
+            tblist = params['tie_break']
+            for pos in range (0, len(tblist)):
+                mytb = self.parse_tiebreak(pos+1, tblist[pos])
+                self.compute_tiebreak(mytb)
+            for i in range(0,len(self.rankorder)):
+                t = self.rankorder[i]
+                #print(t['id'], t['rank'], t['tiebreak'])
+        if chessfile.get_status() == 0:
+            tm = chessfile.get_tournament(eventno)
+            tm['rankOrder'] = self.tiebreaks;
+            jsoncmps = tm['competitors']
+            correct = True
+            competitors = []
+            for cmp in jsoncmps:
+                competitor = {}
+                competitor['cid'] = startno = cmp['cid']
+                correct = correct and cmp['rank'] == self.cmps[startno]['rank']
+                competitor['rank'] = cmp['rank'] = self.cmps[startno]['rank']
+                if self.isteam:
+                    competitor['boardPoints'] = self.cmps[startno]['tbval']['gpoints_' + 'bp']
+                competitor['tiebreakDetails'] = self.cmps[startno]['tiebreakDetails']
+                competitor['tiebreakScore'] = cmp['tiebreakScore'] = self.cmps[startno]['tiebreakScore']
+                competitors.append(competitor)
+            chessfile.result = {
+                'check': correct,
+                'tiebreaks': self.tiebreaks, 
+                'competitors': competitors
+            }
+    
+        
     
     def prepare_competitors(self, tournament, scoretype):
         rounds = self.currentround
@@ -173,9 +217,9 @@ class tiebreak:
                 self.prepare_result(cmps, rst, self.matchscore)
                 if self.isteam:
                     self.prepare_teamgames(cmps, rst, self.gamescore)
-        #with open('C:\\temp\\cmps.json', 'w') as f:
-            #json.dump(cmps, f, indent=2)
-            #pass
+        
+        #helpers.json_output('c:\\temp\\mc01.txt', cmps)
+        
 
         return cmps
 
@@ -195,7 +239,7 @@ class tiebreak:
             black = 0
         if  black > 0:
             if not 'bResult' in rst:
-                rst['bResult'] = self.scoreLists['reverse'][rst['wResult']]
+                rst['bResult'] = self.scoreLists['_reverse'][rst['wResult']]
             bPoints = self.get_score(scoresystem, rst, 'black')
             brPoints = self.get_score('rating', rst, 'black')
             bVur = self.is_vur(rst, 'black')
@@ -742,7 +786,8 @@ class tiebreak:
                         sres = rst[spoints] if spoints in rst else Decimal('0.0')
                     tbvalue = score * sres if is_sb else score
                     #if  opponent >  0 or not tb['modifiers']['p4f'] :
-                    bhvalue.append({'vur': vur, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
+                    if  opponent >  0 or not self.rr:
+                        bhvalue.append({'vur': vur, 'tbvalue': tbvalue, 'score': score, 'rnd': rnd }) 
             tbscore = cmp['tbval']
             tbscore[oprefix + name] ={ 'val' : 0, 'cut': [] }
             for game in bhvalue:
@@ -909,7 +954,7 @@ class tiebreak:
             return 'Z'
         for val in self.acceleration['values']:
             if rnd >= val['firstRound'] and rnd <= val['lastRound'] and startno >= val['firstCompetitor'] and startno <= val['lastCompetitor']:
-                return val['score']
+                return val['gameScore']
         return 'Z'
 
     def compute_acc(self, tb, cmps, rounds):
@@ -984,7 +1029,13 @@ class tiebreak:
             for rnd in range(1, rounds+2):
                 val = True
                 if rnd in cmp['rsts']:
-                    val = str(cmp['rsts'][rnd]['opponent'])+ cmp['rsts'][rnd]['color'] if cmp['rsts'][rnd]['played'] or (cmp['rsts'][rnd]['opponent'] > 0) else ''
+                    if cmp['rsts'][rnd]['opponent'] == 0:
+                        clr = 'w'
+                    elif startno == 0:
+                        clr = 'b'
+                    else:
+                        clr = cmp['rsts'][rnd]['color']
+                    val = str(cmp['rsts'][rnd]['opponent'])+ clr if cmp['rsts'][rnd]['played'] or (cmp['rsts'][rnd]['opponent'] > 0) else ''
                 elif rnd > self.lastplayedround:
                     val = 'Y' if cmp['present'] else ''
                 else: 

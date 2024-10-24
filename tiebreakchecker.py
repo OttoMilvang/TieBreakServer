@@ -115,57 +115,8 @@ class tiebreakchecker(commonmain):
     
     
     
-    
-    
-    def compute_tiebreaks(self, chessfile, tb, eventno, params):                                 
-        
-        # run tiebreak 
-        #json.dump(chessfile.__dict__, sys.stdout, indent=2)
-    
-        if chessfile.get_status() == 0:
-            tblist = params['tie_break']
-            for pos in range (0, len(tblist)):
-                mytb = tb.parse_tiebreak(pos+1, tblist[pos])
-                tb.compute_tiebreak(mytb)
-                #json.dump(tb.__dict__, sys.stdout, indent=2)
-            #print()
-            for i in range(0,len(tb.rankorder)):
-                t = tb.rankorder[i]
-                #print(t['id'], t['rank'], t['tiebreak'])
-        if chessfile.get_status() == 0:
-            tm = chessfile.get_tournament(eventno)
-            tm['rankOrder'] = tb.tiebreaks;
-            #if 'teamTournament' in tm and tm['teamTournament']:
-            #    jsoncmps = tm['competitors']
-            #else:
-            jsoncmps = tm['competitors']
-            #with open('C:\\temp\\tm.json', 'w') as f:
-            #    json.dump(tm, f, indent=2)
-            #with open('C:\\temp\\tbcmps.json', 'w') as f:
-            #    json.dump(tm['teamSection'], f, indent=2)
-            correct = True
-            competitors = []
-            for cmp in jsoncmps:
-                competitor = {}
-                competitor['cid'] = startno = cmp['cid']
-                correct = correct and cmp['rank'] == tb.cmps[startno]['rank']
-                competitor['rank'] = cmp['rank'] = tb.cmps[startno]['rank']
-                if tb.isteam:
-                    competitor['boardPoints'] = tb.cmps[startno]['tbval']['gpoints_' + 'bp']
-                competitor['tiebreakDetails'] = tb.cmps[startno]['tiebreakDetails']
-                competitor['tiebreakScore'] = cmp['tiebreakScore'] = tb.cmps[startno]['tiebreakScore']
-                competitors.append(competitor)
-                #print(startno, cmp['rank'], cmp['tiebreakScore'])
-            chessfile.result = {
-                'check': correct,
-                'tiebreaks': tb.tiebreaks, 
-                'competitors': competitors
-            }
-        #return(tb)
-    
-
-    
-    
+ 
+  
     def do_checker(self):
         result = None
         params = self.params
@@ -175,7 +126,7 @@ class tiebreakchecker(commonmain):
         if chessfile.get_status() == 0:
             if self.eventno > 0:
                 tb  = tiebreak(chessfile, self.eventno, params['number_of_rounds'], params)
-                self.compute_tiebreaks(chessfile, tb, self.eventno, params) 
+                tb.compute_tiebreaks(chessfile, self.eventno, params) 
             else: 
                 tb = tiebreak(chessfile, self.eventno, params['number_of_rounds'], params)
         self.core = tb

@@ -173,7 +173,31 @@ def solve_scoresystem(equations):
     #print(equations) 
     
 
-def sortval(x):
+#
+# Function: getFileFormat
+# Returns a file format.
+#
+# Parameters:
+#     $filename - Filename of tournament file
+#
+ 
+
+def getFileFormat(filename):
+    parts = filename.split('.')
+    lastp = parts[-1].lower()
+    retval = ''
+    match lastp:
+        case 'jch' | 'json':
+            return 'JSON'
+        case 'txt' | 'trf' | 'trfx':
+            return 'TRF'
+        case 'trx':
+            return 'TS'
+        case _:
+            return 'JSON'
+
+
+def sortxval(x):
     return x['val']
     
 def sortnum(x):
