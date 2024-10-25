@@ -126,7 +126,7 @@ class commonmain:
         return params
 
 
-    def read_common_server(self, check, strict):
+    def read_common_server(self, strict):
         #form = cgi.FieldStorage()
         #helpers.json_output('c:\\temp\\t.txt', form)
         charset = "utf-8"
@@ -142,7 +142,8 @@ class commonmain:
         command = jsondata['command']
         helpers.json_output('c:\\temp\\t2.txt', command)
         self.params = {
-          'check': check,
+          'service' : command['service'],
+          'check': command['service'] == 'tiebreak',
           'data': base64.b64decode(command['content']), 
           'input_file': command['filename'], 
           'output_file': '-', 
@@ -155,7 +156,7 @@ class commonmain:
           'experimental': False, 
           'verbose': True
         }
-        if check:
+        if self.params['service'] == 'tiebreak':
             self.params['tie_break']= command['tiebreaks']
             self.params['pre_determined'] = command['tournamenttype'] == 'p'
             self.params['swiss'] = command['tournamenttype'] == 's'
