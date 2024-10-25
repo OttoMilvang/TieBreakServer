@@ -132,15 +132,15 @@ class commonmain:
         charset = "utf-8"
         sys.stdin.reconfigure(encoding = charset)
         data = sys.stdin.read()
-        f = open("c:\\temp\\t1.txt", "w")
-        f.write(data)
-        f.close()
+        #f = open("c:\\temp\\t1.txt", "w")
+        #f.write(data)
+        #f.close()
         #f = open("c:\\temp\\t6881.json", "r")
         #data = f.read()
         #f.close()
         jsondata = json.loads(data)
         command = jsondata['command']
-        helpers.json_output('c:\\temp\\t2.txt', command)
+        #helpers.json_output('c:\\temp\\t2.txt', command)
         self.params = {
           'service' : command['service'],
           'check': command['service'] == 'tiebreak',
