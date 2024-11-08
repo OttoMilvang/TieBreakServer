@@ -364,6 +364,7 @@ class tiebreak:
             tbscore[prefix + 'num'] = { 'val' : 0 }    # number of games played (for pairing)
             tbscore[prefix + 'lp'] =  0     # last round played 
             tbscore[prefix + 'lo'] = 0     # last round without vur
+            tbscore[prefix + 'lp'] = 0     # last round paired
             tbscore[prefix + 'pfp'] = 0    # points from played games
             tbscore[prefix + 'lg'] = 0 #self.scoreLists[scoretype]['D'] # Result of last game
             tbscore[prefix + 'bp'] = {}    # Boardpoints
@@ -477,6 +478,9 @@ class tiebreak:
                         # last round with opponent, pab or fpb (16.2.1, 16.2.2, 16.2.3 and 16.2.4)
                         if rnd > tbscore[prefix + 'lo'] and (vur == 0):
                             tbscore[prefix + 'lo'] = rnd
+                        if rnd > tbscore[prefix + 'lp'] and (game['opponent'] > 0):
+                            tbscore[prefix + 'lp'] = rnd
+
 
 
 
@@ -742,21 +746,22 @@ class tiebreak:
             tbscore = cmp['tbval']
             tbscore[oprefix + 'abh'] = { 'val' : 0 }     # Adjusted score for BH (check algorithm)
             # 16.3.2    Unplayed rounds of category 16.2.5 are evaluated as draws.
+            adjfore = isfb and tbscore[oprefix + 'lp'] == self.rounds # do we need to adjust for Fore
             for rnd, rst in cmp['rsts'].items():
                 if rnd <= rounds:
                     points_no_opp = Decimal(0.0) if self.rr else opointsfordraw
-                    tbval = rst[opoints] if rnd <= tbscore[oprefix + 'lo'] or rst['opponent'] > 0 else points_no_opp
+                    tbval = rst[opoints] if rnd <= tbscore[oprefix + 'lo'] or adjfore or rst['opponent'] > 0 else points_no_opp
                     tbscore[oprefix + 'abh'][rnd] = tbval
                     tbscore[oprefix + 'abh']['val'] += tbval
             fbscore = tbscore[oprefix + 'points']['val']
-            if isfb and rst['opponent'] > 0 and tbscore[oprefix + 'lo'] == self.rounds:
+            #print(startno, isfb, rst['opponent'], tbscore[oprefix + 'lo'],tbscore[oprefix + 'lp'], self.rounds)
+            if adjfore:
                 #print(startno, tbscore[oprefix + 'abh']['val'], tbscore[oprefix + 'abh']['val'] - tbscore[oprefix + 'lg'] + opointsfordraw)
                 adjust = opointsfordraw - tbscore[oprefix + 'lg']
                 #print(tbscore[oprefix + 'lg'])
                 tbscore[oprefix + 'abh'][self.rounds] += adjust 
                 tbscore[oprefix + 'abh']['val'] += adjust
                 fbscore += adjust
-                #print(self.rounds, isfbandlastround)
             tbscore[oprefix + 'ownscore'] = fbscore
         if name == 'abh' or name == 'afb':
             return('abh')

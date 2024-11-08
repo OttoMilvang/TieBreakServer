@@ -57,7 +57,7 @@ class chessjson:
  
     def print_warning(self, line):
         if self.debug:
-            #print(line)
+            print(line)
             pass
         return
 

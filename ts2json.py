@@ -40,6 +40,60 @@ class ts2json(chessjson.chessjson):
                           'listDescription': 'FIDE blitz rating'
                         }]
                             
+        self.translatetb = {
+            'Points': 'PTS',
+            'ExpectedPoints' : 'ExpectedPoints' ,
+            'Accellerated1': 'Accellerated1',
+            'Accellerated2' : 'Accellerated2' ,
+            'StartNo': 'StartNo',
+            'Monrad' : 'Monrad' ,
+            'Monrad-1low' : 'Monrad-1low' ,
+            'Monrad-2low' : 'Monrad-2low' ,
+            'Monrad-1low-1high': 'Monrad-1low-1high',
+            'Buchholz' : 'BH' ,
+            'Buchholz-1low' : 'BH/C1' ,
+            'Buchholz-2low' : 'BH/C2' ,
+            'Buchholz-1low-1high': 'BH/M1',
+            'FB': 'FB',
+            'FB-1low' : 'FB/C1' ,
+            'FB-2low' : 'FB/C2' ,
+            'Berger' : 'SB' ,
+            'Berger-1low' : 'SB/C1' ,
+            'Berger-2low' : 'SB/C2' ,
+            'MutualResult' : 'MutualResult' ,
+            'DE': 'DE',
+            'MutualColor': 'MutualColor',
+            'FIDEtitle' : 'FIDEtitle' ,
+            'FideRating' : 'FideRating' ,
+            'LocalRating': 'LocalRating',
+            'SumProgressiveScore' : 'SumProgressiveScore' ,
+            'SumProgressiveScore-1' : 'SumProgressiveScore-1' ,
+            'SumProgressiveScore-2': 'SumProgressiveScore-2',
+            'AvgFideRatingOpponnent' : 'ARO' ,
+            'AvgFideRatingOpponnent-1low' : 'ARO/C1' ,
+            'AvgLocalRatingOpponnent' : 'AvgLocalRatingOpponnent' ,
+            'AvgLocalRatingOpponnent-1low': 'AvgLocalRatingOpponnent-1low',
+            'FIDERatingPrestation' : 'FIDERatingPrestation' ,
+            'LocalRatingPrestastion': 'LocalRatingPrestastion',
+            'Alphabetically' : 'Alphabetically' ,
+            'PctScoreMin75' : 'PctScoreMin75' ,
+            'Cup' : 'Cup' ,
+            'NumWins' : 'WON' ,
+            'NumBlackWins': 'NumBlackWins',
+            'NumBlacks' : 'NumBlacks' ,
+            'PerfectTournamentPerformance' : 'PTP' ,
+            'Koya' : 'KS' ,
+            'Custom1' : 'Custom1' ,
+            'Custom2': 'Custom2',
+            'GamePoints' : 'GPTS' ,
+            'TeamPointsPlusGamePoints': 'TeamPointsPlusGamePoints',
+            'IndividualMonrad': 'IndividualMonrad',
+            'IndividualMonrad-1low': 'IndividualMonrad-1low',
+            'IndividualMonrad-2low': 'IndividualMonrad-2low',
+            'IndividualMonrad-2low-2high': 'IndividualMonrad-2low-2high',
+            'IndividualBerger' : 'IndividualBerger' ,
+            'PctScoreLeague': 'PctScoreLeague',
+            }
         self.isteam = False
                             
 
@@ -266,10 +320,9 @@ class ts2json(chessjson.chessjson):
             'rounds' : [],
             'currentRound': 0,
             'teamTournament': self.event['eventInfo']['other']['teamEvent'],
-            'rankOrder': [{
-                'order': 1,
-                'name': 'PTS'
-                }],
+            'rankOrder': [
+                'PTS'
+                ],
             'competitors': [],
             'gameScoreSystem': 'game',
             'matchScoreSystem': 'match',
@@ -285,11 +338,11 @@ class ts2json(chessjson.chessjson):
                 case 'Rounds':
                     self.parse_ts_group_rounds(child, tournament)
                 case 'TieBreaksBy':
-                    self.parse_ts_group_order(child, tournamentno, 'TieBreaksBy')
+                    self.parse_ts_group_order(child, tournament, 'TieBreaksBy')
                 case 'IndividualTieBreaksBy':
-                    self.parse_ts_group_order(child, tournamentno, 'IndividualTieBreaksBy')
+                    self.parse_ts_group_order(child, tournament, 'IndividualTieBreaksBy')
                 case 'PairingGroupBy':
-                    self.parse_ts_group_order(child, tournamentno, 'PairingGroupBy')
+                    self.parse_ts_group_order(child, tournament, 'PairingGroupBy')
                 case 'PrizeGroups':
                     self.parse_ts_group_prize(child, tournamentno)
                 case 'ColWidths':
@@ -531,7 +584,10 @@ class ts2json(chessjson.chessjson):
         return periodno
     
 
-    def parse_ts_group_order(self, rank, tournamentno, ordertype):
+    def parse_ts_group_order(self, rank, tournament, ordertype):
+        if ordertype == 'TieBreaksBy':
+             tournament['rankOrder'] = []
+            
         for key, value in rank.items(): 
             if key == 'NumOrdersInPgroup':
                 numberorder = value
@@ -540,11 +596,29 @@ class ts2json(chessjson.chessjson):
         for order in rank:
             if order.tag != 'Order':    
                 self.print_warning('parse_group_order attrib, tag: ' + order.tag + ' not matched')
+            tb = {}
             for key, value in order.items():     
-                if key != 'Name':    
-                    self.print_warning('parse_group_order attrib, attrib: ' + key + ' not matched')
-                # use order
-                
+                tb[key] = value
+            if 'Name' in tb and tb['Name'] in self.translatetb:
+                name = self.translatetb[tb['Name']]
+            else:
+                self.print_warning('parse_group_order attrib, attrib: ' + key + ' not matched')
+                name = 'NOOP'
+            if 'IncludeForfeits' in tb and tb['IncludeForfeits'] =='Y':
+                name += '/P' 
+            if 'Limit' in tb:
+                name += '/L' 
+                if helpers.parse_int(tb['Limit']) >= 0:
+                    name += '+'
+                name +=  tb['Limit']
+            if 'Factor' in tb:
+                name += '/K' + tb['Factor']
+            if 'Fore' in tb and tb['Fore'] =='Y':
+                name += '/F' 
+            if ordertype == 'TieBreaksBy':
+                    tournament['rankOrder'].append(name)    
+        #if ordertype == 'TieBreaksBy':
+        #    print(tournament['rankOrder'])
         return
 
     def parse_ts_group_prize(self, attrib, tournamentno):

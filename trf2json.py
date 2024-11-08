@@ -56,10 +56,9 @@ class trf2json(chessjson.chessjson):
             'numRounds': 0,
             'currentRound': 0,
             'teamTournament': False,
-            'rankOrder': [{
-                'order': 1,
-                'name': 'PTS'
-                }],
+            'rankOrder': [
+                'PTS'
+                ],
             'competitors': [],
             'teamSize' : 0,
             'gameScoreSystem': 'game',
@@ -112,9 +111,9 @@ class trf2json(chessjson.chessjson):
                     case '132':
                         self.parse_trf_dates(tournament, line)
                     case '202': 
-                        self.parse_tiebreaks(False, line)
+                        self.parse_tiebreaks(tournament, line, False)
                     case '212': 
-                        self.parse_tiebreaks(True, line)
+                        self.parse_tiebreaks(tournament, line, True)
                     case '250':
                         self.parse_trf_accellerated(tournament, line)
                     case '300':
@@ -716,9 +715,10 @@ class trf2json(chessjson.chessjson):
             self.event['eventInfo']['arbiters']['arbiters'].append(pid)
         return
 
-    def parse_tiebreaks(self, pts, line):
-        spts = "" if pts else "PTS " 
-        self.tiebreaks = (spts + line[4:]).replace(',', ' ').replace('/', ' ').split(' ')
+    def parse_tiebreaks(self, tournament, line, has_pts):
+        pts = "" if has_pts else "PTS " 
+        self.tiebreaks = (pts + line[4:]).replace(',', ' ').split(' ')
+        tournament['rankOrder'] = self.tiebreaks
         
     def parse_colorsequence(self, tournament, line):
         seq = line[4:].strip()
