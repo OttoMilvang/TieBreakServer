@@ -27,7 +27,7 @@ class convert2jch(commonmain):
     def __init__(self):
         super().__init__()
         self.origin = 'convert ver. 1.00'
-        self.eventno = 0
+        self.tournamentno = 0
 
 
     # read_command_line

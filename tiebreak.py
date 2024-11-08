@@ -130,13 +130,13 @@ class tiebreak:
         self.unrated = int(params['unrated']) if params != None and 'unrated' in params else 0
         
     """
-    compute_tiebreaks(self, chessfile, eventno, params)
+    compute_tiebreaks(self, chessfile, tournamentno, params)
     chessfile - Chessfile structure
-    eventno - which tournament to calculate
+    tournamentno - which tournament to calculate
     params - Parameters from core
     """        
 
-    def compute_tiebreaks(self, chessfile, eventno, params):                                 
+    def compute_tiebreaks(self, chessfile, tournamentno, params):                                 
         
         # run tiebreak 
         #json.dump(chessfile.__dict__, sys.stdout, indent=2)
@@ -150,7 +150,7 @@ class tiebreak:
                 t = self.rankorder[i]
                 #print(t['id'], t['rank'], t['tiebreak'])
         if chessfile.get_status() == 0:
-            tm = chessfile.get_tournament(eventno)
+            tm = chessfile.get_tournament(tournamentno)
             tm['rankOrder'] = self.tiebreaks;
             jsoncmps = tm['competitors']
             correct = True

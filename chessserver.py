@@ -34,7 +34,7 @@ Request:
         "filename" : "<original file name>",
         "filetype": "TRF" | "TS" | < other known format >,
         "content": ["<lines with base 64 encoded file>"],
-        "eventno": <0 or tournamentno to convert>,
+        "tournamentno": <0 or tournamentno to convert>,
         "number_of_rounds": <int>, 
         // parameters for tiebreaks
             "tiebreaks" : [string list],
@@ -78,7 +78,7 @@ class chessserver(commonmain):
     def __init__(self):
         super().__init__()
         self.origin = 'chessserver ver. 1.00'
-        self.eventno = 0
+        self.tournamentno = 0
 
     def read_command_line(self):
         self.read_common_server(True)
@@ -99,11 +99,11 @@ class chessserver(commonmain):
                     self.filetype = 'tiebreak'
                 chessfile = self.chessfile
                 if chessfile.get_status() == 0:
-                    if self.eventno > 0:
-                        tb  = tiebreak(chessfile, self.eventno, params['number_of_rounds'], params)
-                        tb.compute_tiebreaks(chessfile, self.eventno, params) 
+                    if self.tournamentno > 0:
+                        tb  = tiebreak(chessfile, self.tournamentno, params['number_of_rounds'], params)
+                        tb.compute_tiebreaks(chessfile, self.tournamentno, params) 
                     else: 
-                        tb = tiebreak(chessfile, self.eventno, params['number_of_rounds'], params)
+                        tb = tiebreak(chessfile, self.tournamentno, params['number_of_rounds'], params)
                 self.core = tb
             case _:
                 self.core = None

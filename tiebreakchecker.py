@@ -124,11 +124,11 @@ class tiebreakchecker(commonmain):
             self.filetype = 'tiebreak'
         chessfile = self.chessfile
         if chessfile.get_status() == 0:
-            if self.eventno > 0:
-                tb  = tiebreak(chessfile, self.eventno, params['number_of_rounds'], params)
-                tb.compute_tiebreaks(chessfile, self.eventno, params) 
+            if self.tournamentno > 0:
+                tb  = tiebreak(chessfile, self.tournamentno, params['number_of_rounds'], params)
+                tb.compute_tiebreaks(chessfile, self.tournamentno, params) 
             else: 
-                tb = tiebreak(chessfile, self.eventno, params['number_of_rounds'], params)
+                tb = tiebreak(chessfile, self.tournamentno, params['number_of_rounds'], params)
         self.core = tb
         
  

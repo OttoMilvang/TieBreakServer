@@ -33,7 +33,7 @@ class commonmain:
          self.params = None
          self.filetype = 'chessjson'
          self.origin = 'checker, version 1.00'
-         self.eventno = 1
+         self.tournamentno = 1
 
     def printhelp(self):
         print('checker [options]')
@@ -90,8 +90,8 @@ class commonmain:
             #default='TS',
             default='TRF',
             help="path to output file")
-        parser.add_argument("-e", "--event-number", required=False,
-            default= str(self.eventno),
+        parser.add_argument("-e", "--tournament-number", required=False,
+            default= str(self.tournamentno),
             help="tournament number")
         parser.add_argument("-n", "--number-of-rounds", type=int,
             default=-1,
@@ -148,7 +148,7 @@ class commonmain:
           'input_file': command['filename'], 
           'output_file': '-', 
           'file_format': helpers.getFileFormat(command['filename']), 
-          'event_number' : str(command['eventno']), 
+          'tournamentno' : str(command['tournamentno']), 
           'number_of_rounds': (int(command['norounds']) if command['norounds'] != '' else -1), 
           'game_score': None, 
           'match_score': None, 
@@ -277,11 +277,11 @@ class commonmain:
             self.error(502, "Error when reading file: " + params['input_file'])
     
     
-        if not 'event_number' in self.params:
-            self.error(501, "Missing parameter --event-number")
-        self.eventno = helpers.parse_int(self.params['event_number'])
-        if self.eventno < 0 or self.eventno > len(self.chessfile.event['tournaments']):
-            self.error(501, "Invalid parameter --event-number")
+        if not 'tournament_number' in self.params:
+            self.error(501, "Missing parameter --tournament-number")
+        self.tournamentno = helpers.parse_int(self.params['tournament_number'])
+        if self.tournamentno < 0 or self.tournamentno > len(self.chessfile.event['tournaments']):
+            self.error(501, "Invalid parameter --tournament-number")
     
         # Add command line parameters
         for score in ['game', 'match']:
