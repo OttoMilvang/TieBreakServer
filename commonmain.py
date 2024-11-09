@@ -148,7 +148,7 @@ class commonmain:
           'input_file': command['filename'], 
           'output_file': '-', 
           'file_format': helpers.getFileFormat(command['filename']), 
-          'tournamentno' : str(command['tournamentno']), 
+          'tournament_number' : str(command['tournamentno']), 
           'number_of_rounds': (int(command['norounds']) if command['norounds'] != '' else -1), 
           'game_score': None, 
           'match_score': None, 
