@@ -22,7 +22,7 @@ class ts2json(chessjson.chessjson):
 
     def __init__(self):
         super().__init__()
-        self.debug = True
+        self.debug = False
         self.event['origin'] = 'ts2json ver. 1.00'
         self.pcompetitors = {} # pointer to player section competitors
         self.bcompetitors = {} # pointer to team competitors via 1st board player
@@ -122,6 +122,10 @@ class ts2json(chessjson.chessjson):
                     for group in child:
                         if group.tag == 'Group':
                             tournamentno += 1
+                            self.pcompetitors = {} # pointer to player section competitors
+                            self.bcompetitors = {} # pointer to team competitors via 1st board player
+                            self.tcompetitors = {} # pointer to team section competitors
+
                             tournament = self.parse_ts_group(group, tournamentno)
                             if self.isteam:
                                 self.prepare_team_section(tournament)

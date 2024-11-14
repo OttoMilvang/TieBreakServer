@@ -617,8 +617,9 @@ class tiebreak:
             unique = True
             for i in range(1, len(subro)):
                 rank += 1
+                tbmax = max(subro[i:], key=lambda tbval: tbval['tbval']['demax'])
                 de = subro[i]['tbval']
-                if (unique and val > de['demax']):
+                if (unique and val > tbmax['tbval']['demax']):
                     crank = de[prefix + name]['val'] = rank
                     val = de['deval']
                     maxval = de['demax']
