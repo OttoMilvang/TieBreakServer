@@ -1,0 +1,61 @@
+Tiebreaks:
+Corrected Tiebreaks for team FB:GP
+Corrected Tiebreaks for team unplayed rounds EGGSB
+Added support for /F switch
+Added support for multiple modifierers e.g. FP:GP/C1/P
+Added support for all tiebreaks in "Mandatory Tie-Breaks"
+tested with individual:
+DE WIN FB DE/P WON FB/C1 BPG PS FB/C2 BWG PS/C1 FB/M1 REP PS/C2 FB/M2 SB BH FB/P SB/C1 BH/C1 
+FB/C1/P SB/C2 BH/C2 FB/C2/P SB/P BH/M1 FB/M1/P SB/C1/P BH/M2 FB/M2/P SB/C2/P BH/P AOB ARO BH/C1/P 
+AOB/F ARO/C1 BH/C2/P KS ARO/C2 BH/M1/P KS/L40 KS/L-2 ARO/M1 BH/M2/P ARO/M2 TPR PTP APRO APPO
+tested with team:
+WIN:MP BH:MP/C1/P FB:MP/C1/P ESB:MM ESB:GG WON:MP BH:MP/C2/P FB:MP/C2/P ESB:MM/C1 ESB:GG/C1 PS:MP 
+BH:MP/M1/P FB:MP/M1/P ESB:MM/C2 ESB:GG/C2 PS:GP BH:MP/M2/P FB:MP/M2/P ESB:MM/P ESB:GG/P PS:MP/C1 
+BH:GP/C1/P FB:GP/C1/P ESB:MM/C1/P ESB:GG/C1/P PS:MP/C2 BH:GP/C2/P FB:GP/C2/P ESB:MM/C2/P ESB:GG/C2/P 
+PS:GP/C1 BH:GP/M1/P FB:GP/M1/P ESB:MG EDE PS:GP/C2 BH:GP/M2/P FB:GP/M2/P ESB:MG/C1 EDE/P BH:MP 
+FB:MP AOB:MP ESB:MG/C2 SSSC BH:GP FB:GP AOB:GP ESB:MG/P SSSC/F BH:MP/C1 FB:MP/C1 AOB:MP/F ESB:MG/C1/P 
+SSSC/P BH:MP/C2 FB:MP/C2 AOB:GP/F ESB:MG/C2/P SSSC/F/P BH:MP/M1 FB:MP/M1 KS:MP ESB:GM SSSC/K5 
+BH:MP/M2 FB:MP/M2 KS:MP/L-2 ESB:GM/C1 SSSC/F/K5 BH:GP/C1 FB:GP/C1 KS:GP ESB:GM/C2 SSSC/P/K5 BH:GP/C2 
+FB:GP/C2 KS:GP/L-2 ESB:GM/P SSSC/F/P/K5 BH:GP/M1 FB:GP/M1 BC ESB:GM/C1/P BH:GP/M2 FB:GP/M2 TBR 
+ESB:GM/C2/P BH:MP/P FB:MP/P BBE BH:GP/P FB:GP/P MPvGP
+
+Changes in calculation:
+Decimal numbers has changed from float to Decimal. 
+It's known that 1.1 + 2.2 = is evaluated to3.3000000000000003 in python float.
+With Decimal, Decimal('1.1') + Decimal('2.2') is evaluated to Decimal('3.3').
+The tiebreak structure has a new element precision, that shows the number of digits after decimal point.
+
+Program:
+New switches:
+-p : tournament has predefined pairing
+-s : tournament is a swiss tournament
+-r : sort in rank order (in combination with -d) 
+Program returns %errorlevel% 0 if everything is OK
+Program returns %errorlevel% 1 with -c switch and rank order does not match
+Program returns %errorlevel% >=500 on error
+
+Internal structure:
+The sections playerSection and teamSection are replaced by
+gameList, matchList, gameScoreSystem, matchScoreSystem and competitors.
+competitors are players for individual tournaments and teams for team tournaments.
+
+In return struture
+result is changed to tieBreakResult
+
+2025-04-30
+New program: pairingchecker.py
+python pairingchecker.py [-i <input> ] [-o <output> ] [-c] [-a] [-p] [-d T] [-n <round>]
+-c = Check mode 
+-a - analyze current file 
+-p - show pairing 
+-d T - formatted text output
+-n round - Ruund number to analyze 
+
+python pairingchecker.py -i <input> -d T -p
+will give pairing of bext round
+
+python pairingchecker.py -i <input> -d T -c
+will check all round in the input file
+
+python pairingchecker.py -i <input> -d T -c -a -p -n 8
+will print details albout the pairing in round 8

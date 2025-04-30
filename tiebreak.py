@@ -187,6 +187,7 @@ class tiebreak:
                 cmp["rsts"][rnd] = {
                     ptype: zero,
                     "rpoints": zero,
+                    "res" : "Z",
                     "color": "w",
                     "played": False,
                     "vur": True,
@@ -228,9 +229,9 @@ class tiebreak:
             brPoints = self.get_score("rating", rst, "black")
             bVur = self.is_vur(rst, "black")
             if rst["played"]:
-                if "rating" in cmps[white] and cmps[white]["rating"] > 0:
+                if white in cmps and "rating" in cmps[white] and cmps[white]["rating"] > 0:
                     wrating = cmps[white]["rating"]
-                if "rating" in cmps[black] and cmps[black]["rating"] > 0:
+                if black in cmps and "rating" in cmps[black] and cmps[black]["rating"] > 0:
                     brating = cmps[black]["rating"]
                 expscore = rating.ComputeExpectedScore(wrating, brating)
         board = rst["board"] if "board" in rst else 0
@@ -238,6 +239,7 @@ class tiebreak:
             cmps[white]["rsts"][rnd] = {
                 ptype: wPoints,
                 "rpoints": wrPoints,
+                "res": rst["wResult"],
                 "color": "w",
                 "played": rst["played"],
                 "vur": wVur,
@@ -252,6 +254,7 @@ class tiebreak:
             cmps[black]["rsts"][rnd] = {
                 ptype: bPoints,
                 "rpoints": brPoints,
+                "res": rst["bResult"],
                 "color": "b",
                 "played": rst["played"],
                 "vur": bVur,
@@ -317,6 +320,7 @@ class tiebreak:
         # print('self.max', self.maxboard)
 
     def addtbval(self, obj, rnd, val):
+        rnd = str(rnd)
         if rnd in obj:
             if isinstance(val, str):
                 obj[rnd] = obj[rnd] + val
@@ -342,6 +346,7 @@ class tiebreak:
             tbscore[prefix + "bwg"] = {"val": 0}  # number of games won with black
             tbscore[prefix + "ge"] = {"val": 0}  # number of games played + PAB
             tbscore[prefix + "rep"] = {"val": 0}  # number of rounds elected to play (same as GE)
+            tbscore[prefix + "rip"] = {"val": 0}  # number of rounds paired (for TPN assignment)
             tbscore[prefix + "vur"] = {"val": 0}  # number of vurs (check algorithm)
             tbscore[prefix + "cop"] = {"val": "  "}  # color preference (for pairing)
             tbscore[prefix + "cod"] = {"val": 0}  # color difference (for pairing)
@@ -466,6 +471,11 @@ class tiebreak:
                         self.addtbval(tbscore[prefix + "rep"], rnd, ge)
                         self.addtbval(tbscore[prefix + "rep"], "val", ge)
 
+                        # number of gamesin pairing
+                        rip = 1 if game["played"] or game['opponent']> 0 else 0
+                        self.addtbval(tbscore[prefix + "rip"], rnd, rip)
+                        self.addtbval(tbscore[prefix + "rip"], "val", rip)
+ 
                         vur = 1 if game["vur"] else 0
                         self.addtbval(tbscore[prefix + "vur"], rnd, vur)
                         self.addtbval(tbscore[prefix + "vur"], "val", vur)
@@ -476,6 +486,15 @@ class tiebreak:
                         if rnd > tbscore[prefix + "lp"] and (game["opponent"] > 0):
                             tbscore[prefix + "lp"] = rnd
 
+
+    """
+    compute_recursive_if_tied is used for DE, EDE, EDEBT, EDEBB, EDET, EDEB, TBR and BBE
+    Foreach loop see if last run untied any more. If not sort all records
+    In loopcount 0 initializee all structures
+    In loopcount 1 .. n run different parts for example for EDE alternate Primary scoro, secondary score  
+    When subrange is empty clean up. We have finished all subranges and will report more_to_do
+    
+    """
     def compute_recursive_if_tied(self, tb, cmps, rounds, compute_singlerun):
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         name = tb["name"].lower()
@@ -484,6 +503,7 @@ class tiebreak:
             player["tbval"][prefix + name] = {}
             player["tbval"][prefix + name]["val"] = player["rank"]  # rank value initial value = rank
             player["tbval"]["moreloops"] = True  # As long as True we have more to check
+        # part 1, run recursive until no more are tied
         loopcount = 0
         moretodo = compute_singlerun(tb, cmps, rounds, ro, loopcount)
         while moretodo:
@@ -512,8 +532,7 @@ class tiebreak:
             moreloops = compute_singlerun(tb, cmps, rounds, [], loopcount)
             moretodo = moretodo or moreloops
             ro = sorted(ro, key=lambda p: (p["rank"], p["tbval"][prefix + name]["val"], p["cid"]))
-        # print('L=' + str(loopcount))
-        # reorder 'tb'
+        # part 2, Reorder rank
         start = 0
         while start < len(ro):
             currentrank = ro[start]["rank"]
@@ -532,6 +551,7 @@ class tiebreak:
     def compute_basic_direct_encounter(self, tb, cmps, rounds, subro, loopcount, points, scoretype, prefix):
         name = tb["name"].lower()
         (xpoints, xscoretype, prefix) = self.get_scoreinfo(tb, True)
+        # print("compute_basic_direct_encounter", loopcount, points, scoretype, prefix, xpoints, xscoretype, prefix)
         changes = 0
         rpos = loopcount - tb["modifiers"]["swap"]  # Report pos
         postfix = " " + scoretype[0] if tb["name"] == "EDE" else ""
@@ -633,37 +653,64 @@ class tiebreak:
             changes = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scoretype, prefix)
         return changes
 
+    
+    """
+    EDE - Primary Score - Secondary score
+    EDEC - Primary Score - Secondary score - BC
+    EDET - Primary Score - Secondary score - TBR
+    EDEB - Primary Score - Secondary score - BBE
+    EDEBT - Primary Score - Secondary score - BC -TBR
+    EDEBB - Primary Score - Secondary score - BC - BBE
+    """
     def compute_singlerun_ext_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
         # name = tb["name"].lower()
-        (points, scoretype, prefix) = self.get_scoreinfo(tb, loopcount == 0 or tb["modifiers"]["primary"])
+        print("compute_singlerun_ext_direct_encounter", loopcount, points, scoretype, prefix, subro[0]['rank'] if len(subro)> 0 else 0 , len(subro))
         changes = 0
         if loopcount == 0:
-            tb["modifiers"]["primary"] = True
-            tb["modifiers"]["points"] = points
-            (spoints, secondary, sprefix) = self.get_scoreinfo(tb, False)
+            functype = {'EDE': 'PS', 
+                        'EDEC': 'PSC', 
+                        'EDET': 'PST', 
+                        'EDEB': 'PSB', 
+                        'EDEBT': 'PSCT', 
+                        'EDEBB': 'PSCB'}
+            tb["modifiers"]["functions"] = functions = functype[tb['name']]
             tb["modifiers"]["loopcount"] = 0
-            tb["modifiers"]["edechanges"] = {scoretype: 0, secondary: 1}
+            tb["modifiers"]["edechanges"] = [True]*len(functions)
             tb["modifiers"]["swap"] = 0
             return True
         if tb["modifiers"]["loopcount"] != loopcount:
-            # print(scoretype)
             tb["modifiers"]["loopcount"] = loopcount
             tb["modifiers"]["changes"] = 0
         if len(subro) == 0:
             if tb["modifiers"]["changes"] == 0:
                 tb["modifiers"]["primary"] = not tb["modifiers"]["primary"]
                 tb["modifiers"]["edechanges"][scoretype] = 0
-                tb["modifiers"]["swap"] += 1
+                swap = tb["modifiers"]["swap"]
+                tb["modifiers"]["edechanges"][swap] = True
+                tb["modifiers"]["swap"] = (swap + 1) % len(tb["modifiers"]["functions"])
                 ro = self.rankorder
                 for player in ro:
                     player["tbval"]["moreloops"] = True  # 'de' rank value initial value = rank
             else:
-                (spoints, secondary, sprefix) = self.get_scoreinfo(tb, not tb["modifiers"]["primary"])
-                tb["modifiers"]["edechanges"][secondary] = 1
-            retsum = tb["modifiers"]["edechanges"]["match"] + tb["modifiers"]["edechanges"]["game"]
+                tb["modifiers"]["edechanges"] = [True for _ in tb["modifiers"]["edechanges"]]
             # print('E', loopcount, tb['modifiers']['changes'], retsum, tb['modifiers']['edechanges'])
-            return retsum > 0 and loopcount < 30
-        changes = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scoretype, prefix)
+            return any(tb["modifiers"]["edechanges"]) and loopcount < 30
+        changes = 0
+        match tb["modifiers"]["functions"][tb["modifiers"]["swap"]]:
+            case 'P':
+                (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
+                while (ch := self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scoretype, prefix)) > 0:
+                    changes += ch
+            case 'S':
+                (points, scoretype, prefix) = self.get_scoreinfo(tb, False)
+                while (ch := self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scoretype, prefix)) > 0:
+                    changes += ch
+            case 'B':
+                (points, scoretype, prefix) = self.get_scoreinfo(tb, False)
+                while (ch := self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, "bc", "bc", prefix)) > 0:
+                    changes += ch
+
+                    
         tb["modifiers"]["changes"] += changes
         # print(loopcount, tb['modifiers']['scoretype'], tb['modifiers']['edechanges'], changes)
         # print(len(subro),loopcount, changes, tb['modifiers']['edechanges'], scoretype)
@@ -738,22 +785,19 @@ class tiebreak:
             tbscore = cmp["tbval"]
             tbscore[oprefix + "abh"] = {"val": 0}  # Adjusted score for BH (check algorithm)
             # 16.3.2    Unplayed rounds of category 16.2.5 are evaluated as draws.
-            adjfore = isfb and tbscore[oprefix + "lp"] == self.rounds  # do we need to adjust for Fore
+            isfore = isfb and tbscore[oprefix + "lp"] == self.rounds  # do we need to adjust for Fore
+            adjustfore = False
             for rnd, rst in cmp["rsts"].items():
                 if rnd <= rounds:
                     points_no_opp = Decimal(0.0) if self.rr else opointsfordraw
-                    tbval = (
-                        rst[opoints]
-                        if rnd <= tbscore[oprefix + "lo"] or adjfore or rst["opponent"] > 0
-                        else points_no_opp
-                    )
+                    hasopponent = rnd <= tbscore[oprefix + "lo"] or rst["opponent"] > 0
+                    adjustfore = adjustfore or (isfore and rnd == rounds and rst["opponent"] > 0)
+                    tbval = rst[opoints] if hasopponent else points_no_opp
                     tbscore[oprefix + "abh"][rnd] = tbval
                     tbscore[oprefix + "abh"]["val"] += tbval
             fbscore = tbscore[oprefix + "points"]["val"]
             # print(startno, isfb, rst['opponent'], tbscore[oprefix + 'lo'],tbscore[oprefix + 'lp'], self.rounds)
-            if adjfore:
-                # print(startno, tbscore[oprefix + 'abh']['val'], tbscore[oprefix + 'abh']['val'] - tbscore[oprefix +
-                # 'lg'] + opointsfordraw)
+            if adjustfore:
                 adjust = opointsfordraw - tbscore[oprefix + "lg"]
                 # print(tbscore[oprefix + 'lg'])
                 tbscore[oprefix + "abh"][self.rounds] += adjust
@@ -1000,39 +1044,46 @@ class tiebreak:
         scorelist = self.scoreLists[scoretype]
         for startno, cmp in cmps.items():
             tbscore = cmp["tbval"]
-            tbscore[prefix + "flt"] = {"val": 0}
-            sfloat = 0  # Float so far
-            for rnd in range(1, rounds + 1):
-                sfloat //= 4
-                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else Decimal("0.0")
-                opp = cmp["rsts"][rnd]["opponent"] if rnd in cmp["rsts"] and "opponent" in cmp["rsts"][rnd] else 0
-                if opp > 0:
-                    ownacc = cmp["tbval"][prefix + "acc"][rnd - 1]
-                    oppacc = cmps[opp]["tbval"][prefix + "acc"][rnd - 1]
-                elif p > scorelist["L"]:
+            tbscore[prefix + "flt"] = { "val": 0 }
+            nfloat = 0  # Float so far as numeric
+            sfloat = "" # Float so far as string
+            for rnd in range(1, rounds+1):
+                nfloat *= 4  
+                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"]  and points in cmp["rsts"][rnd] else Decimal("0.0")
+                opp = cmp["rsts"][rnd]["opponent"] if rnd in cmp["rsts"]  and "opponent" in cmp["rsts"][rnd] else 0
+                # ownacc = own points + accellerated 
+                # oppacc = opponent points + accellerated 
+                if opp > 0 and cmp["rsts"][rnd]['played']: 
+                    ownacc = cmp["tbval"][prefix + "acc"][rnd-1]
+                    oppacc = cmps[opp]["tbval"][prefix + "acc"][rnd-1]                    
+                elif p > scorelist["L"] or cmp["rsts"][rnd]['played']: # Have points without playing, more than points for loss 
+                    # print("XX", p, rnd, startno, opp)
                     ownacc = 1
                     oppacc = 0
                 else:
+                    # print("YY", p, rnd, startno, opp)
                     ownacc = 0
                     oppacc = 0
                 if ownacc > oppacc:
                     cfloat = "d"
-                    ifloat = 8
+                    ifloat = 1
                 elif ownacc < oppacc:
                     cfloat = "u"
-                    ifloat = 4
+                    ifloat = 2
                 else:
-                    cfloat = " "
+                    cfloat = "-"
                     ifloat = 0
-                if rnd == 1 and cfloat == "u":
-                    # print(startno, opp)
-                    # print(cmp['tbval'])
-                    # print(cmps[opp]['tbval'])
+                if rnd == 1 and cfloat =="u":
+                    #print(startno, opp)
+                    #print(cmp["tbval"])
+                    #print(cmps[opp]["tbval"])
                     pass
-                self.addtbval(tbscore[prefix + "flt"], rnd, cfloat)
-                sfloat += ifloat
-            tbscore[prefix + "flt"]["val"] = sfloat
+                self.addtbval(tbscore[prefix + "flt"], rnd, cfloat) 
+                nfloat += ifloat
+                sfloat += cfloat
+            tbscore[prefix + "flt"]["val"] = (sfloat if tb["modifiers"]["sws"] else nfloat) % 16
         return "flt"
+
 
     def compute_rfp(self, tb, cmps, rounds):
         (points, scoretype, prefix) = self.get_scoreinfo(tb, True)
@@ -1060,6 +1111,13 @@ class tiebreak:
                 else:
                     val = ""
                 if rnd <= rounds:
+                    val = "pab" if val == "0w" else val 
+                    if not cmp["rsts"][rnd]["played"]:
+                        res = cmp["rsts"][rnd]["res"]
+                        if cmp["rsts"][rnd]["opponent"]:
+                            val = {"W": "+", "D": "=", "L": "-", "P": "pab", "U": "=", "Z": "-"}[res]
+                        else:
+                            val = {"W": "F", "D": "H", "L": "Z", "P": "pab", "U": "=", "Z": "Z"}[res]
                     tbscore[prefix + "rfp"][rnd] = val
             tbscore[prefix + "rfp"]["val"] = val
         return "rfp"
@@ -1185,7 +1243,7 @@ class tiebreak:
                         tb["modifiers"]["fmo"] = True
                     case "R":
                         tb["modifiers"]["rb5"] = True
-                    case "d.S":
+                    case "S":
                         tb["modifiers"]["sws"] = True
                     case "Z":
                         tb["modifiers"]["z4h"] = True
@@ -1267,13 +1325,15 @@ class tiebreak:
                 tbname = self.compute_recursive_if_tied(
                     tb, cmps, self.currentround, self.compute_singlerun_direct_encounter
                 )
-            case "EDE":
+            case "EDE" | "EDEC" | "EDET" | "EDEB" | "EDEBT" | "EDEBB":
                 # tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
                 tb["modifiers"]["reverse"] = False
+                if tb["name"] in ["EDEC" , "EDEBT" , "EDEBB"]:
+                    compute_boardcount(tb, cmps, self.currentround)
                 tbname = self.compute_recursive_if_tied(
                     tb, cmps, self.currentround, self.compute_singlerun_ext_direct_encounter
                 )
-            case "WIN" | "WON" | "BPG" | "BWG" | "GE" | "REP" | "VUR" | "NUM" | "COP" | "COD" | "CSQ":
+            case "WIN" | "WON" | "BPG" | "BWG" | "GE" | "REP" | "RIP" | "VUR" | "NUM" | "COP" | "COD" | "CSQ":
                 tbname = tb["name"].lower()
             case "PS":
                 tbname = self.compute_progressive_score(tb, cmps, self.currentround)
