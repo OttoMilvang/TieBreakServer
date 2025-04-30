@@ -1,1 +1,0 @@
-python tiebreakchecker.py -c -i "..\test\MommysCup.trf" -t PTS PTS:GP EDE BH/C1 BH SB -d T -v | grep "12 28 30"
