@@ -1,0 +1,12 @@
+[workspace]
+restore_data_on_startup = True
+save_data_on_exit = True
+save_history = True
+save_non_project_files = False
+project_type = 'empty-project-type'
+recent_files = ['pairingchecker.py', 'trf2json.py', 'ts2json.py', 'rating.py', 'helpers.py', 'chessjson.py', 'berger.py', 'README.md', 'ngpbgp.py', 'ngpbgp.md', 'unplayed.py', 'jsonscheme.py', 'pairing.py', 'commonmain.py', 'testberger.py', 'verifyjch.py', 'chessserver.py', 'convert.py', 'tiebreak.py', 'tiebreakchecker.py', 's1exchanges.py', 't.py', 'crosstable.py', 'crosstable2.py']
+
+[main]
+version = 0.2.0
+recent_files = []
+
