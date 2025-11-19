@@ -5,6 +5,7 @@ Created on Mon Oct 25 08:16:13 2024
 @author: Otto Milvang, sjakk@milvang.no
 """
 import sys
+import version
 from commonmain import commonmain
 from tiebreak import tiebreak
 
@@ -64,7 +65,7 @@ class chessserver(commonmain):
 
     def __init__(self):
         super().__init__()
-        self.origin = "chessserver ver. 1.00"
+        self.origin = "chessserver ver. " + version.version
         self.tournamentno = 0
 
     def read_command_line(self):
@@ -76,10 +77,11 @@ class chessserver(commonmain):
     def do_checker(self):
         params = self.params
         self.core = None
-        match (params["service"]):
-            case "convert":
+        service = params["service"]
+        
+        if service == "convert":
                 self.core = None
-            case "tiebreak":
+        elif service == "tiebreak":
                 # result = None
                 if params["check"]:
                     self.filetype = "tiebreak"
@@ -91,7 +93,7 @@ class chessserver(commonmain):
                     else:
                         tb = tiebreak(chessfile, self.tournamentno, params["number_of_rounds"], params)
                 self.core = tb
-            case _:
+        else:
                 self.core = None
 
 

@@ -29,7 +29,7 @@ class convert2jch(commonmain):
     #   -v = verbose and debug
 
     def read_command_line(self):
-        self.read_common_command_line(True)
+        self.read_common_command_line("convert 1.1.35", True)
 
     def write_text_file(self, f, result, delimiter):
         pass
@@ -39,6 +39,9 @@ class convert2jch(commonmain):
 
 
 # run program
-jch = convert2jch()
-code = jch.common_main()
-sys.exit(code)
+
+if __name__ == "__main__":
+
+    jch = convert2jch()
+    code = jch.common_main()
+    sys.exit(code)

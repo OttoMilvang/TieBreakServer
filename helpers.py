@@ -7,9 +7,34 @@ import json
 import sys
 from decimal import Decimal
 
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Decimal.Decimal):
+            return str(o)
+        return super().default(o)
+
+
 # ==============================
 #
 #  Helpers
+
+
+#  Dict access
+
+
+def safe(dict_list, acc_list, default=None):
+    for d in dict_list:
+        val = d
+        for a in acc_list:
+            if val is not None:
+                val = val.get(a)
+        if val is not None:
+            return val
+    return default
+
+
+#  Parse
 
 
 def parse_date(date):
@@ -62,8 +87,9 @@ def to_base36(num):
     b36 = min(abs(int(num * Decimal("2.0"))), 35)
     return "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[b36]
 
+
 def from_base36(s):
-    if s == '':
+    if s == "":
         return 0
     b36 = int(s, 36)
     return b36
@@ -71,9 +97,10 @@ def from_base36(s):
 
 def spilt_my_line(line, maxlen, delimiter):
     if len(line) < maxlen:
-        return(line, "")
+        return (line, "")
     pos = line[:maxlen].rfind(delimiter)
-    return(line[:pos+1], line[pos+1:]) 
+    return (line[: pos + 1], line[pos + 1:])
+
 
 # return -1 if different
 # return 1 if equal
@@ -94,96 +121,6 @@ def is_equal(txt, struct1, struct2):
 
 
 #
-# Solve point system
-# Input array of equations:
-# sum = w * W + d * D + l * L + p * P + u * U + z * Z
-# Solve w, d, l, p, u, z for variables where W, D, L, P, U and Z present in equautins
-#
-
-
-def solve_scoresystem_p(equations, pab):
-    # print(equations)
-    score = {"sum": Decimal("0.0"), "W": 0, "D": 0, "L": 0, "P": 0, "U": 0, "Z": 0}
-    # print ('PAB:', pab)
-    res = {}
-    for loss in [Decimal("0.0"), Decimal("0.5"), Decimal("1.0")]:
-        res["L"] = loss
-        for draw in [loss + Decimal("0.5"), loss + Decimal("1.0"), loss + Decimal("1.5"), loss + Decimal("2.0")]:
-            res["D"] = draw
-            for win in [
-                draw + draw - loss,
-                draw + draw - loss + 1,
-                draw + draw - loss + Decimal("0.5"),
-                draw + draw - loss + Decimal("1.0"),
-                draw + draw - loss + Decimal("1.5"),
-                draw + draw - loss + Decimal("2.0"),
-            ]:
-                res["W"] = win
-                for unknown in ["D", "L", "W"]:
-                    res["U"] = res[unknown]
-                    ok = True
-                    # if loss != 0.0 or draw != 0.5 or win != 1.0 or unknown != 'D':
-                    #    continue
-                    for result in equations:
-                        tsum = 0
-                        tsum += result["W"] * win
-                        tsum += result["D"] * draw
-                        tsum += result["L"] * loss
-                        tsum += result["U"] * res[unknown]
-                        res["U"] = unknown
-                        res["Z"] =  Decimal("0.0")
-                        for key, value in result.items():
-                            if key != "pab" and key != "pres":
-                                score[key] += value
-                        pok = False
-                        if result["P"] > 0:
-                            for p in pab:
-                                # print(tsum, result['P'], res[p],  tsum + result['P'] * res[p], result['sum'])
-                                if tsum + result["P"] * res[p] == result["sum"]:
-                                    # print('TRUE', result['sum'])
-                                    pok = True
-                                    result["pres"] = p
-                                    res["P"] = res[p]
-                        else:
-                            # print(tsum, result['P'], result['sum'])
-                            pok = tsum == result["sum"]
-                        ok = ok and pok
-
-                    if ok:
-                        ret = {key: value for key, value in res.items() if score[key] != 0}
-                        for key in ["X", "U"]:
-                            if key in ret and res[key] in ["W", "D", "L", "Z"] and ret[key] not in ret:
-                                ret[res[key]] = res[res[key]]
-
-                        for eq in equations:
-                            # print(eq)
-                            if "pab" in eq:
-                                # print(eq)
-                                eq["pab"]["wResult"] = eq["pres"]
-                                res.pop("P", None)
-
-                        # print(equations)
-                        # print('Score:', score)
-                        # print('Ret = ',  ret)
-                        return ret
-    # print('none')
-    # return None
-
-
-def solve_scoresystem(equations):
-    res = False
-    res = res or solve_scoresystem_p(equations, ["W"])
-    res = res or solve_scoresystem_p(equations, ["D"])
-    res = res or solve_scoresystem_p(equations, ["L"])
-    res = res or solve_scoresystem_p(equations, ["W", "D"])
-    res = res or solve_scoresystem_p(equations, ["D", "L"])
-    res = res or solve_scoresystem_p(equations, ["W", "D", "L"])
-
-    return res
-    # print(equations)
-
-
-#
 # Function: getFileFormat
 # Returns a file format.
 #
@@ -196,15 +133,14 @@ def getFileFormat(filename):
     parts = filename.split(".")
     lastp = parts[-1].lower()
     # retval = ""
-    match lastp:
-        case "jch" | "json":
-            return "JSON"
-        case "txt" | "trf" | "trfx":
-            return "TRF"
-        case "trx":
-            return "TS"
-        case _:
-            return "JSON"
+    # match lastp:
+    if lastp == "jch" or lastp == "json":
+        return "JSON"
+    if lastp == "txt" or lastp == "trf" or  lastp == "trfx":
+        return "TRF"
+    if lastp == "trx":
+        return "TS"
+    return "JSON"
 
 
 def sortxval(x):
@@ -215,6 +151,9 @@ def sortnum(x):
     return x["num"]
 
 
+def subtract_lowest(x, y):
+    minval = min(x, y)
+    return (x - minval, y - minval)
 
 
 # =================
@@ -223,22 +162,45 @@ def sortnum(x):
 #
 #
 
-def print_pair(c, pcmps, bsn, sno):
-    a = c['w']
-    b = c['b']
-    sa = ('   ' + str(pcmps[a][sno]))[-3:]
-    sb = (str(pcmps[b][sno])+'   ')[0:3]
-    ba = ('   ' + (str(bsn[pcmps[a]['cid']]))[-3:]) if pcmps[a]['cid'] in bsn else "  ?"
-    bb = ((str(bsn[pcmps[b]['cid']])+'   ')[:3]) if pcmps[b]['cid'] in bsn else "  ?"
-    return sa+' - '+sb + " (" + ba+' - '+bb + ")"
-    
 
-def print_down(c, pcmps, bsn):
-    sa = ('   ' + str(c))[-3:]
-    sb = '   '
-    ba = ('   ' +str(bsn[pcmps[c]['cid']]))[-3:] if pcmps[c]['cid'] in bsn else "  ?"
-    bb = '   '
-    return sa+' - '+sb + " (" + ba+' - '+bb + ")"
+def format_pair(c, pcmps, bsn, sno):
+    a = c["w"]
+    b = c["b"]
+    sa = ("    " + str(pcmps[a][sno]))[-4:]
+    sb = (str(pcmps[b][sno]) + "   ")[0:4]
+    ba = ("    " + str(bsn[pcmps[a]["cid"]]))[-4:] if pcmps[a]["cid"] in bsn else "  ?"
+    bb = ((str(bsn[pcmps[b]["cid"]]) + "    ")[:4]) if pcmps[b]["cid"] in bsn else "  ?"
+    return sa + " - " + sb + " (" + ba + " - " + bb + ")"
+
+
+def format_down(c, pcmps, bsn):
+    sa = ("    " + str(c))[-4:]
+    sb = "    "
+    ba = ("    " + str(bsn[pcmps[c]["cid"]]))[-4:] if pcmps[c]["cid"] in bsn else "  ?"
+    bb = "    "
+    return sa + " - " + sb + " (" + ba + " - " + bb + ")"
+
+
+def format_name(profile):
+    if "fideName" in profile and profile["fideName"].find(",") > 0:
+        # if "fideName" in profile and len(profile["fideName"]) > 0:
+        name = profile["fideName"]
+    elif len(profile["lastName"]) > 0 and len(profile["firstName"]) > 0:
+        name = profile["lastName"] + ", " + profile["firstName"]
+    elif len(profile["lastName"]) > 0:
+        name = profile["lastName"]
+    elif len(profile["firstName"]) > 0:
+        name = profile["firstName"]
+    else:
+        name = ""  # f"Player {profile['id']:4}"
+    return name
+
+
+def format_datetime(datetime):
+    if len(datetime) == 10 and datetime[4] == "-" and datetime[7] == "-":
+        return datetime[2:4] + "/" + datetime[5:7] + "/" + datetime[8:10]
+    return datetime
+
 
 # =================
 #
@@ -246,23 +208,30 @@ def print_down(c, pcmps, bsn):
 #
 #
 
+
 def rating_fide(fide, nrs):
     return fide
+
 
 def rating_nro(fide, nrs):
     return nrs
 
+
 def rating_fidon(fide, nrs):
     return fide if fide > 0 else nrs
+
 
 def rating_nidof(fide, nrs):
     return nrs if nrs > 0 else fide
 
+
 def rating_hbfn(fide, nrs):
     return max(fide, nrs)
 
+
 def rating_lbfn(fide, nrs):
     return min(fide, nrs) if fide > 0 and nrs > 0 else max(fide, nrs)
+
 
 def rating_other(fide, nrs):
     return 0
@@ -313,6 +282,17 @@ def decimal_serializer(obj):
     raise TypeError("Type not serializable")
 
 
+def json_input(file, json, obj):
+    if isinstance(file, str):
+        f = sys.stdin if file == "-" else open(file, "r")
+    else:
+        f = file
+    jsonout = json.dumps(obj, indent=2, default=decimal_serializer)
+    f.write(jsonout.replace('"_jpre_', "").replace('_jpost_"', "") + "\n")
+    if isinstance(file, str) and file != "-":
+        f.close()
+
+
 def json_output(file, obj):
     if isinstance(file, str):
         f = sys.stdout if file == "-" else open(file, "w")
@@ -323,6 +303,7 @@ def json_output(file, obj):
     if isinstance(file, str) and file != "-":
         f.close()
 
+
 def txt_output(file, obj):
     if isinstance(file, str):
         f = sys.stdout if file == "-" else open(file, "w")
@@ -331,5 +312,3 @@ def txt_output(file, obj):
     f.write(obj)
     if isinstance(file, str) and file != "-":
         f.close()
-
-

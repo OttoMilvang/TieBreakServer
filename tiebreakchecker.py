@@ -6,6 +6,7 @@ Created on Mon Aug  7 16:48:53 2023
 import sys
 
 import helpers
+import version
 from commonmain import commonmain
 from tiebreak import tiebreak
 
@@ -16,7 +17,7 @@ class tiebreakchecker(commonmain):
 
     def __init__(self):
         super().__init__()
-        self.origin = "tiebreakchecker ver. 1.04"
+        self.origin = "tiebreakchecker ver. " + version.version
         self.resulttype = "tiebreakResult"
 
     # read_command_line
@@ -59,7 +60,7 @@ class tiebreakchecker(commonmain):
             # default=['PTS', 'DE'],
             help="Delimiter in output text",
         )
-        self.read_common_command_line(True)
+        self.read_common_command_line(self.origin, True)
 
         # Parse game-score and match-score
         for scoretype in ["game", "match"]:
@@ -116,7 +117,7 @@ class tiebreakchecker(commonmain):
 
 
 # run program
-if __name__ == '__main__':
+if __name__ == "__main__":
     tbc = tiebreakchecker()
     code = tbc.common_main()
     sys.exit(code)

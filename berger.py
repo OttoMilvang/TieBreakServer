@@ -156,8 +156,44 @@ def print_bergertable(n):
 
 # Module test #
 
+# run program
+if __name__ == "__main__":
 
-def module_test():
-    for n in [6, 10, 25]:
-        print_bergertable(n)
-        print()
+    import argparse
+    import sys
+
+    def module_test(p):
+        for n in p:
+            print_bergertable(n)
+            print()
+
+    def print_pairing(f, p, r):
+        berger = bergertables(p)
+        boards = (p + 1) // 2
+        f.write(str(boards) + "\n")
+        for board in range(boards):
+            g = bergerpairing(berger, r, board + 1)
+            w = g["white"] if g["white"] <= p else 0
+            b = g["black"] if g["black"] <= p else 0
+            if w == 0:
+                (w, b) = (b, w)
+            f.write(str(w) + " " + str(b) + "\n")
+
+    def read_command_line():
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-r", "--round", required=False, type=int, default=-1, help="Round number")
+        parser.add_argument("-p", "--players", required=False, type=int, default=-1, help="Number of players")
+        parser.add_argument("-o", "--output-file", required=False, default="-", help="path to output file")
+
+        params = vars(parser.parse_args())
+        return (params["round"], params["players"], params["output_file"])
+
+    (r, p, o) = read_command_line()
+    if o == "-":
+        f = sys.stdout
+    else:
+        f = open(o, "w")
+    if r == -1:
+        module_test([6, 10, 26] if p <= 0 else [p])
+    else:
+        print_pairing(f, p, r)

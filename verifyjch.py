@@ -61,9 +61,7 @@ def error(code, txt):
 
 def read_command_line():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c", "--check", required=False, action="store_true", help="Shall we add checkflag to json file"
-    )
+    parser.add_argument("-c", "--check", required=False, action="store_true", help="Shall we add checkflag to json file")
     parser.add_argument(
         "-i",
         "--input-file",

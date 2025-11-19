@@ -4,8 +4,9 @@ Created on Tue Apr 29 09:21:45 2025
 
 @author: otto
 """
+import helpers
 
-version = "1.3.55"
+version = "1.7.38"
 version_major = 1
-version_minor = 3
-version_patch = 55
+version_minor = 7
+version_patch = 38

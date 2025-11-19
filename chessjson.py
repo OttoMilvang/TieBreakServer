@@ -4,9 +4,9 @@ Created on Wed Nov  1 11:01:49 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 import json
-import random
 import sys
 from decimal import Decimal
+import random
 
 
 class chessjson:
@@ -15,7 +15,7 @@ class chessjson:
 
     # constructor function
     def __init__(self):
-        random.seed(a=None, version=2)
+        # random.seed(a=None, version=2)
         self.chessjson = {
             "filetype": "Event",
             "version": "1.0",
@@ -26,19 +26,20 @@ class chessjson:
                 "eventName": "",
                 "eventInfo": {},
                 "ratingLists": [{"listName": "Rating"}],
-                "scoreLists": [],
                 "profiles": [],
                 "teams": [],
                 "tournaments": [],
             },
         }
-        self.event = self.chessjson["event"]
-        self.scoreLists = {
+        self.default_score = {
             "game": {
                 "W": Decimal("1.0"),
                 "D": Decimal("0.5"),
                 "L": Decimal("0.0"),
+                "F": "W",
+                "H": "D",
                 "Z": Decimal("0.0"),
+                "P": "W",
                 "A": "D",
                 "U": "Z",
             },
@@ -46,48 +47,37 @@ class chessjson:
                 "W": Decimal("2.0"),
                 "D": Decimal("1.0"),
                 "L": Decimal("0.0"),
+                "F": "W",
+                "H": "D",
                 "Z": Decimal("0.0"),
+                "P": "D",
                 "A": "D",
                 "U": "Z",
+                "FG": "W*",
+                "HG": "D*",
+                "ZG": "Z*",
+                "PB": "P*",
             },
-            "children": {
-                "W": Decimal("3.0"),
-                "D": Decimal("2.0"),
-                "L": Decimal("1.0"),
-                "Z": Decimal("0.0"),
-                "A": "D",
-                "U": "Z",
-            },
-            "football": {
-                "W": Decimal("3.0"),
-                "D": Decimal("1.0"),
-                "L": Decimal("0.0"),
-                "Z": Decimal("0.0"),
-                "A": "D",
-                "U": "Z",
-            },
-            "rating": {
-                "W": Decimal("1.0"),
-                "D": Decimal("0.5"),
-                "L": Decimal("0.0"),
-                "Z": Decimal("0.0"),
-                "A": "Z",
-                "U": "Z",
-            },
-            "_reverse": {"W": "L", "D": "D", "L": "W", "Z": "W", "A": "A", "U": "U"},
         }
+
         self.numProfiles = 0
         self.numTeams = 0
+        self.pid = {}  # Lookup table for id
         self.numResults = 0
-        if sys.version_info[0] < 3 or sys.version_info[0] == 3 and sys.version_info[1] < 10:
+        self.reverse = {"W": "L", "D": "D", "L": "W", "Z": "W", "A": "A", "U": "U"}
+
+        if sys.version_info[0] < 3 or sys.version_info[0] == 3 and sys.version_info[1] < 8:
             self.chessjson["status"]["code"] = 500
-            self.chessjson["result"]["error"].append("Python version must be at least ver. 3.10")
+            self.chessjson["result"]["error"].append("Python version must be at least ver. 3.8")
 
     def print_warning(self, line):
         if self.debug:
             print(line)
             pass
         return
+
+    def get_event(self):
+        return self.chessjson["event"]
 
     def get_status(self):
         return self.chessjson["status"]["code"]
@@ -99,13 +89,33 @@ class chessjson:
         else:
             self.chessjson["status"]["error"].append(msg)
 
+    def add_tournament(self, tournamentno, team, numRounds):
+        self.chessjson["event"]["tournaments"].append(
+            {
+                "tournamentNo": 1,
+                "tournamentType": "Tournament",
+                "ratingList": "TRF",
+                "numRounds": numRounds,
+                "currentRound": 0,
+                "teamTournament": team,
+                "rankOrder": ["PTS"],
+                "competitors": [],
+                "teamSize": 0,
+                "scoreSystem": self.default_score.copy(),
+                "gameList": [],
+                "matchList": [],
+                "timeControl": {"description": "", "encoded": ""},
+            }
+        )
+        return self.get_tournament(tournamentno)
+
     def get_tournament(self, tournamentno):
-        for tournament in self.event["tournaments"]:
+        for tournament in self.chessjson["event"]["tournaments"]:
             if tournament["tournamentNo"] == tournamentno:
                 return tournament
         return None
 
-    def get_scoresystem(self, scoreLists, name):
+    def get_scoresystemxx(self, scoreLists, name):
         for scoreList in scoreLists:
             if scoreList["listName"] == name:
                 return scoreList["scoreSystem"]
@@ -114,7 +124,7 @@ class chessjson:
         return newlist["scoreSystem"]
 
     def parse_score_system(self, name, txt):
-        scoresystem = self.get_scoresystem(self.event["scoreLists"], name)
+        scoresystem = self.get_scoresystem(self.chessjson["event"]["scoreLists"], name)
         try:
             for param in txt.split(","):
                 param = param.replace("=", ":")
@@ -125,7 +135,7 @@ class chessjson:
 
     def parse_file(self, lines, verbose):
         # now = time.time()
-        self.chessjson = json.loads(lines)
+        self.chessjson = json.loads(lines, parse_float=Decimal)
 
     def tournament_getvalue(self, tournamentno, key):
         tournament = self.get_tournament(tournamentno)
@@ -144,12 +154,29 @@ class chessjson:
     # if True: Update the profile object and return the ID
     # if False: Add the profile to the profile list
 
+    def create_profile(self, fideId, firstName, lastName, sex, federation, fideTitle=None):
+        profile = {
+            "id": 0,
+            "fideId": fideId,
+            "firstName": firstName,
+            "lastName": lastName,
+            "sex": "u",
+            "federation": "",
+            "fideName": lastName + ", " + firstName,
+        }
+        pid = self.append_profile(profile)
+        return pid
+
+    def get_profile(self, pid):
+        return self.pid[pid]
+
     def append_profile(self, profile):
         if "id" in profile and profile["id"] != 0:
             return max(0, profile["id"])
         self.numProfiles += 1
         pid = profile["id"] = self.numProfiles + self.numTeams
-        self.event["profiles"].append(profile)
+        self.chessjson["event"]["profiles"].append(profile)
+        self.pid[pid] = profile
         return pid
 
     # append_team
@@ -161,7 +188,7 @@ class chessjson:
         if type(team) is type(""):
             team = {"id": 0, "teamName": team, "players": []}
         teamname = team["teamName"]
-        for elem in self.event["teams"]:
+        for elem in self.chessjson["event"]["teams"]:
             if elem["teamName"] != teamname:
                 continue
             for key, value in team.items():
@@ -174,7 +201,7 @@ class chessjson:
         tid = team["id"] = self.numProfiles + self.numTeams
         if profileid > 0 and not (profileid in team):
             team["players"].append(profileid)
-        self.event["teams"].append(team)
+        self.chessjson["event"]["teams"].append(team)
         return tid
 
     # append_result
@@ -183,9 +210,10 @@ class chessjson:
     # if False: Add the result to the result list
 
     def append_result(self, results, result):
-        gamelist = list(
-            filter(lambda elem: elem["round"] == result["round"] and elem["white"] == result["white"], results)
-        )
+        # gamelist = list(
+        #    filter(lambda elem: elem["round"] == result["round"] and elem["white"] == result["white"], results)
+        # )
+        gamelist = [game for game in results if game["round"] == result["round"] and game["white"] == result["white"]]
         if len(gamelist) > 0:
             elem = gamelist[0]
             if not ("wResult" in elem) and ("wResult" in result):
@@ -260,6 +288,11 @@ class chessjson:
         for team in team_competitors:
             cid = team["cid"]
             cplayers[cid] = []
+            if "teamId" not in team:
+                if len(team["cplayers"]) > 0 and "teamId" in team["cplayers"][0]:
+                    team["teamId"] = team["cplayers"][0]["teamId"]
+                else:
+                    team["teamId"] = 0
             teamid = team["teamId"]
             clookup[teamid] = cid
             for player in team["cplayers"]:
@@ -288,9 +321,9 @@ class chessjson:
     # get_score
     # return a float value from result struct and color
 
-    def get_score(self, name, result, color):
+    def get_scorexx(self, name, result, color):
         scoreSystem = (
-            self.scoreLists[name] if name in self.scoreLists else self.get_scoresystem(self.event["scoreLists"], name)
+            self.scoreLists[name] if name in self.scoreLists else self.get_scoresystem(self.chessjson["event"]["scoreLists"], name)
         )
 
         reverse = self.scoreLists["_reverse"]
@@ -306,15 +339,29 @@ class chessjson:
             res = scoreSystem[res]
         return res
 
+    def get_score(self, slist, result, color):
+        if color[0] + "Result" in result:
+            res = result[color[0] + "Result"]
+        elif result["black"] > 0:
+            res = self.reverse[result[color[0] + "Result"]]
+        else:
+            # print("get_score" ,  slist, result, color, "Null")
+            return 0.0
+        while res in slist:
+            if res == "L" and result["played"] is False:
+                res = "Z"
+            res = slist[res]
+        # print("get_score" ,  slist, result, color, res)
+        return res
+
     def is_vur(self, result, color):  #
-        reverse = self.scoreLists["_reverse"]
         if result["played"]:
             return False
 
         if color[0] + "Result" in result:
             res = result[color[0] + "Result"]
         elif result["black"] > 0:
-            res = reverse[result[color[0] + "Result"]]
+            res = self.reverse[result[color[0] + "Result"]]
         else:
             return 0.0
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
@@ -327,13 +374,13 @@ class chessjson:
     # allgames[round][cid] where cid is cid for a team
 
     def all_pids(self):
-        if not hasattr(self, "pids") or len(self.event["profiles"]) != len(self.pids):
-            self.pids = {elem["id"]: elem for elem in self.event["profiles"]}
+        if not hasattr(self, "pids") or len(self.chessjson["event"]["profiles"]) != len(self.pids):
+            self.pids = {elem["id"]: elem for elem in self.chessjson["event"]["profiles"]}
         return self.pids
 
     def all_tids(self):
-        if not hasattr(self, "tids") or len(self.event["teams"]) != len(self.tids):
-            self.tids = {elem["id"]: elem for elem in self.event["teams"]}
+        if not hasattr(self, "tids") or len(self.chessjson["event"]["teams"]) != len(self.tids):
+            self.tids = {elem["id"]: elem for elem in self.chessjson["event"]["teams"]}
         return self.tids
 
     def build_all_games(self, tournament, cteam, makecopy):
@@ -357,7 +404,7 @@ class chessjson:
     # update_tournament_random
     # Update all competitors with random value
 
-    def points2score(self, tournament, match, points):
+    def xxpoints2score(self, tournament, match, points):
         scorename = tournament["matchScoreSystem"] if match else tournament["gameScoreSystem"]
         scoresystem = self.scoreLists[scorename]
         score = "U"
@@ -386,18 +433,18 @@ class chessjson:
     def update_chessjson_format(self, tournament, isteam):
         pass
 
-
     def get_topcolor(self, tournamentno, defcolor):
         tournament = self.get_tournament(tournamentno)
         if "topColor" in tournament:
             # print("Topcolor if", tournament["topColor"].lower())
             return tournament["topColor"].lower()
-        clist = tournament["matchList"] if "matchList" in tournament and len(tournament["matchList"]) > 0 else tournament["gameList"]
+        mlist = tournament["matchList"]
+        glist = tournament["gameList"]
+        clist = mlist if "matchList" in tournament and len(mlist) > 0 else glist
         if len(clist) > 0:
             clist = sorted(clist, key=lambda p: (p["round"], (p["black"] == 0), min(p["white"], p["black"])))
-            topcolor = 'w' if clist[0]['white'] < clist[0]['black'] else 'b'  
-            return topcolor.lower() 
+            topcolor = "w" if clist[0]["white"] < clist[0]["black"] else "b"
+            return topcolor.lower()
         if defcolor in ["w", "b", "W", "B"]:
-            return defcolor.lower() 
-        return 'w' if random.random() < 0.5 else 'b' 
-        
+            return defcolor.lower()
+        return "w" if random.random() < 0.5 else "b"
