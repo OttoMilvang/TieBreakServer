@@ -211,6 +211,8 @@ class pairing:
             self.roundpairing.append(bracket)
             mdp = len(bracket["downfloaters"])
             scorelevel -= 1
+        if mdp > 0:
+            raise            
         self.update_board(self.roundpairing)
         return self.roundpairing
 
@@ -466,15 +468,13 @@ class pairing:
             t0 = time.time()
 
             if pairingmode == "B":
-                if self.optimize:
-                    (weighted, pairsleft, pairs) = self.pair_simple_round(
-                        bracket, nodes, edges, pairingmode, numpairs, mdp, category
-                    )
-                    # print("Simple ", self.rnd, scorelevel, pairsleft)
-                if not self.optimize or pairs is None:
-                    continue
+                (weighted, pairsleft, pairs) = self.pair_simple_round(bracket, nodes, edges, pairingmode, numpairs, mdp, category)
             else:
                 (weighted, pairsleft, pairs) = self.pair_round(bracket, nodes, edges, pairingmode, numpairs, mdp, category)
+
+            if pairs is None:
+                continue
+
             t1 = time.time()
             if self.verbose:
                 print("Pair round", self.rnd, "Scorelevel:", scorelevel, pairingmode, f"{t1-t0:.2f}")
@@ -514,8 +514,8 @@ class pairing:
                 break
         bracket["remaining"] = [c["cid"] for c in nodes if c["scorelevel"] < scorelevel]
         bracket["downfloaters"] = [c["cid"] for c in nodes if c["scorelevel"] >= scorelevel]
-        if len(bracket["pairs"]):
-            bracket["quality"] = self.crosstable.compute_weight(wpairs, bracket["quality"])
+        if len(bracket["pairs"]): #  and pairingmode != "B":
+            bracket["quality"] = self.crosstable.compute_weight(wpairs, bracket["quality"]) 
         else:
             testpab = False
         return (bracket, nodes, edges, testpab)
@@ -884,12 +884,18 @@ class pairing:
         return (len(wpairs), 0, pablevel)
 
     def pair_simple_round(self, bracket, nodes, edges, hetrogenious, numpairs, mdp, category):
+
         testlevel = -1
         scorelevel = bracket["scorelevel"]
-        h = self.hammilton[scorelevel]
+        hthis = self.hammilton[scorelevel]
+        hnext = self.hammilton[scorelevel-1] if scorelevel > 0  else {}
+        
+        # Don't run if not optimizez, or rest cvan not be paired
+        if (not self.optimize) or hnext.get("rem_unpaired",1) > 1:
+            return (False, 1, None)
+
         # Don't bother try this with less than 20 players
-        # print("Category", category, "Simple? ", "E" if hetrogenious else "O", h.get("cur_pairs"), h.get("this_hammilton"))
-        if h.get("cur_pairs", 0) < 10:
+        if hthis.get("cur_pairs", 0) < 10:
             return (False, 1, None)
         pairs = []
 
@@ -909,7 +915,7 @@ class pairing:
         slen = s2len
         if scorelevel <= self.pab:
             slen -= 1
-        if slen % 2 == 1 and self.hammilton[scorelevel - 1].get("cur_hammilton", -1) < 2:
+        if slen % 2 == 1 and hnext.get("cur_hammilton", -1) < 2:
             return (False, 2, None)
 
         colordiff = self.analyze_colordiff(nodes[:s2len])
@@ -959,7 +965,9 @@ class pairing:
 
         bracket["bsno"] = self.update_bsn(scorelevel, [node for node in nodes if node["cid"] in SER])
         self.crosstable.update_hetrogenious(scorelevel, epairs, mdp, bracket["bsne"])
-        self.crosstable.update_homogenious(scorelevel, spairs, bracket["bsne"], len(spairs))
+        self.crosstable.update_bipartite(scorelevel, pairs, bracket["bsno"], SS2[0], SS2[-1], mdp)
+        # self.crosstable.update_homogenious(scorelevel, spairs, bracket["bsne"], len(spairs))
+
 
         if c12 != tc12 or c13 != tc13: # We never end here if recursion is corrrect
             # breakpoint()
@@ -1060,143 +1068,6 @@ class pairing:
                 # print("RES return", False)
                 return False
 
-    def xxpair_simple_round(self, bracket, nodes, edges, hetrogenious, numpairs, mdp, category):
-        testlevel = -1
-        scorelevel = bracket["scorelevel"]
-        h = self.hammilton[scorelevel]
-        # Don't bother try this with less than 20 players
-        if h.get("cur_pairs", 0) < 10:
-            return (None, 0)
-        pairs = []
-        if hetrogenious:
-            if scorelevel > 1 and self.hammilton[scorelevel].get("this_hammilton", -1) <= mdp + 1:
-                return (None, 1)
-            # if scorelevel == 5: breakpoint()
-            (mod_nodes, mod_edges) = self.select_nodes_and_edges(nodes, edges, scorelevel, self.levels)
-            self.crosstable.update_hetrogenious(scorelevel, mod_edges, mdp, bracket["bsne"])
-            s1len = 0
-            while len(mod_nodes) and mod_nodes[s1len]["scorelevel"] > scorelevel:
-                s1len += 1
-            colordiff = self.analyze_colordiff(mod_nodes)
-            while len(mod_nodes) and mod_nodes[0]["scorelevel"] > scorelevel:
-                cid = mod_nodes[0]["cid"]
-                for edge in mod_edges:
-                    if (edge["ca"] == cid or edge["cb"] == cid) and edge["qc"] and self.try_and_update_colordiff(edge, colordiff):
-                        pairs.append((edge["ca"], edge["cb"]))
-                        mod_nodes = [node for node in mod_nodes if node["cid"] != edge["ca"] and node["cid"] != edge["cb"]]
-                        # weight = self.crosstable.update_weight("E", edge)
-                        break
-                else:
-                    return (None, 2)
-            rempairs = len(mod_nodes) // 2
-            return (pairs, rempairs)
-        else:
-            mod_nodes = [node for node in nodes if node["scorelevel"] >= scorelevel]
-            if (slen := len(mod_nodes)) == 0:
-                return ([], 6)
-            # if self.pab >= scorelevel: slen -=1
-            if scorelevel == testlevel:
-                breakpoint()
-            s1nodes = mod_nodes[: (slen) // 2]
-            s2nodes = mod_nodes[(slen) // 2:]
-            s1len = len(s1nodes)
-            s2len = len(s2nodes)
-            (s1nodes, bipartite_edges) = self.modify_edges(s1nodes, s2nodes, edges, scorelevel, category, "qc")
-            # print("S2", len(s1nodes), len(s2nodes), s1nodes[-1]["cid"])
-            if len(s1nodes) != len(s2nodes):
-                return (None, 7)
-            blob = 0 if s1len == s2len else s1nodes[-1]["cid"]
-
-            slen = len(s1nodes) + len(s2nodes)
-            bsnnodes = s1nodes + s2nodes
-            bsno = {node["cid"]: i + 1 for i, node in enumerate(bsnnodes)}
-            bracket["bsno"] = bsno
-
-            colordiff = self.analyze_colordiff(s1nodes + s2nodes)
-            # numdf = self.analyze_downfloat(scorelevel, s1nodes, s2nodes, edges, colordiff)
-            c12 = colordiff["c12"]
-            c13 = colordiff["c13"]
-            histx = [0] * slen
-            histc = [0] * slen
-            for edge in bipartite_edges:
-                if edge["qc"]:
-                    if edge.get("colordiff", "").lower() in ["ww", "bb"]:
-                        histx[bsno[edge["ca"]] - 1] += 1
-                        histx[bsno[edge["cb"]] - 1] += 1
-                    else:
-                        histc[bsno[edge["ca"]] - 1] += 1
-                        histc[bsno[edge["cb"]] - 1] += 1
-            hist = [(a + b) for (a, b) in list(zip(histc, histx))]
-            lim = min(hist) - 3 if min(histc) > 3 else 0
-            if self.verbose:
-                print(
-                    "Rnd",
-                    self.rnd,
-                    "Scorelevel",
-                    scorelevel,
-                    "Len",
-                    len(mod_nodes),
-                    "Lim:",
-                    lim,
-                    "Ham",
-                    self.hammilton[scorelevel]["cur_hammilton"],
-                )
-            if lim < 1:
-                return (None, 8)
-            if scorelevel == testlevel:
-                breakpoint()
-            for pairno in range(lim):
-                cid = s1nodes[pairno]["cid"]
-                for nodeno, node in enumerate(s2nodes[pairno:], start=pairno):
-                    edge = self.competitors[cid]["opp"][node["cid"]]
-                    if edge["qc"] and self.try_and_update_colordiff(edge, colordiff):
-                        pairs.append((edge["ca"], edge["cb"]))
-                        s2nodes = s2nodes[0:pairno] + [s2nodes[nodeno]] + s2nodes[pairno:nodeno] + s2nodes[nodeno + 1:]
-                        self.crosstable.update_weight("S", edge)
-                        break
-                else:
-                    if pairno <= 0:
-                        return (None, 9)
-                    pairs = pairs[:-1]
-                    break
-            numpairs = len(pairs)
-            while numpairs > 0:
-                restnodes = s1nodes[numpairs:] + s2nodes[numpairs:]
-                restcid = self.get_nodeid(restnodes)
-                restedges = [edge for edge in bipartite_edges if edge["ca"] in restcid and edge["cb"] in restcid]
-                wpairs = sorted(self.pair_weighted_round(bracket, bsnnodes, restedges, "B", len(restcid) // 2, mdp, 0))
-                tpairs = wpairs + pairs
-                nc12 = sum(
-                    filter(
-                        None,
-                        [
-                            self.competitors[ca]["opp"][cb]["quality"][qdefs.C12.value]
-                            for (ca, cb) in tpairs
-                            if ca != blob and cb != blob
-                        ],
-                    )
-                )
-                nc13 = sum(
-                    filter(
-                        None,
-                        [
-                            self.competitors[ca]["opp"][cb]["quality"][qdefs.C13.value]
-                            for (ca, cb) in tpairs
-                            if ca != blob and cb != blob
-                        ],
-                    )
-                )
-                if self.verbose:
-                    print("Simple pairs=", len(pairs), "Weighted pairs=", len(wpairs))
-
-                if len(tpairs) * 2 == slen and nc12 == c12 and nc13 == c13:
-                    break
-                numpairs -= 1
-                if numpairs > 0:
-                    pairs = pairs[:-1]
-            else:
-                return (None, 10)
-            return (tpairs, 0)
 
     def pair_weighted_round(self, bracket, nodes, edges, pairingmode, numpairs, mdp, category):
         scorelevel = bracket["scorelevel"]
@@ -1214,9 +1085,10 @@ class pairing:
             self.crosstable.update_homogenious(scorelevel, modified_edges, bracket["bsno"], numpairs)
         elif pairingmode == "B":
             bracket["bsnb"] = {node["cid"]: i + 1 for i, node in enumerate(modified_nodes)}
-            self.crosstable.update_bipartite(
-                scorelevel, modified_edges, bracket["bsnb"], nodes[len(nodes) // 2]["cid"], nodes[-1]["cid"]
-            )
+            self.crosstable.update_hetrogenious(scorelevel, modified_edges, mdp, bracket["bsnb"])
+            #self.crosstable.update_bipartite(
+            #    scorelevel, modified_edges, bracket["bsnb"], nodes[len(nodes) // 2]["cid"], nodes[-1]["cid"]
+            #)
         if self.reportlevel > 2:
             print("pair_weighted(" + pairingmode + "," + str(numpairs) + ") comp:", [c["cid"] for c in modified_nodes])
             print("edges", [(c["ca"], c["cb"]) for c in modified_edges])

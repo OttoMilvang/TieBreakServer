@@ -8,7 +8,7 @@ Created on Tue Feb 18 07:39:55 2025
 from decimal import Decimal
 from tiebreak import tiebreak
 from qdefs import qdefs
-
+from itertools import combinations  
 
 # Keywords from tiebreaks
 PTS = 0
@@ -123,7 +123,9 @@ class crosstable:
             self.R = 100
         self.Cbits = ncmps.bit_length()
         self.Rbits = rnd.bit_length()
-        return self.list_edges(cmps, maxmeet, topcolor, unpaired)
+        prohibited = chessfile.get_tournament(tournamentno).get("prohibited", [])
+        edges = self.list_edges(cmps, maxmeet, topcolor, unpaired, prohibited)
+        return edges
 
     def compute_tiebreak(self, chessfile, tournamentno, rnd):
         tb = tiebreak(chessfile, tournamentno, rnd - 1, None)
@@ -134,7 +136,7 @@ class crosstable:
                 tb.compute_tiebreak(mytb)
         return tb.cmps
 
-    def list_edges(self, cmps, maxmeet, topcolor, unpaired):
+    def list_edges(self, cmps, maxmeet, topcolor, unpaired, prohibited):
         self.cmps = cmps
         self.size = self.BLOB = len(cmps.keys()) + 1
         self.ilen = 0
@@ -208,6 +210,13 @@ class crosstable:
                         # print(i, j, c['canmeet'], c['w'] if 'w' in c else '?', c['b'] if 'b' in c else '?' )
                     else:
                         c["canmeet"] = False
+                        
+        for elem in prohibited:
+            if  elem["firstRound"] <= self.rnd <= elem["lastRound"]:
+                for c1, c2 in list(combinations(elem["competitors"], 2)):
+                    cr[c1]["opp"][c2]["canmeet"] = False
+                    
+                        
         edges = [edge for edge in edges if edge["canmeet"]]
         return (self.crosstable, edges)
 
@@ -415,7 +424,6 @@ class crosstable:
         self.ilen = 0
         weight = self.weight
         self.init_eweights(scorelevel, 0)
-
         e1weight = sum([weight[E1][i] for i in range(M)])
         for c in edges:
             (ca, cb) = (c["ca"], c["cb"])
@@ -487,25 +495,34 @@ class crosstable:
                     # if c['quality'][S5] != [bbsn if absn == i+1 else 0 for i in range(B)]: breakpoint()
             c["sweight"] = sweight
 
-    def update_bipartite(self, scorelevel, edges, bsn, s2start, s2stop):
+    def update_bipartite(self, scorelevel, pairs, bsn, s2start, s2stop, mdp):
         H = self.H = len(bsn) // 2
-        # print ("BO:", B, S, self.S)
+        M = self.M = mdp
+       # print ("BO:", B, S, self.S)
 
         # print("CheckAnlyse", scorelevel, "M="+str(M), "P="+str(P), "N="+str(N), "S="+str(S), "B="+str(B) )
         self.init_bweights(scorelevel, H)
         weight = self.weight
-
-        for c in edges:
-            (ca, cb) = (c["ca"], c["cb"])
+        for pno, pair in enumerate(pairs):
+            (ca, cb) = pair
+            bweight = 0
             if s2start <= ca <= s2stop:
                 (ca, cb) = (cb, ca)
-            q = c["quality"]
+            q = self.crosstable[ca]["opp"][cb]["quality"]
+            if q[E1] is None or len(q[E1]) != M:
+                q[E1] = [0] * M
+                q[E2] = [0] * M
+            q[S1] = 0
+            q[S2] = 0
+            q[S3] = 0
+            q[S4] = 0
             q[S5] = [0] * H
-            absn = bsn[ca]
-            bbsn = bsn[cb]
-            q[S5][absn - 1] = bbsn
-            bweight = weight[S5][absn - 1] * bbsn
-            c["bweight"] = bweight
+            if pno >= mdp:
+                absn = pno - mdp
+                bbsn = bsn[cb]
+                q[S5][absn] = bbsn
+                bweight = weight[S5][absn] * bbsn
+            self.crosstable[ca]["opp"][cb]["bweight"] = bweight
 
     # Compute weight
     # mode 'E' - Hetrogenous

@@ -128,7 +128,8 @@ class pairingchecker(commonmain):
 
     def __init__(self):
         super().__init__()
-        self.origin = "pairingchecker ver. " + version.version
+        ver = version.version()
+        self.origin = "pairingchecker ver. " + ver["version"]
         self.resulttype = "pairingResult"
 
     def read_command_line(self):
@@ -353,21 +354,8 @@ class pairingchecker(commonmain):
                 for i in range(24):  # (crosstable.IW):
 
                     label = qdefs(i).name
-                    if i == 133 or i == 333:
-                        bn = bno if i == 1 else bno + 1
-                        p = (
-                            str(sorted([cr.crosstable[c]["scorelevel"] for c in pairing[bn]["downfloaters"]], reverse=True))
-                            if bn < len(pairing)
-                            else ""
-                        )
-                        a = (
-                            str(sorted([cr.crosstable[c]["scorelevel"] for c in analyze[bn]["downfloaters"]], reverse=True))
-                            if bn < len(analyze)
-                            else ""
-                        )
-                    else:
-                        p = str(pairing[bno]["quality"][i] if bno < len(pairing) else "")
-                        a = str(analyze[bno]["quality"][i] if bno < len(analyze) else "")
+                    p = str(pairing[bno]["quality"][i] if bno < len(pairing) else "")
+                    a = str(analyze[bno]["quality"][i] if bno < len(analyze) else "")
                     label = f"{label:<5}"
                     plen = len(PHEAD) if len(p) > 0 else 0
                     alen = len(AHEAD) if len(a) > 0 else 0

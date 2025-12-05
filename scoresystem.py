@@ -212,7 +212,7 @@ class scoresystem:
         self.score["game"] = defscore
         return defscore
 
-    def update_gamescore(self, tournament, equations, istrf25):
+    def update_gamescore(self, chessjson, tournament, equations, istrf25):
         # score = helpers.solve_scoresystem(equations)  -- added record 162 to solve this
         score = self.fill_default_scoresystem("game")
         trans = {}
@@ -236,7 +236,7 @@ class scoresystem:
                     # if "pab" in eq and version == "TRF25":
                     #    eq["pab"]["wResult"] = score["P"]
                     checksum = Decimal("0.0")
-                    for elem in ["W", "D", "L", "Z", "P", "U"]:
+                    for elem in ["W", "D", "L", "Z", "P", "A", "U"]:
                         if elem in score:
                             num = eq[elem]
                             val = elem
@@ -245,6 +245,8 @@ class scoresystem:
                             checksum += num * val
                     # print(eq)
                     if eq["sum"] != checksum:
+                        msg = "Incorrect score in" + eq
+                        chessjson["status"]["error"].append(msg)
                         eqok = False
                 # print("-EQOK", eqok, version, "162" in self.all_lines)
         if not eqok:

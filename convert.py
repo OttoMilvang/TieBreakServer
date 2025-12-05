@@ -5,6 +5,7 @@ Created on Mon Aug  7 16:48:53 2023
 """
 import sys
 from commonmain import commonmain
+import version
 
 # ==============================
 
@@ -13,7 +14,8 @@ class convert2jch(commonmain):
 
     def __init__(self):
         super().__init__()
-        self.origin = "convert ver. 1.00"
+        ver = version.version()
+        self.origin = "convert ver. " + ver["version"]
         self.tournamentno = 0
 
     # read_command_line
@@ -29,7 +31,7 @@ class convert2jch(commonmain):
     #   -v = verbose and debug
 
     def read_command_line(self):
-        self.read_common_command_line("convert 1.1.35", True)
+        self.read_common_command_line(self.origin, True)
 
     def write_text_file(self, f, result, delimiter):
         pass

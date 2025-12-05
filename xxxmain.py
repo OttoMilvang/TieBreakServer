@@ -28,42 +28,38 @@ class main(commonmain):
 
     def __init__(self):
         super().__init__()
-        self.origin = 'convert2jch ver. 1.03'
+        self.origin = "convert2jch ver. 1.03"
         self.eventno = 0
-
 
     # read_command_line
     #   options:
     #   -i = input-file
     #   -o = output-file
-    #   -f = file-format    
-    #   -e = event-number    
+    #   -f = file-format
+    #   -e = event-number
     #   -n = number-of-rounds
     #   -g = game-score
     #   -m = match-score
     #   -v = verbose and debug
 
-
     def read_command_line(self):
-        parser.add_argument("-@", "--program", required=False,
-            default='help',
-            help="Program to run")
+        parser.add_argument("-@", "--program", required=False, default="help", help="Program to run")
         self.read_common_command_line(False)
 
- 
+
 # run program
 mainprog = main()
 params = mainprog.read_command_line()
-prog = params['program']
-match(program):
-    case 'help':
+prog = params["program"]
+match (program):
+    case "help":
         print("Help")
         code = 0
-    case 'tiebreak':
+    case "tiebreak":
         tbc = tiebreakchecker()
         code = tbc.common_checker()
-    case 'convert':
+    case "convert":
         jch = convert2jch()
         code = jch.common_checker()
-   
+
 sys.exit(code)

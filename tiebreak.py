@@ -76,61 +76,63 @@ class tiebreak:
     # constructor function
     def __init__(self, chessevent, tournamentno, currentround, params):
         self.tiebreaklist = {
-            "NUL":   {"func": self.get_nul,                             "rev": False, "desc": "Null"},
-            "PTS":   {"func": self.get_builtin,                         "rev": True , "desc": "Points (default)"},
-            "MPTS":  {"func": self.get_builtin,                         "rev": True , "desc": "Match Points"},
-            "GPTS":  {"func": self.get_builtin,                         "rev": True , "desc": "Game Points"},
-            "SNO":   {"func": self.get_builtin,                         "rev": False, "desc": "Start number"},
-            "RANK":  {"func": self.get_builtin,                         "rev": False, "desc": "Original rank in tournament file"},
-            "RND":   {"func": self.get_builtin,                         "rev": False, "desc": "Unique random number"},
-            "WIN":   {"func": self.get_builtin,                         "rev": True , "desc": "Number of Wins"},
-            "WON":   {"func": self.get_builtin,                         "rev": True , "desc": "Number of Games Won"},
-            "BPG":   {"func": self.get_builtin,                         "rev": True , "desc": "Number of Games Played with Black"},
-            "BWG":   {"func": self.get_builtin,                         "rev": True , "desc": "Number of Games Won with Black"},
-            "GE":    {"func": self.get_builtin,                         "rev": True , "desc": "Same as REP"},
-            "REP":   {"func": self.get_builtin,                         "rev": True , "desc": "Rounds one Elected to Play"},
-            "RIP":   {"func": self.get_builtin,                         "rev": True , "desc": "number of rounds paired (for TPN assignment)"},
-            "VUR":   {"func": self.get_builtin,                         "rev": True , "desc": "Voluntary unplayed rounds"},
-            "NUM":   {"func": self.get_builtin,                         "rev": True , "desc": "Number of played games"},
-            "COP":   {"func": self.get_builtin,                         "rev": True , "desc": "Color preference"},
-            "COD":   {"func": self.get_builtin,                         "rev": True , "desc": "Color difference"},
-            "CSQ":   {"func": self.get_builtin,                         "rev": True , "desc": "Color sequence"},
-            "RTG":   {"func": self.get_builtin,                         "rev": True , "desc": "Start number"},
-            "MPVGP": {"func": self.reverse_pointtype,                   "rev": True , "desc": "Match Points or Game Points"},
-            "DE":    {"func": self.compute_direct_encounter,            "rev": False, "desc": "Direct Encounter"},
-            "EDE":   {"func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
-            "EDEC":  {"func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
-            "EDET":  {"func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
-            "EDEB":  {"func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
-            "EDEBT": {"func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
-            "EDEBB": {"func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
-            "PS":    {"func": self.compute_progressive_score,           "rev": True , "desc": "Progressive Scores"},
-            "KS":    {"func": self.compute_koya,                        "rev": True , "desc": "Koya system"},
-            "BH":    {"func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Bochholz"},
-            "FB":    {"func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Fore Bochholz"},
-            "SB":    {"func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Sonneborn Berger"},
-            "ABH":   {"func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Adjusted score for Buchholz"},
-            "AFB":   {"func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Adjusted score for Fore Buchholz"},
-            "AOB":   {"func": self.compute_average_of_buchholz,         "rev": True , "desc": "Average of Buchholz"},
-            "ARO":   {"func": self.compute_ratingperformance,           "rev": True , "desc": "Average Rating of opponents"},
-            "TPR":   {"func": self.compute_ratingperformance,           "rev": True , "desc": "Tournament Rating Performance"},
-            "PTP":   {"func": self.compute_ratingperformance,           "rev": True , "desc": "Perfect Rating Performance"},
-            "APRO":  {"func": self.compute_average_rating_performance,  "rev": True , "desc": "Average of Rating Performance"},
-            "APPO":  {"func": self.compute_average_perfect_performance, "rev": True , "desc": "Average of Perfect Performance"},
-            "ESB":   {"func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
-            "EMMSB": {"func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
-            "EMGSB": {"func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
-            "EGMSB": {"func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
-            "EGGSB": {"func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
-            "BC":    {"func": self.compute_boardcount,                  "rev": False, "desc": "Board count"},
-            "TBR":   {"func": self.compute_top_bottom_board,            "rev": False, "desc": "Board count"},
-            "BBE":   {"func": self.compute_top_bottom_board,            "rev": False, "desc": "Board count"},
-            "SSSC":  {"func": self.compute_score_strength_combination,  "rev": True , "desc": "Score strength combination"},
-            "STD":   {"func": self.compute_std,                         "rev": True , "desc": "Stanard score system"},
-            "ACC":   {"func": self.compute_acc,                         "rev": True , "desc": "	Points + accellerated points"},
-            "FLT":   {"func": self.compute_flt,                         "rev": True , "desc": "Float (8=df 4=uf in prev round, 2=df 1=uf in 2 rounds before)"},
-            "RFP":   {"func": self.compute_rfp,                         "rev": True , "desc": "Registered for round"},
-            "TOP":   {"func": self.compute_top,                         "rev": True , "desc": "	Is player a top-scorer in last round"},
+            "NUL":   {"name": "NUL",   "func": self.get_nul,                             "rev": False, "desc": "Null"},
+            "PTS":   {"name": "POINTS","func": self.get_builtin,                         "rev": True , "desc": "Points (default)"},
+            "MPTS":  {"name": "POINTS","func": self.get_builtin,                         "rev": True , "desc": "Match Points"},
+            "GPTS":  {"name": "POINTS","func": self.get_builtin,                         "rev": True , "desc": "Game Points"},
+            "SNO":   {"name": "SNO",   "func": self.get_builtin,                         "rev": False, "desc": "Start number"},
+            "TPN":   {"name": "SNO",   "func": self.get_builtin,                         "rev": False, "desc": "Start number"},
+            "RANK":  {"name": "RANK",  "func": self.get_builtin,                         "rev": False, "desc": "Original rank in tournament file"},
+            "RND":   {"name": "RND",   "func": self.get_builtin,                         "rev": False, "desc": "Unique random number"},
+            "WIN":   {"name": "WIN",   "func": self.get_builtin,                         "rev": True , "desc": "Number of Wins"},
+            "WON":   {"name": "WON",   "func": self.get_builtin,                         "rev": True , "desc": "Number of Games Won"},
+            "BPG":   {"name": "BPG",   "func": self.get_builtin,                         "rev": True , "desc": "Number of Games Played with Black"},
+            "BWG":   {"name": "BWG",   "func": self.get_builtin,                         "rev": True , "desc": "Number of Games Won with Black"},
+            "GE":    {"name": "GE",    "func": self.get_builtin,                         "rev": True , "desc": "Same as REP"},
+            "REP":   {"name": "REP",   "func": self.get_builtin,                         "rev": True , "desc": "Rounds one Elected to Play"},
+            "RIP":   {"name": "RIP",   "func": self.get_builtin,                         "rev": True , "desc": "number of rounds paired (for TPN assignment)"},
+            "VUR":   {"name": "VUR",   "func": self.get_builtin,                         "rev": True , "desc": "Voluntary unplayed rounds"},
+            "NUM":   {"name": "NUM",   "func": self.get_builtin,                         "rev": True , "desc": "Number of played games"},
+            "COP":   {"name": "COP",   "func": self.get_builtin,                         "rev": True , "desc": "Color preference"},
+            "COD":   {"name": "COD",   "func": self.get_builtin,                         "rev": True , "desc": "Color difference"},
+            "CSQ":   {"name": "CSQ",   "func": self.get_builtin,                         "rev": True , "desc": "Color sequence"},
+            "RTG":   {"name": "RTG",   "func": self.get_builtin,                         "rev": True , "desc": "Start rating"},
+            "RTNG":  {"name": "RTG",   "func": self.get_builtin,                         "rev": True , "desc": "Start rating"},
+            "MPVGP": {"name": "MPVGP", "func": self.reverse_pointtype,                   "rev": True , "desc": "Match Points or Game Points"},
+            "DE":    {"name": "DE",    "func": self.compute_direct_encounter,            "rev": False, "desc": "Direct Encounter"},
+            "EDE":   {"name": "EDE",   "func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
+            "EDEC":  {"name": "EDEC",  "func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
+            "EDET":  {"name": "EDET",  "func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
+            "EDEB":  {"name": "EDEB",  "func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
+            "EDEBT": {"name": "EDEBT", "func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
+            "EDEBB": {"name": "EDEBB", "func": self.compute_ext_direct_encounter,        "rev": False, "desc": "Direct Encounter"},
+            "PS":    {"name": "PS",    "func": self.compute_progressive_score,           "rev": True , "desc": "Progressive Scores"},
+            "KS":    {"name": "KS",    "func": self.compute_koya,                        "rev": True , "desc": "Koya system"},
+            "BH":    {"name": "BH",    "func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Bochholz"},
+            "FB":    {"name": "FB",    "func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Fore Bochholz"},
+            "SB":    {"name": "SB",    "func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Sonneborn Berger"},
+            "ABH":   {"name": "ABH",   "func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Adjusted score for Buchholz"},
+            "AFB":   {"name": "AFB",   "func": self.compute_buchholz_sonneborn_berger,   "rev": True , "desc": "Adjusted score for Fore Buchholz"},
+            "AOB":   {"name": "AOB",   "func": self.compute_average_of_buchholz,         "rev": True , "desc": "Average of Buchholz"},
+            "ARO":   {"name": "ARO",   "func": self.compute_ratingperformance,           "rev": True , "desc": "Average Rating of opponents"},
+            "TPR":   {"name": "TPR",   "func": self.compute_ratingperformance,           "rev": True , "desc": "Tournament Rating Performance"},
+            "PTP":   {"name": "PTP",   "func": self.compute_ratingperformance,           "rev": True , "desc": "Perfect Rating Performance"},
+            "APRO":  {"name": "APRO",  "func": self.compute_average_rating_performance,  "rev": True , "desc": "Average of Rating Performance"},
+            "APPO":  {"name": "APPO",  "func": self.compute_average_perfect_performance, "rev": True , "desc": "Average of Perfect Performance"},
+            "ESB":   {"name": "ESB",   "func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
+            "EMMSB": {"name": "EMMSB", "func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
+            "EMGSB": {"name": "EMGSB", "func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
+            "EGMSB": {"name": "EGMSB", "func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
+            "EGGSB": {"name": "EGGSB", "func": self.compute_ext_sonneborn_berger,        "rev": True , "desc": "Extended Sonneborn Berger" },
+            "BC":    {"name": "BC",    "func": self.compute_boardcount,                  "rev": False, "desc": "Board count"},
+            "TBR":   {"name": "TBR",   "func": self.compute_top_bottom_board,            "rev": False, "desc": "Board count"},
+            "BBE":   {"name": "BBE",   "func": self.compute_top_bottom_board,            "rev": False, "desc": "Board count"},
+            "SSSC":  {"name": "SSSC",  "func": self.compute_score_strength_combination,  "rev": True , "desc": "Score strength combination"},
+            "STD":   {"name": "STD",   "func": self.compute_std,                         "rev": True , "desc": "Stanard score system"},
+            "ACC":   {"name": "ACC",   "func": self.compute_acc,                         "rev": True , "desc": "	Points + accellerated points"},
+            "FLT":   {"name": "FLT",   "func": self.compute_flt,                         "rev": True , "desc": "Float (8=df 4=uf in prev round, 2=df 1=uf in 2 rounds before)"},
+            "RFP":   {"name": "RFP",   "func": self.compute_rfp,                         "rev": True , "desc": "Registered for round"},
+            "TOP":   {"name": "TOP",   "func": self.compute_top,                         "rev": True , "desc": "	Is player a top-scorer in last round"},
             }
             
         self.tournament = tournament = chessevent.get_tournament(tournamentno)
@@ -147,7 +149,7 @@ class tiebreak:
         self.maxboard = 0
         self.lastplayedround = 0
         self.primaryscore = None  # use default
-        self.acceleration = tournament["acceleration"] if "acceleration" in tournament else None
+        self.accelerated = tournament["accelerated"] if "accelerated" in tournament else None
         self.rating = {"W": Decimal("1.0"), "D": Decimal("0.5"), "L": "Z", "Z": Decimal("0.0"), "A": "Z", "U": "Z"}
 
         if self.isteam:
@@ -801,23 +803,24 @@ class tiebreak:
         swap = tb["modifiers"]["functions"][tb["modifiers"]["swap"]]
         if swap == "P":
                 (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
-                while (
-                    ch := self.compute_basic_direct_encounter(
-                        tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix
-                    )
-                ) > 0:
+                while (True): 
+                    ch = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
+                    if ch <= 0:
+                        break
                     changes += ch
         if swap == "S":
                 (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, False)
-                while (
-                    ch := self.compute_basic_direct_encounter(
-                        tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix
-                    )
-                ) > 0:
+                while (True):
+                    ch = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
+                    if ch <= 0:
+                        break
                     changes += ch
         if swap == "B":
                 (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, False)
-                while (ch := self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, "bc", "bc", "bc", prefix)) > 0:
+                while (True): 
+                    ch = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, "bc", "bc", "bc", prefix)
+                    if ch <= 0:
+                        break
                     changes += ch
 
         tb["modifiers"]["changes"] += changes
@@ -883,7 +886,12 @@ class tiebreak:
         (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         plim = tb["modifiers"]["plim"]
         nlim = tb["modifiers"]["nlim"]
-        lim = plim * scoretype["W"] * rounds * (self.teamsize if points == "gpoints" else 1) / Decimal("100.0") + nlim
+        competitors = len(cmps)
+        maxgames = rounds
+        # if RoundRobin with odd number of players the number of games is reduced by 1 (2, for double rr, ...)
+        if self.rr and rounds % competitors == 0:
+            maxgames -= rounds//competitors
+        lim = plim * scoretype["W"] * maxgames * (self.teamsize if points == "gpoints" else 1) / Decimal("100.0") + nlim
         for startno, cmp in cmps.items():
             tbscore = cmp["tbval"]
             ks = 0
@@ -1149,9 +1157,9 @@ class tiebreak:
 
     def get_accelerated(self, prefix, rnd, startno):
         acc = "Z"
-        if self.acceleration is None:
+        if self.accelerated is None:
             return acc
-        for val in self.acceleration["values"]:
+        for val in self.accelerated["values"]:
             if (
                 rnd >= val["firstRound"]
                 and rnd <= val["lastRound"]
@@ -1295,9 +1303,9 @@ class tiebreak:
                     if not cmp["rsts"][rnd]["played"]:
                         res = cmp["rsts"][rnd]["res"]
                         if cmp["rsts"][rnd]["opponent"]:
-                            val = {"W": "+", "D": "=", "L": "-", "P": "pab", "U": "=", "Z": "-"}[res]
+                            val = {"W": "+", "D": "=", "L": "-", "P": "pab", "A": "=", "U": "-", "Z": "-"}[res]
                         else:
-                            val = {"W": "F", "D": "H", "L": "Z", "P": "pab", "U": "=", "Z": "Z"}[res]
+                            val = {"W": "F", "D": "H", "L": "Z", "P": "pab", "A": "=", "U": "-", "Z": "Z"}[res]
                     tbscore[prefix + "rfp"][rnd] = val
             tbscore[prefix + "rfp"]["val"] = val
         return "rfp"
@@ -1318,8 +1326,7 @@ class tiebreak:
 
     def get_builtin(self, tb, cmps, rounds):
         tbname = tb["name"]
-        if tbname == "PTS" or tbname == "MPTS" or tbname == "GPTS":
-            return "points"
+        tbname = self.tiebreaklist[tbname]["name"]
         return tbname.lower()
 
     def reverse_pointtype(self, tb, cmps, rounds):

@@ -17,7 +17,8 @@ class tiebreakchecker(commonmain):
 
     def __init__(self):
         super().__init__()
-        self.origin = "tiebreakchecker ver. " + version.version
+        ver = version.version()
+        self.origin = "tiebreakchecker ver. " + ver["version"]
         self.resulttype = "tiebreakResult"
 
     # read_command_line

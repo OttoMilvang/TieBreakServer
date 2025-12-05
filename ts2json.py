@@ -64,7 +64,7 @@ class ts2json(chessjson.chessjson):
             "AvgLocalRatingOpponnent": "AvgLocalRatingOpponnent",
             "AvgLocalRatingOpponnent-1low": "AvgLocalRatingOpponnent-1low",
             "FIDERatingPrestation": "FIDERatingPrestation",
-            "LocalRatingPrestastion": "LocalRatingPrestastion",
+            "LocalRatingPrestation": "LocalRatingPrestation",
             "Alphabetically": "Alphabetically",
             "PctScoreMin75": "PctScoreMin75",
             "Cup": "Cup",
@@ -119,6 +119,7 @@ class ts2json(chessjson.chessjson):
                         self.update_tournament_rating(tournament)
                         self.update_tournament_teamcompetitors(tournament)
                         self.update_tournament_random(tournament, self.isteam)
+                        self.add_accelerated(tournament)
         return
 
     def parse_ts_tournament_attrib(self, attrib):
@@ -392,11 +393,10 @@ class ts2json(chessjson.chessjson):
                 tournament["maxMeet"] = helpers.parse_int(value)
             elif key == "PairingAccellerated":
                 if value == "Y":
-                    tournament["accelerated"] = "BAKU2016"
-                else:
-                    tournament["accelerated"] = ""
+                    tournament["accelerated"] = { "name" : "BAKU2016", "values": []}
             elif key == "AccelleratedLastGaSn":
-                other["accelleratedLastGaSn"] = helpers.parse_int(value)
+                if "accelerated" in tournament:
+                    tournament["accelerated"]["bakuGa"] = helpers.parse_int(value)
             elif key == "Pairing":
                 tournament["tournamentType"] = value
             elif key == "FirstRatedRound":
@@ -415,7 +415,10 @@ class ts2json(chessjson.chessjson):
                 if value == "+":
                     scoresystem_map["game"]["P"] = "W"
             elif key == "PostponedCalcAs":
-                pass
+                if value == "d" or value == "=": 
+                    scoresystem_map["game"]["A"] = "D"
+                if value == "+":
+                    scoresystem_map["game"]["A"] = "W"
             elif key == "RankPerClass":
                 pass
             elif key == "ShowRankNum":
@@ -465,7 +468,7 @@ class ts2json(chessjson.chessjson):
             scoresystem_map["game"]["D"] = Decimal("1.0")
         scoresystem_map["game"]["Z"] = Decimal("0.0")
         scoresystem_map["game"]["F"] = "W"
-        scoresystem_map["game"]["A"] = scoresystem_map["game"]["H"] = "D"
+        scoresystem_map["game"]["H"] = "D"
         scoresystem_map["game"]["U"] = "Z"
 
         if ca["id"] == 0 or da["id"] == 0:
@@ -827,7 +830,7 @@ class ts2json(chessjson.chessjson):
             result["white"] = playerno
             result["black"] = max(0, opponent)
             result["wResult"] = score
-        result["played"] = ((res == "1" or res == "=" or res == "0") and opponent > 0) or (opponent == -1)
+        result["played"] = ((res == "1" or res == "=" or res == "0" or res == "A") and opponent > 0) or (opponent == -1)
         if score != "U":
             self.append_result(cresults, result)
         return
@@ -948,6 +951,25 @@ class ts2json(chessjson.chessjson):
             self.tcompetitors[competitor["teamName"]]["cplayers"].append(competitor)
             competitor.pop("teamName", None)
 
+    def add_accelerated(self, tournament):
+        if tournament.get("accelerated", {}).get("name", "") == "BAKU2016":
+            acc = tournament["accelerated"]
+            bakuga = acc["bakuGa"]
+            numrounds = tournament["numRounds"]
+            accDrounds = (numrounds + 1)//2
+            accWrounds = (accDrounds + 1)//2
+            for (res, start, stop) in [("W", 1, accWrounds), ("D", accWrounds+1, accDrounds)]:
+                value = {
+                    "matchResult": res,
+                    "gameResult": res,
+                    "firstRound": start,
+                    "lastRound": stop,
+                    "firstCompetitor": 1,
+                    "lastCompetitor": bakuga,
+                }
+                tournament["accelerated"]["values"].append(value)
+
+    
 
 # ============ Module test ==============
 def dotest(name):

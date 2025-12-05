@@ -28,7 +28,7 @@ class commonmain:
         self.resulttype = "chessjsonResult"
         self.origin = "checker, version 1.00"
         self.tournamentno = 1
-        self.sysexit = False
+        self.exit = False
 
     def printhelp(self):
         print("checker [options]")
@@ -46,11 +46,12 @@ class commonmain:
         }
         chessjson["status"]["code"] = code
         chessjson["status"]["error"].append(txt)
+        #if code >= 400 and code < 500:
+        #    raise
         if code >= 400:
-            json.dump(chessjson, sys.stdout, indent=2)
-        if code >= 400:
-            # self.sysexit = True
-            sys.exit(code)
+            if self.params["verbose"]:
+                raise
+            self.exit = True
 
     # read_command_line
     #   options:
@@ -168,7 +169,8 @@ class commonmain:
                     chessfile = ts2json()
                     charset = "ascii"
             else:
-                    self.error(403, "Error in file format: " + self.params["file_format"])
+                    chessfile = chessjson()
+                    chessfile.put_status(403, "Error in file format: " + self.params["file_format"])
 
             self.chessfile = chessfile
             if len(self.params["encoding"]) > 0:
@@ -186,8 +188,12 @@ class commonmain:
                 lines = f.read()
                 f.close()
             else:
-                with io.open(self.params["input_file"], mode="r", encoding=charset) as f:
-                    lines = f.read()
+                try:
+                    with io.open(self.params["input_file"], mode="r", encoding=charset) as f:
+                        lines = f.read()
+                except:
+                    chessfile.put_status(405, "Can't open file: " + self.params["input_file"])
+
 
             if charset == "latin1" and lines[0] == "\xef" and lines[1] == "\xbb" and lines[2] == "\xbf":
                 lines = lines[3:]
@@ -246,7 +252,7 @@ class commonmain:
                     fileformat = params["output_format"]
                     if fileformat == "TRF":
                             trf = trf2json()
-                            data = trf.output_file(result, 1, self.verbose)
+                            data = trf.output_file(result, 1, self.params["verbose"])
                             f.write(data)
                     elif fileformat == "JSON":
                             helpers.json_output(f, chessjson)
@@ -265,53 +271,97 @@ class commonmain:
             if fileopen:
                 f.close()
             raise
-        return code
+        return chessfile.chessjson["status"]["code"]
+
+    def write_error_file(self):
+        fileopen = False
+        params = self.params if self.params is not None else []
+        chessfile = self.chessfile
+        try:
+            status = chessfile.chessjson["status"]
+            if params["output_file"] == "-":
+                f = sys.stdout
+                if "data" in params:
+                    f.write("Content-Type: application/json; charset=utf-8\r\n\r\n")
+            else:
+                f = open(params["output_file"], "w")
+                fileopen = True
+        except:
+            f = sys.stdout
+            if "data" in params:
+                f.write("Content-Type: application/json; charset=utf-8\r\n\r\n")
+            
+            # if params["check"] and self.core is not None:
+        chessjson = {
+            "filetype": "Error",
+            "version": "1.0",
+            "origin": self.origin,
+            "published": str(datetime.datetime.now())[0:19],
+            "status": chessfile.chessjson["status"],
+        }
+        delimiter = params.get("delimiter", "JSON") 
+        if delimiter == "JSON" or delimiter is None:
+            helpers.json_output(f, chessjson)
+        else:
+            f.write("### Error " + str(chessjson["status"]["code"]) + "\n\r")
+            for line in chessjson["status"]["error"]:
+                f.write(line + "\r\n")
+                
 
     def common_main(self):
         # Read command line
-        try:
-            self.read_command_line()
-        except:
-            raise
-            self.error(500, "Bad command line")
-        params = self.params
-        try:
-            self.read_input_file()
-        except:
-            if params["verbose"] > 0:
+        while not self.exit:
+            try:
+                self.read_command_line()
+            except:
                 raise
-            stat = self.chessfile.chessjson["status"]
-            if stat["code"] > 0:
-                self.error(stat["code"], stat["error"])
-            self.error(502, "Error when reading file: " + params["input_file"])
+                self.error(500, "Bad command line")
+                break
+            params = self.params
+            try:
+                self.read_input_file()
+            except:
+                if params["verbose"] > 0:
+                    raise
+                stat = self.chessfile.chessjson["status"]
+                if stat["code"] > 0:
+                    self.error(stat["code"], stat["error"])
+                self.error(502, "Error when reading file: " + params["input_file"])
+                
+                break
 
-        if "tournament_number" not in self.params:
-            self.error(501, "Missing parameter --tournament-number")
-        self.tournamentno = helpers.parse_int(self.params["tournament_number"])
-        if self.tournamentno < 0 or self.tournamentno > len(self.chessfile.chessjson["event"]["tournaments"]):
-            self.error(501, "Invalid parameter --tournament-number")
-
-        # Add command line parameters
-        for score in ["game", "match"]:
-            if score + "_score" in params and params[score + "_score"] is not None:
-                for arg in params[score + "_score"]:
-                    self.chessfile.parse_score_system(score, arg)
-
-        try:
-            self.do_checker()
-        except:
-            if params["verbose"] > 0:
-                raise
-            else:
-                if not self.sysexit:
+            if "tournament_number" not in self.params:
+                self.error(501, "Missing parameter --tournament-number")
+            self.tournamentno = helpers.parse_int(self.params["tournament_number"])
+            if self.tournamentno < 0 or self.tournamentno > len(self.chessfile.chessjson["event"]["tournaments"]):
+                self.error(501, "Invalid parameter --tournament-number")
+                break
+    
+            # Add command line parameters
+            for score in ["game", "match"]:
+                if score + "_score" in params and params[score + "_score"] is not None:
+                    for arg in params[score + "_score"]:
+                        self.chessfile.parse_score_system(score, arg)
+    
+            try:
+                self.do_checker()
+            except:
+                if params["verbose"] > 0:
+                    raise
+                else:
                     self.error(510, "Program error")
+                break
+    
+            try:
+                code = self.write_output_file()
+                if "DUMP" in params["experimental"]:
+                    self.chessfile.dumpresults()
+            except:
+                if params["verbose"] > 0:
+                    raise
+                self.error(503, "Error when writing file: " + params["output_file"])
+            break
+        if self.exit:
+            self.write_error_file()
+        return self.chessfile.chessjson["status"]["code"]
 
-        try:
-            code = self.write_output_file()
-            if "DUMP" in params["experimental"]:
-                self.chessfile.dumpresults()
-        except:
-            if params["verbose"] > 0:
-                raise
-            self.error(503, "Error when writing file: " + params["output_file"])
-        return code
