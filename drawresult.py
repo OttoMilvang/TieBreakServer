@@ -100,18 +100,58 @@ class drawresult:
    
 # run program
 if __name__ == '__main__':
-    dr = drawresult(None)
-    rs = ""
-    for i in range(40):
-        rs += dr.result(2100,1700)
-    print(rs)
+    import sys
+    import version   
+    import argparse
+    import helpers
     
-    print(dr.prob(2000,1800))
-    print(dr.prob(1800,2000))
-    print(dr.prob(2000,2000))
-    dr.set_team(2)
-    print(dr.teamprob(2000,1800))
-    print(dr.teamprob(2000,2000))
-    dr.set_team(4)
-    print(dr.teamprob(2000,1800))
-    print(dr.teamprob(2000,2000))
+    def read_command_line(version, strict):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-c", "--check", required=False, action="count", default=0, help="check")
+        parser.add_argument("-w", "--white", required=False, default="2000", help="White rating")
+        parser.add_argument("-b", "--black", required=False, default="1800", help="Black rating")
+        parser.add_argument("-v", "--verbose", required=False, action="count", default=0, help="verbose")
+        parser.add_argument("-V", "--version", required=False, action="count", default=0, help="Version")
+        if strict:
+            params = vars(parser.parse_args())
+        else:
+            params = vars(parser.parse_known_args())
+        # print(params)
+
+        if params.get("version", 0) > 0 or params.get("verbose", 0) > 0:
+            print(version)
+            if params["version"] > 0:
+                sys.exit(0)
+        return params
+
+
+    def do_test(w, b, c):    
+        dr = drawresult(None)
+        rs = ""
+        for i in range(40):
+            rs += dr.result(w, b)
+        if not c: 
+            print("Test individual:", w, b)
+            print(rs)
+        
+        print(dr.prob(w,b))
+        if not c:
+            print(dr.prob(b,w))
+            print(dr.prob(w,w))
+            print(dr.prob(b,b))
+            dr.set_team(2)
+            print("Test team 2 players:", w, b)
+            print(dr.teamprob(w,b))
+            print(dr.teamprob(w,w))
+            dr.set_team(4)
+            print("Test team 4 players:", w, b)
+            print(dr.teamprob(w,b))
+            print(dr.teamprob(w,w))
+
+    params = read_command_line("drawresult ver. " + version.version()["version"], True)
+    w = helpers.parse_int(params["white"])
+    b = helpers.parse_int(params["black"])
+    c = params["check"]
+    do_test(w, b, c)
+        
+        
