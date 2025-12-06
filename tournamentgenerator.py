@@ -77,7 +77,7 @@ class tournamentgenerator(commonmain):
         self.parser.add_argument("-T", "--members", required=False, default="1",
                             help="Team members")
         self.parser.add_argument("-r", "--rating", required=False, nargs="*", default=["2200", "10", "0"], help=self.helptxt["-r"])
-        self.parser.add_argument("-s", "--statistics", required=False, nargs="*", default=["2200", "10", "0"], help=self.helptxt["-s"])
+        self.parser.add_argument("-s", "--statistics", required=False, nargs="*", default=["0.01", "0.05", "0.02"], help=self.helptxt["-s"])
         self.parser.add_argument("-m", "--method", required=False, default="dutch",
                             help="dutch | berger")
         self.parser.add_argument("-t", "--top-color", required=False,
