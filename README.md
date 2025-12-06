@@ -73,13 +73,14 @@ Print tiebreak values for the given tiebreaks
 
 - **-g \<number\>** or **--generate \<number\>** - Generate \<number\> tournaments 
 - **-p \<number\>** or **--players \<number\>** - Number of players in the tournament
-- **-r \<number\>** or **--rounds \<number\>** - Number of rounds
+- **-n \<number\>** or **--number-of-rounds \<number\>** - Number of rounds
 - **-t \<w | b\>** or **--top-color \<w | b\>** - Color on top board")
-- **-s \<args\>** or **--statistics \<list\>** - List of 6 numbers, \<higest rating\> \<step rating\> \<rate zpb\> \<rate hpb\>  \<rate forfeited\>  \<sigma\>
+- **-r \<args\>** or **--rating \<list\>** - List of 3 numbers, \<higest rating\> \<step rating\> \<sigma\>
+- **-s \<args\>** or **--statistics \<list\>** - List of 3 numbers,  \<rate zpb\> \<rate hpb\>  \<rate forfeited\> 
 - **-x \<list\>** or **--experimental \<list\>** - list of kewords, "weighted" - use weighted
 
 ### 👷 Examples
 
- - python tournamentgenerator.py -n 9 -x weighted -p 15 -s 2200 10 0.02 0.10 0.04 50.0 -o C:/temp/t_n9_p15_d10_s50/T%d.trf -g 10000<br>
+ - python tournamentgenerator.py -n 9 -x weighted -p 15 -r 2200 10 50.0 -s 0.02 0.10 0.04 -o C:/temp/t_n9_p15_d10_s50/T%d.trf -g 10000<br>
  This will create directory C:/temp/t_n9_p15_d10_s50 and generate 10000 tournamen numbered T0000.trf to T9999.trf<br>
  Top color will alternate unless -t flag say otherwise  
