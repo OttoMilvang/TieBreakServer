@@ -69,6 +69,7 @@ class tiebreak:
     # CURRENT_RULES = 2  => 2026-02-01,  §16, max value  
     
     TIEBREAK_RULES = {
+        0 : "2022-01-01",
         1 : "2024-08-01",
         2 : "2026-02-01",
         } 
@@ -1057,6 +1058,7 @@ class tiebreak:
             tbscore[prefix + "tpr"] = {"val": 0, "cut": []}
             tbscore[prefix + "ptp"] = {"val": 0, "cut": []}
             ratingopp = []
+            # trounds
             trounds = 0
             for rnd, rst in cmp["rsts"].items():
                 if rnd <= rounds and rst["played"] and rst["opponent"] > 0:
@@ -1069,12 +1071,19 @@ class tiebreak:
                         self.addtbval(cmp["tbval"][prefix + "tpr"], rnd, rtng)
                         self.addtbval(cmp["tbval"][prefix + "ptp"], rnd, rtng)
             # trounds = rounds  // This is correct only if unplayed gmes are cut.
+            ver = tb["modifiers"]["ver"]
             low = tb["modifiers"]["low"]
             if low > rounds:
                 low = rounds
             high = tb["modifiers"]["high"]
             if low + high > rounds:
                 high = rounds - low
+            if ver == 0 and (low > 0 or high > 0) : # Rules 2022 for WCC Blitz and Rapid
+                unplayed = rounds - trounds
+                diff = min(unplayed, low)
+                low -= diff
+                diff = min(unplayed - diff, high)
+                high -= diff
             while low > 0:
                 if trounds == len(ratingopp):
                     newopp = sorted(ratingopp, key=lambda p: (p["adjrating"]))
@@ -1360,7 +1369,7 @@ class tiebreak:
             "GG": "ggpoints",
         }
         txt = txt.upper()
-        comp = txt.replace("!", "/").replace("#", "/").split("/", 2)
+        comp = txt.replace("!", "/").replace("#", "/").split("/")
         # if len(comp) == 1:
         #    comp = txt.split('-')
         nameparts = comp[0].split(":")
@@ -1444,9 +1453,9 @@ class tiebreak:
                 elif mf[index] == "V":
                         ver = int(mf[1:]) if len(mf[1:]) else max(self.TIEBREAK_RULES.keys()) 
                         if ver > 2000:
-                            ver = 2 if ver == 2026 else 1
+                            ver = {2022: 0, 2024: 1, 2026:2}.get(ver, 2)
                         else:
-                            ver = 1 if ver == 1 else 2 
+                            ver = ver if ver == 0 or ver == 1 else 2 
                         tb["modifiers"]["ver"] = ver
                 elif mf[index] == "N":
                         tb["modifiers"]["vun"] = True
