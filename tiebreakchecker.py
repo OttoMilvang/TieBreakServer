@@ -74,12 +74,6 @@ class tiebreakchecker(commonmain):
                         scoresystem[args[0]] = helpers.parse_float(args[1])
                 self.params[scoretype + "_score"] = scoresystem
 
-        # Set pre-determined or swiss
-        self.params["is_rr"] = None
-        if self.params["pre_determined"]:
-            self.params["is_rr"] = True
-        if self.params["swiss"]:
-            self.params["is_rr"] = False
 
     def write_text_file(self, f, result, delimiter):
         if self.params["rank"]:

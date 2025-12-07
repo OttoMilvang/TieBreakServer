@@ -7,10 +7,10 @@ Created on Tue Apr 29 09:21:45 2025
 
 def version():
     return {
-        "version": "1.7.41",
+        "version": "1.7.42",
         "version_major": 1,
         "version_minor": 7,
-        "version_patch": 41,
+        "version_patch": 42,
     }
 
 if __name__ == "__main__":

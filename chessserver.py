@@ -65,7 +65,7 @@ class chessserver(commonmain):
 
     def __init__(self):
         super().__init__()
-        self.origin = "chessserver ver. " + version.version
+        self.origin = "chessserver ver. " + version.version()["version"]
         self.tournamentno = 0
 
     def read_command_line(self):
