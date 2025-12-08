@@ -117,7 +117,7 @@ class scoresystem:
 
     def solve_scoresystem_p(self, equations, pab):
         # print(equations)
-        score = {"sum": Decimal("0.0"), "W": 0, "D": 0, "L": 0, "P": 0, "U": 0, "Z": 0}
+        score = {"sum": Decimal("0.0"), "W": 0, "D": 0, "L": 0, "P": 0, "U": 0, "Z": 0, "A": 0}
         # print ('PAB:', pab)
         res = {}
         for loss in [Decimal("0.0"), Decimal("0.5"), Decimal("1.0")]:
@@ -229,7 +229,7 @@ class scoresystem:
                 eqok = True
                 score = self.fill_default_scoresystem("game") if version == "TRF25" else self.solve_scoresystem(equations)
                 # print(version, score)
-                for eq in equations:
+                for lineno, eq in enumerate(equations):
                     if eq["sum"] == Decimal("0.0"):
                         continue
                     # print(eq)
@@ -245,7 +245,7 @@ class scoresystem:
                             checksum += num * val
                     # print(eq)
                     if eq["sum"] != checksum:
-                        msg = "Incorrect score in" + eq
+                        msg = "Incorrect score in line " + str(lineno+1)
                         chessjson["status"]["error"].append(msg)
                         eqok = False
                 # print("-EQOK", eqok, version, "162" in self.all_lines)
