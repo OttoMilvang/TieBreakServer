@@ -141,11 +141,12 @@ class tiebreak:
         if tournament is None:
             return
         # Set pre-determined or swiss
-        params["is_rr"] = None
-        if params["pre_determined"]:
-            params["is_rr"] = True
-        if params["swiss"]:
-            params["is_rr"] = False
+        if params is not None:
+            params["is_rr"] = None
+            if params.get("pre_determined", False):
+                params["is_rr"] = True
+            if params.get("swiss", False):
+                params["is_rr"] = False
 
         self.isteam = self.isteam = tournament["teamTournament"] if "teamTournament" in tournament else False
         self.teamsize = tournament["teamSize"] if "teamSize" in tournament else 1
