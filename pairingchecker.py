@@ -135,7 +135,7 @@ class pairingchecker(commonmain):
     def read_command_line(self):
         self.parser.add_argument("-a", "--analyze", required=False, action="count", default=0, help="Analyze pairing")
         self.parser.add_argument("-p", "--pairing", required=False, action="count", default=0, help="Do pairing")
-        self.parser.add_argument("-m", "--method", required=False, action="store_true", help="dutch | berger")
+        self.parser.add_argument("-m", "--method", required=False, default="dutch", help="dutch | berger")
         self.parser.add_argument("-t", "--top-color", required=False, default=" ", help="Color on top board")
         self.parser.add_argument("-u", "--unpaired", required=False, nargs="*", default=[])
         self.read_common_command_line(self.origin, True)
@@ -471,6 +471,10 @@ class pairingchecker(commonmain):
                 if lastround > numrounds:
                     self.error(504, "Number of rounds = " + str(numrounds) + ", can't pair round " + str(lastround))
                 params["is_rr"] = False
+                method = params["method"].lower()
+                if method != "dutch":
+                    chessfile.put_status(410, "Method '" + method + "' not implemented")
+                    raise
                 topcolor = chessjson.get_topcolor(chessfile, self.tournamentno, params["top_color"])
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
                     tb = tiebreak(chessfile, self.tournamentno, rnd - 1, None)

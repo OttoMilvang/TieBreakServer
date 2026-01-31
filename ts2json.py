@@ -12,6 +12,7 @@ Created on Thu Oct 19 11:55:32 2023
 import xml.etree.ElementTree as ET
 from decimal import Decimal
 import chessjson
+import games2matches
 import helpers
 import scoresystem
 
@@ -54,11 +55,11 @@ class ts2json(chessjson.chessjson):
             "DE": "DE",
             "MutualColor": "MutualColor",
             "FIDEtitle": "FIDEtitle",
-            "FideRating": "FideRating",
+            "FideRating": "RTNG",
             "LocalRating": "LocalRating",
-            "SumProgressiveScore": "SumProgressiveScore",
-            "SumProgressiveScore-1": "SumProgressiveScore-1",
-            "SumProgressiveScore-2": "SumProgressiveScore-2",
+            "SumProgressiveScore": "PS",
+            "SumProgressiveScore-1": "PS/C1",
+            "SumProgressiveScore-2": "PS/V2",
             "AvgFideRatingOpponnent": "ARO",
             "AvgFideRatingOpponnent-1low": "ARO/C1",
             "AvgLocalRatingOpponnent": "AvgLocalRatingOpponnent",
@@ -83,6 +84,7 @@ class ts2json(chessjson.chessjson):
             "IndividualMonrad-2low-2high": "IndividualMonrad-2low-2high",
             "IndividualBerger": "IndividualBerger",
             "PctScoreLeague": "PctScoreLeague",
+            "REP": "REP",
         }
         self.isteam = False
 
@@ -334,9 +336,9 @@ class ts2json(chessjson.chessjson):
             else:
                 self.print_warning("parse_ts_group tag: " + child.tag + " not matched")
 
-        self.scores.fill_default_scoresystem("game")
+        tournament["scoreSystem"]["game"].update(self.scores.fill_default_scoresystem("game"))
         if tournament["teamTournament"]:
-            self.scores.fill_default_scoresystem("match")
+            tournament["scoreSystem"]["match"].update(self.scores.fill_default_scoresystem("match"))
         self.chessjson["event"]["tournaments"].append(tournament)
         return tournament
 
@@ -642,46 +644,62 @@ class ts2json(chessjson.chessjson):
     def update_tournament_teamcompetitors(self, tournament):
         if not tournament["teamTournament"]:
             return
+        current = self.current_id
+        matchlist =  tournament["matchList"]
+        print("B", self.current_id)
+        g2m = games2matches.games2matches(self.scores, tournament, {"current_id": self.current_id})
+        matches = g2m.merge_matches()
+        for key, tmatch in matches.items():
+            if tmatch["id"] > current:
+                print(tmatch)
+                matchlist.append(tmatch)
+        self.current_id = g2m.get_current_id()
+        print("A", self.current_id)
+        return
+
         [cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
         competitors = tournament["competitors"]
         allgames = self.build_all_games(tournament, cteam, False)
-        pscore = tournament["gameScoreSystem"]
-        tscore = tournament["matchScoreSystem"]
+        pscore = tournament["scoreSystem"]["game"]
+        tscore = tournament["scoreSystem"]["match"]
         for competitor in competitors:
             competitor["matchPoints"] = 0
             competitor["gamePoints"] = 0
-        for game in tournament["matchList"]:
-            rnd = game["round"]
+        for tmatch in tournament["matchList"]:
+            rnd = tmatch["round"]
             gpoints = {}
             played = False
+            games = []
             for col in ["white", "black"]:
-                if col in game and game[col] > 0:
-                    teamno = game[col]
+                if col in tmatch and tmatch[col] > 0:
+                    teamno = tmatch[col]
                     teamres = allgames[rnd][teamno]
                     tsum = 0
-                    for igame in teamres:
-                        if teamno == cteam[igame["white"]]:
-                            tsum += self.get_score(pscore, igame, "white")
-                            played = played or igame["played"]
-                        if "black" in igame and igame["black"] > 0 and teamno == cteam[igame["black"]]:
-                            tsum += self.get_score(pscore, igame, "black")
-                            played = played or igame["played"]
+                    for game in teamres:
+                        if teamno == cteam[game["white"]]:
+                            tsum += self.get_score(pscore, game, "white")
+                            played = played or game["played"]
+                            games.append(game["id"])
+                        if "black" in game and game["black"] > 0 and teamno == cteam[game["black"]]:
+                            tsum += self.get_score(pscore, game, "black")
+                            played = played or game["played"]
                     gpoints[col] = tsum
-            game["played"] = played
+            tmatch["played"] = played
+            tmatch["games"] = games
             if "black" in gpoints:
                 if gpoints["white"] > gpoints["black"]:
-                    game["wResult"] = "W"
-                    game["bResult"] = "L" if played else "Z"
+                    tmatch["wResult"] = "W"
+                    tmatch["bResult"] = "L" if played else "Z"
                 elif gpoints["white"] < gpoints["black"]:
-                    game["bResult"] = "W"
-                    game["wResult"] = "L" if played else "Z"
+                    tmatch["bResult"] = "W"
+                    tmatch["wResult"] = "L" if played else "Z"
                 else:
-                    game["wResult"] = "D"
-                    game["bResult"] = "D"
-                competitors[game["black"] - 1]["gamePoints"] += gpoints["black"]
-                competitors[game["black"] - 1]["matchPoints"] += self.get_score(tscore, game, "black")
-                competitors[game["white"] - 1]["gamePoints"] += gpoints["white"]
-                competitors[game["white"] - 1]["matchPoints"] += self.get_score(tscore, game, "white")
+                    tmatch["wResult"] = "D"
+                    tmatch["bResult"] = "D"
+                competitors[tmatch["black"] - 1]["gamePoints"] += gpoints["black"]
+                competitors[tmatch["black"] - 1]["matchPoints"] += self.get_score(tscore, tmatch, "black")
+                competitors[tmatch["white"] - 1]["gamePoints"] += gpoints["white"]
+                competitors[tmatch["white"] - 1]["matchPoints"] += self.get_score(tscore, tmatch, "white")
         return
 
     # ==============================

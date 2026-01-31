@@ -60,10 +60,8 @@ class chessjson:
             },
         }
 
-        self.numProfiles = 0
-        self.numTeams = 0
+        self.current_id = 0
         self.pid = {}  # Lookup table for id
-        self.numResults = 0
         self.reverse = {"W": "L", "D": "D", "L": "W", "Z": "W", "A": "A", "U": "U"}
 
         if sys.version_info[0] < 3 or sys.version_info[0] == 3 and sys.version_info[1] < 8:
@@ -75,6 +73,10 @@ class chessjson:
             print(line)
             pass
         return
+
+    def next_id(self):
+        self.current_id += 1
+        return self.current_id
 
     def get_event(self):
         return self.chessjson["event"]
@@ -173,8 +175,7 @@ class chessjson:
     def append_profile(self, profile):
         if "id" in profile and profile["id"] != 0:
             return max(0, profile["id"])
-        self.numProfiles += 1
-        pid = profile["id"] = self.numProfiles + self.numTeams
+        pid = profile["id"] = self.next_id()
         self.chessjson["event"]["profiles"].append(profile)
         self.pid[pid] = profile
         return pid
@@ -197,8 +198,7 @@ class chessjson:
                 if profileid > 0 and not (profileid in elem["players"]):
                     elem["players"].append(profileid)
             return elem["id"]
-        self.numTeams += 1
-        tid = team["id"] = self.numProfiles + self.numTeams
+        tid = team["id"] = self.next_id()
         if profileid > 0 and not (profileid in team):
             team["players"].append(profileid)
         self.chessjson["event"]["teams"].append(team)
@@ -225,10 +225,7 @@ class chessjson:
                 # if (result['white'] == trace or result['black'] == trace):
                 #    print('Update black', elem)
             return elem["id"]
-        self.numResults += 1
-        rid = result["id"] = self.numResults
-        # if (result['white'] == trace or result['black'] == trace):
-        #    print('First', result)
+        rid = result["id"] = self.next_id()
         results.append(result)
         return rid
 
@@ -251,15 +248,12 @@ class chessjson:
                     # if (result['white'] == trace or result['black'] == trace):
                     #    print('Update black', elem)
                 return elem["id"]
-        rid = result["id"] = self.next_game()
+        rid = result["id"] = self.next_id()
         # if (result['white'] == trace or result['black'] == trace):
         #    print('First', result)
         results.append(result)
         return rid
 
-    def next_game(self):
-        self.numResults += 1
-        return self.numResults
 
     # ==============================
     #
@@ -332,7 +326,7 @@ class chessjson:
         elif result["black"] > 0:
             res = reverse[result[color[0] + "Result"]]
         else:
-            return 0.0
+            return Decimal("0.0")
         while res in scoreSystem:
             if res == "L" and result["played"] is False:
                 res = "Z"
@@ -346,7 +340,7 @@ class chessjson:
             res = self.reverse[result[color[0] + "Result"]]
         else:
             # print("get_score" ,  slist, result, color, "Null")
-            return 0.0
+            return Decimal("0.0")
         while res in slist:
             if res == "L" and result["played"] is False:
                 res = "Z"
@@ -363,7 +357,7 @@ class chessjson:
         elif result["black"] > 0:
             res = self.reverse[result[color[0] + "Result"]]
         else:
-            return 0.0
+            return Decimal("0.0")
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
         if res == "W":
             return False
@@ -397,9 +391,12 @@ class chessjson:
                         arnd[nteam] = []
                     cgame = game.copy() if makecopy else game
                     arnd[nteam].append(cgame)
-        # with open('C:\\temp\\allgames.json', 'w') as f:
-        #    json.dump(allgames, f, indent=2)
         return allgames
+
+    def build_games_from_id(self, tournament):
+        return  {game["id"]: game for game in tournament["gameList"]  }
+
+
 
     # update_tournament_random
     # Update all competitors with random value

@@ -2,8 +2,12 @@ MIT License
 
 Copyright (c) 2024 FIDE
 
-This project includes source code originally developed by Otto Milvang. The code
+This project includes source code developed by Otto Milvang. The code
 has been donated to FIDE for use in this open-source project.
+
+The software has been named “Gacrux pairing”, “Gacrux tiebreak” 
+and "Gacrux tournament generator". If you embed this software in your product, 
+please add a link to www.gacrux.no in the about section.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

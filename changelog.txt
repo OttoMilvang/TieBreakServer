@@ -1,3 +1,87 @@
+2026-01-29
+
+LICENSE
+Updated with brand "gacrux"
+
+Chessjson.py 
+Make sure all "id"s are uniqe
+Return Decimal type for unplayed games 
+
+chessjson.py
+Improved some error codes
+
+crosstable.py
+Prevent error if color difference < 3 or >3
+
+pairingchecker.py
+Correct -m switch. Only method implemented:
+-m dutch
+ 
+scoresystem.py
+For a scoresystem, set number of decimales equal for all scores (W, D, L, Z, P,...) 
+
+tiebreak.py
+Build all games with index key: id
+Put "zero" in a function. This will return 0.0 with the correct number of decimals
+This is a trick such as
+0 * 0 => 0
+0 + 0 => 0
+0.0 * 0.0 => 0.00
+0.0 + 0.0 => 0.0
+so all tiebreaks are presented tith the correct number of decimals
+Improve error messages
+Add game id's to match result 
+Prepare teamgames from match result based on game id's in the team match insted of allgames
+Set result og last game to 0 as default insted of score["D"] 
+Skip some color sequence stuff for individual team players
+Fix error in Koya system in round robin with withdrawn player(s)
+Add support for new Tiebreak rules for Buchholtz and unplayed games 
+Fix Fore in Buchholtz for team tournament 
+
+games2matches.py
+New file, combine all games in trf to matches 
+
+trf2json.py
+Added support for 352 record
+Corrected 330 record 
+Make sure 013 recrds are ignored if 310 records are present
+Fix bourd number in Berger tournament
+Add some tests on misaligned records (due to UTF8 or other error )
+
+ts2json.py
+Some TBs translated to codes known to tiebreakchecker
+Added games2matches 
+
+
+
+2025-12-08
+Add adjourned to score calculation
+Be sure that check on "is_rr" dont fail
+
+
+2025-12-07
+Add support for old ARO rules for Rapid/Blitz WCC
+Mode detection of -p / -s flag from tiebreakchecker.py to tiebreak.py
+
+2025-12-07
+Corrected default values on zpb, hpb, forfeited,
+Add drawresult.py as a standalone program
+Add tournamentgenerator.py and drawresult.py
+Added tournamentgenerator.py and drawresult.py
+
+2025-11-19
+Added documentation
+add file scoresystem.py
+Update to TRF2026
+
+2025-04-30
+Add new program pairingchecker.py
+
+2024-12-11
+Added -b <charset (utf-8, latin1, ...> to command line.
+
+
+Older:
 Tiebreaks:
 Corrected Tiebreaks for team FB:GP
 Corrected Tiebreaks for team unplayed rounds EGGSB

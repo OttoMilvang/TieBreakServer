@@ -357,7 +357,7 @@ class crosstable:
                     q[C13] = 1
                     cweight += weight[C13]
 
-                c["colordiff"] = coltrans[a["cop"]] + coltrans[b["cop"]]
+                c["colordiff"] = coltrans.get(a["cop"], a["cop"][0].upper()) + coltrans.get(b["cop"], b["cop"][0].upper())
 
                 # c15 minimize the number of players who receive upfloft in the previous round
                 c15 = 1 if (a["acc"] < b["acc"]) and (a["flt"] & UF1) or (a["acc"] > b["acc"]) and (b["flt"] & UF1) else 0

@@ -71,7 +71,7 @@ class tiebreak:
     TIEBREAK_RULES = {
         0 : "2022-01-01",
         1 : "2024-08-01",
-        2 : "2026-02-01",
+        2 : "2126-02-01",   # New rules for tiebreaks , not approved yet
         } 
 
     # constructor function
@@ -136,6 +136,7 @@ class tiebreak:
             "TOP":   {"name": "TOP",   "func": self.compute_top,                         "rev": True , "desc": "	Is player a top-scorer in last round"},
             }
             
+        self.chessevent = chessevent
         self.tournament = tournament = chessevent.get_tournament(tournamentno)
         self.tiebreaks = []
         if tournament is None:
@@ -167,6 +168,7 @@ class tiebreak:
             self.gamescore = tournament["scoreSystem"]["game"]
             [self.cplayers, self.cteam] = chessevent.build_tournament_teamcompetitors(tournament)
             self.allgames = chessevent.build_all_games(tournament, self.cteam, False)
+            self.cgames = chessevent.build_games_from_id(tournament)
             self.teams = self.prepare_competitors(tournament, "match")
             self.compute_score(self.teams, "match", "mpoints", self.matchscore, self.currentround)
             self.compute_score(self.teams, "game", "gpoints", self.gamescore, self.currentround)
@@ -201,6 +203,8 @@ class tiebreak:
         if startdate < self.TIEBREAK_RULES[2]:
             self.rulesversion = 1
         
+    def zero(self, scorename):
+        return self.matchscore["Z"] if scorename == "match" else self.gamescore["Z"]
 
     """
     compute_tiebreaks(self, chessfile, tournamentno, params)
@@ -246,12 +250,7 @@ class tiebreak:
 
     def prepare_competitors(self, tournament, scorename):
         rounds = self.currentround
-        # for rst in competition['results']:
-        #    rounds = max(rounds, rst['round'])
-        # self.rounds = rounds
         ptype = "mpoints" if self.isteam else "points"
-        # scoresystem = self.scoresystem['match']
-        # Fill competition structure, replaze unplayed games with played=Fales, points=0.0
         cmps = {}
         for competitor in tournament["competitors"]:
             rnd = competitor["random"] if "random" in competitor else 0
@@ -268,11 +267,10 @@ class tiebreak:
                 "tbval": {},
             }
             # Be sure that missing results are replaced by zero
-            zero = Decimal("0.0")
             for rnd in range(1, rounds + 1):
                 cmp["rsts"][rnd] = {
-                    ptype: zero,
-                    "rpoints": zero,
+                    ptype: self.zero(scorename),
+                    "rpoints": Decimal("0.0"),
                     "res": "Z",
                     "color": "w",
                     "played": False,
@@ -319,7 +317,9 @@ class tiebreak:
             black = 0
         if black > 0:
             if "bResult" not in rst:
-                rst["bResult"] = self.scoreLists["_reverse"][rst["wResult"]]
+                err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(rst.get("white", 0)) + ", black=" +  str(rst.get("black", 0))
+                self.chessevent.put_status(451, err)
+                raise
             bPoints = self.get_score(scoresystem, rst, "black")
             brPoints = self.get_score(self.rating, rst, "black")
             bVur = self.is_vur(rst, "black")
@@ -343,6 +343,7 @@ class tiebreak:
                 "opprating": brating,
                 "board": board,
                 "deltaR": (rating.ComputeDeltaR(expscore, wrPoints) if expscore is not None else None),
+                "games": rst["games"] if "games" in rst else None,
             }
         if black > 0:
             self.lastplayedround = max(self.lastplayedround, rnd)
@@ -358,6 +359,7 @@ class tiebreak:
                 "opprating": wrating,
                 "board": board,
                 "deltaR": (rating.ComputeDeltaR(Decimal(1.0) - expscore, brPoints) if expscore is not None else None),
+                "games": rst["games"] if "games" in rst else None,
             }
         return
 
@@ -369,9 +371,10 @@ class tiebreak:
                 gpoints = 0
                 competitor = rst[col]
                 games = []
-                cmp = cmps[competitor]["rsts"][rnd]
-                if competitor in self.allgames[rnd]:
-                    for game in self.allgames[rnd][competitor]:
+                tmatch = cmps[competitor]["rsts"][rnd]
+ 
+                if len(tmatch["games"]) > 0 and rst["black"] > 0:
+                    for game in [self.cgames[game] for game in tmatch["games"]]:
                         white = game["white"]
                         black = game["black"] if "black" in game else 0
                         board = game["board"] if "board" in game else 0
@@ -410,16 +413,16 @@ class tiebreak:
                                     "board": board,
                                 }
                             )
-                    cmp["gpoints"] = gpoints
-                    cmp["games"] = games
+                    tmatch["gpoints"] = gpoints
+                    tmatch["games"] = games
                 else:
-                    if cmp["opponent"] == 0 and cmp["played"]:
-                        cmp["gpoints"] = self.solve_score(self.tournament, score, "match", "PG")
+                    if tmatch["opponent"] == 0 and tmatch["played"]:
+                        tmatch["gpoints"] = self.solve_score(self.tournament, score, "match", "PG")
                     else:
                         trans = {"W": "F", "D": "H", "L": "Z"}
-                        res = trans[cmp["res"]] if cmp["res"] in trans else cmp["res"]
-                        cmp["gpoints"] = self.solve_score(self.tournament, score, "match", res + "G")
-                    cmp["games"] = []
+                        res = trans[tmatch["res"]] if tmatch["res"] in trans else tmatch["res"]
+                        tmatch["gpoints"] = self.solve_score(self.tournament, score, "match", res + "G")
+                    tmatch["games"] = []
         self.maxboard = max(self.maxboard, maxboard)
 
     def addtbval(self, obj, rnd, val):
@@ -444,7 +447,7 @@ class tiebreak:
             tbscore[prefix + "rnd"] = {"val": cmp["rnd"]}
             tbscore[prefix + "rtg"] = {"val": cmp["rating"]}
             tbscore[prefix + "cnt"] = {"val": 0}  # count number of elements (why)
-            tbscore[prefix + "points"] = {"val": Decimal("0.0")}  # total points
+            tbscore[prefix + "points"] = {"val": self.zero(scorename)}  # total points
             tbscore[prefix + "win"] = {"val": 0}  # number of wins (played and unplayed)
             tbscore[prefix + "won"] = {"val": 0}  # number of won games over the board
             tbscore[prefix + "bpg"] = {"val": 0}  # number of black games played
@@ -459,9 +462,8 @@ class tiebreak:
             tbscore[prefix + "num"] = {"val": 0}  # number of games played (for pairing)
             tbscore[prefix + "lp"] = 0  # last round played
             tbscore[prefix + "lo"] = 0  # last round without vur
-            tbscore[prefix + "lp"] = 0  # last round paired
             tbscore[prefix + "pfp"] = 0  # points from played games
-            tbscore[prefix + "lg"] = 0  # self.scoreLists[scoretype]['D'] # Result of last game
+            tbscore[prefix + "lg"] = 0  # Result of last game
             tbscore[prefix + "bp"] = {}  # Boardpoints
             # cmpr = sorted(cmp, key=lambda p: (p['rank'], p['tbval'][prefix + name]['val'], p['cid']))
             pcol = " "  # Previous color
@@ -518,25 +520,27 @@ class tiebreak:
                             if game["opponent"] > 0:
                                 self.addtbval(tbscore[prefix + "num"], "val", 1)
                                 tbscore[prefix + "pfp"] += points
-                                ocol = ncol = game["color"]
-                                pf = 1 if ocol == "w" else -1
-                                self.addtbval(tbscore[prefix + "cod"], rnd, pf)
-                                self.addtbval(tbscore[prefix + "cod"], "val", pf)
-                                pf = tbscore[prefix + "cod"]["val"]
-                                ncol = (other[ocol] + "bbbbwwww")[pf]
-                                ncol += str(abs(pf)) if ocol != pcol else "2"
-                                # if ocod > -2 and ocod < 2:
-                                #    ncol = 'w' if ocol == 'b' else 'b'
-                                #    ncol = ncol.upper() if ncol.upper() == tbscore[prefix + 'cop']['val'].upper()
-                                #    else ncol
-
-                                csq += ocol
-                                pcol = ocol
-                                self.addtbval(tbscore[prefix + "csq"], rnd, ocol)
-                                self.addtbval(tbscore[prefix + "csq"], "val", ocol)
-
-                                self.addtbval(tbscore[prefix + "cop"], rnd, ncol)
-                                tbscore[prefix + "cop"]["val"] = ncol
+                                if not self.isteam or scorename == "match":
+                                    ocol = ncol = game["color"]
+                                    pf = 1 if ocol == "w" else -1
+                                    self.addtbval(tbscore[prefix + "cod"], rnd, pf)
+                                    self.addtbval(tbscore[prefix + "cod"], "val", pf)
+                                    pf = tbscore[prefix + "cod"]["val"]
+                                    ncol = (other[ocol] + "bbbbwwww")[pf]
+                                    ncol += str(abs(pf)) if ocol != pcol else "2"
+    
+                                    # if ocod > -2 and ocod < 2:
+                                    #    ncol = 'w' if ocol == 'b' else 'b'
+                                    #    ncol = ncol.upper() if ncol.upper() == tbscore[prefix + 'cop']['val'].upper()
+                                    #    else ncol
+    
+                                    csq += ocol
+                                    pcol = ocol
+                                    self.addtbval(tbscore[prefix + "csq"], rnd, ocol)
+                                    self.addtbval(tbscore[prefix + "csq"], "val", ocol)
+    
+                                    self.addtbval(tbscore[prefix + "cop"], rnd, ncol)
+                                    tbscore[prefix + "cop"]["val"] = ncol
 
                             # last played game (or PAB)
                             if rnd > tbscore[prefix + "lp"]:
@@ -564,9 +568,6 @@ class tiebreak:
                         self.addtbval(tbscore[prefix + "bwg"], rnd, bwg)
                         self.addtbval(tbscore[prefix + "bwg"], "val", bwg)
 
-                        # number of games elected to play
-                        # ge = 1 if game['played'] or (game['opponent'] > 0 and points == self.scoreLists[scoretype][
-                        # 'W']) else 0
                         ge = 1 if game["played"] or (points == scoretype["W"]) else 0
                         self.addtbval(tbscore[prefix + "ge"], rnd, ge)
                         self.addtbval(tbscore[prefix + "ge"], "val", ge)
@@ -880,7 +881,7 @@ class tiebreak:
             ssf = 0  # Sum so far
             tbscore[prefix + "ps"] = {"val": ps, "cut": []}
             for rnd in range(1, rounds + 1):
-                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else Decimal("0.0")
+                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else self.zero(scorename)
                 ssf += p
                 # p = p * (rounds+1-rnd)
                 tbscore[prefix + "ps"][rnd] = ssf
@@ -900,7 +901,13 @@ class tiebreak:
         # if RoundRobin with odd number of players the number of games is reduced by 1 (2, for double rr, ...)
         if self.rr and rounds % competitors == 0:
             maxgames -= rounds//competitors
+        for startno, cmp in cmps.items():
+            tbscore = cmp["tbval"]
+            if tbscore[prefix + "rep"]["val"] == 0:
+                maxgames -= 1
         lim = plim * scoretype["W"] * maxgames * (self.teamsize if points == "gpoints" else 1) / Decimal("100.0") + nlim
+        
+                    
         for startno, cmp in cmps.items():
             tbscore = cmp["tbval"]
             ks = 0
@@ -938,6 +945,7 @@ class tiebreak:
         isfb = name == "fb" or name == "afb" or tb["modifiers"]["fmo"]
         (oscorename, opoints, oscoretype, oprefix) = self.get_scoreinfo(tb, True)
         (sscorename, spoints, sscoretype, sprefix) = self.get_scoreinfo(tb, name == "sb")
+        vprefix = "mpoints_" if self.isteam else "points_" # prefix for unplayed games
         opointsfordraw = oscoretype["D"] * (self.teamsize if opoints == "gpoints" else 1)
         spointsfordraw = sscoretype["D"] * (self.teamsize if spoints == "gpoints" else 1)
         # print("Pointsfordraw",  oprefix, opointsfordraw, sprefix, spointsfordraw)
@@ -951,11 +959,11 @@ class tiebreak:
             tbscore = cmp["tbval"]
             tbscore[oprefix + "abh"] = {"val": 0}  # Adjusted score for BH (check algorithm)
             # 16.3.2    Unplayed rounds of category 16.2.5 are evaluated as draws.
-            isfore = isfb and tbscore[oprefix + "lp"] == self.rounds  # do we need to adjust for Fore
+            isfore = isfb and tbscore[vprefix + "lp"] == self.rounds  # do we need to adjust for Fore
             adjustfore = False
             for rnd, rst in cmp["rsts"].items():
                 if rnd <= rounds:
-                    points_no_opp = Decimal(0.0) if self.rr else opointsfordraw
+                    points_no_opp = self.zero(oscorename) if self.rr else opointsfordraw
                     hasopponent = rnd <= tbscore[oprefix + "lo"] or rst["opponent"] > 0
                     adjustfore = adjustfore or (isfore and rnd == rounds and rst["opponent"] > 0)
                     tbval = rst[opoints] if hasopponent else points_no_opp
@@ -963,7 +971,7 @@ class tiebreak:
                     tbscore[oprefix + "abh"]["val"] += tbval
             fbscore = tbscore[oprefix + "points"]["val"]
             if adjustfore:
-                adjust = opointsfordraw - tbscore[oprefix + "lg"]
+                adjust = opointsfordraw - tbscore[oprefix + "points"][rnd]
                 tbscore[oprefix + "abh"][self.rounds] += adjust
                 tbscore[oprefix + "abh"]["val"] += adjust
                 fbscore += adjust
@@ -997,7 +1005,7 @@ class tiebreak:
                     if tb["modifiers"]["urd"] and not self.rr:
                         sres = spointsfordraw
                     else:
-                        sres = rst[spoints] if spoints in rst else Decimal("0.0")
+                        sres = rst[spoints] if spoints in rst else self.zero(sscorename)
                     tbvalue = score * sres if is_sb else score
                     # if  opponent >  0 or not tb['modifiers']['p4f'] :
                     if opponent > 0 or not self.rr:
@@ -1133,8 +1141,8 @@ class tiebreak:
         (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         if loopcount == 0:
             for player in ro:
-                player["tbval"]["tbrval"] = Decimal("0.0")
-                player["tbval"]["bbeval"] = Decimal("0.0")
+                player["tbval"]["tbrval"] = self.zero(scorename)
+                player["tbval"]["bbeval"] = self.zero(scorename)
                 for val, points in player["tbval"]["gpoints_" + "bp"].items():
                     player["tbval"]["bbeval"] += points
             return True
@@ -1243,7 +1251,7 @@ class tiebreak:
             tbscore[prefix + "acc"] = {"val": val, 0: val}
             spoints = 0  # Points so far
             for rnd in range(1, rounds + 1):
-                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else Decimal("0.0")
+                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else self.zero(scorename)
                 spoints += p
                 acc = self.get_accelerated(prefix, rnd + 1, startno)  # Round 0 shall have the value of 1 and so on
                 val = spoints + scoretype[acc]
@@ -1261,7 +1269,7 @@ class tiebreak:
             sfloat = ""  # Float so far as string
             for rnd in range(1, rounds + 1):
                 nfloat *= 4
-                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else Decimal("0.0")
+                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else self.zero(scorename)
                 opp = cmp["rsts"][rnd]["opponent"] if rnd in cmp["rsts"] and "opponent" in cmp["rsts"][rnd] else 0
                 # ownacc = own points + accellerated
                 # oppacc = opponent points + accellerated

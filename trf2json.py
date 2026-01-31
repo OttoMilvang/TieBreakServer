@@ -10,6 +10,7 @@ from decimal import Decimal
 
 import berger
 import chessjson
+import games2matches
 import scoresystem
 from helpers import *
 
@@ -46,7 +47,7 @@ class trf2json(chessjson.chessjson):
             {"id": "202", "read": self.parse_tiebreaks202,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to break ties"},
             {"id": "212", "read": self.parse_tiebreaks212,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to define standings"},
             {"id": "222", "read": self.parse_trf_timecontrol,   "write": self.output_trf_noop,          "desc": "Encoded Time Control"},
-            {"id": "352", "read": self.parse_trf_noop,          "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
+            {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
             {"id": "362", "read": self.parse_trf_matchscore,    "write": self.output_trf_noop,          "desc": "Scoring point system for teams"},
             {"id": "001", "read": self.parse_trf_player,        "write": self.output_trf_player,        "desc": "Player section"},
             {"id": "FID", "read": self.parse_trf_natrating,     "write": self.output_trf_noop,          "desc": "National Rating Support"},
@@ -56,7 +57,7 @@ class trf2json(chessjson.chessjson):
             {"id": "260", "read": self.parse_trf_prohibited,    "write": self.output_trf_prohibited,    "desc": "Prohibited pairings"},
             {"id": "240", "read": self.parse_trf_bye4,          "write": self.output_trf_noop,          "desc": "Bye section HPB and FPB"},
             {"id": "320", "read": self.parse_trf_pab,           "write": self.output_trf_noop,          "desc": "Bye section PAB"},
-            {"id": "330", "read": self.parse_trf_bye3,          "write": self.output_trf_noop,          "desc": "Forfeited matches"},
+            {"id": "330", "read": self.parse_forfeited,         "write": self.output_trf_noop,          "desc": "Forfeited matches"},
             {"id": "299", "read": self.parse_trf_abnormal,      "write": self.output_trf_noop,          "desc": "Abnormal Assignment points"},
             {"id": "300", "read": self.parse_trf_outoforder,    "write": self.output_trf_noop,          "desc": "Out of order"},
             {"id": "801", "read": self.parse_trf_noop,          "write": self.output_trf_noop,          "desc": "Informative records for teams"},
@@ -203,6 +204,8 @@ class trf2json(chessjson.chessjson):
             parser = record["read"]
             # print(trfid, parser, record["desc"])
             if trfid in all_lines:
+                if trfid == "013" and "310" in all_lines:
+                    continue
                 for trfline in all_lines[trfid]:
                     lineno = trfline["no"]
                     line = trfline["txt"]
@@ -425,11 +428,14 @@ class trf2json(chessjson.chessjson):
             w = result["white"]
             b = result["black"] if "black" in result and result["black"] > 0 else n
             blku = berger.bergerlookup(rr, w, b)
-            rnd = blku["round"] if blku["round"] < n else blku["round"] - n + 1
-            if cround > 0 and cround != rnd:
-                return self.update_swiss_board_number(roundresults, numcomp, points)  # not rr
-            cround = rnd
-            result["board"] = blku["board"]
+            if blku:
+                rnd = blku["round"] if blku["round"] < n else blku["round"] - n + 1
+                if cround > 0 and cround != rnd:
+                    return self.update_swiss_board_number(roundresults, numcomp, points)  # not rr
+                cround = rnd
+                result["board"] = blku["board"]
+            else:
+                result["board"] = 0
         return
 
     def update_swiss_board_number(self, roundresults, numcomp, points):
@@ -566,12 +572,6 @@ class trf2json(chessjson.chessjson):
         else:
             white = startno
             black = opponent
-        # game = None
-        # for item in section['results']:
-        #    if item['round'] == currentround and item['white'] == white and item['black'] == black:
-        #       game = item
-        # if game == None:
-        # self.numResults += 1
         score[points] = (score[points] if points in score else 0) + 1
         game = {"id": 0, "round": currentround, "white": white, "black": black, "played": played, "rated": rated}
         # section['results'].append(game)
@@ -610,11 +610,14 @@ class trf2json(chessjson.chessjson):
         startno = parse_int(line[4:8])
         self.o001[startno] = line
         self.p001[startno] = line
+        col = max(0, line[86:].find("w"), line[86:].find("b"))
+        if col % 10:
+            self.put_status(467, "Player " + str(startno) + " has misaligned data, may be bad character encoding") 
         gamePoints = parse_float(line[80:84])
         # score accumulates number of wins, draws and losses and will compare it to sum in order to guess score system
         competitor = {
             "cid": startno,
-            "profileId": self.numProfiles,
+            "profileId": profile["id"],
             "present": startno > 0,
             "gamePoints": gamePoints,
             "rank": parse_int(line[85:89]),
@@ -655,6 +658,8 @@ class trf2json(chessjson.chessjson):
         matchPoints = parse_float(line[54:60]) if ext else Decimal("0.0")
         gamePoints = parse_float(line[61:67]) if ext else Decimal("0.0")
         rank = parse_int(line[68:71]) if ext else 0
+        if ext and line[71:74].strip() != "":
+            self.put_status(467, "Team " + str(cid) + " has misaligned data, may be bad character encoding") 
         team = {"id": 0, "teamName": teamname, "players": []}
         teamid = self.append_team(team, 0)
         # players = []
@@ -676,18 +681,15 @@ class trf2json(chessjson.chessjson):
             pid = parse_int(line[i - 4 : i])
             if pid == 0:
                 continue
-            if ext:
-                competitor["cplayers"].append(self.pcompetitors[pid])
-            else:
-                competitor["cplayers"].append(pid)
-            # players.append(cplayers[pid-1]['profileId'])
+            self.pcompetitors[pid]["order"] = board 
+            competitor["cplayers"].append(self.pcompetitors[pid])
             self.pcompetitors[pid]["teamId"] = teamid
             self.cboard[pid] = board
             # self.cteam[pid] = competitor['cid']
         if ext:
             self.tcompetitors[cid] = competitor
         else:
-            self.bcompetitors[competitor["cplayers"][0]] = competitor
+            self.bcompetitors[cid] = competitor
 
     def parse_trf_info(self, tournament, info, value):
         self.chessjson["event"]["eventInfo"][info] = value
@@ -820,7 +822,7 @@ class trf2json(chessjson.chessjson):
     def parse_trf_matchscore(self, tournament, line):
         self.parse_trf_scoresystem(tournament, line, "match")
 
-    def parse_trf_scoresystem(self, tournament, line, scoretyp):
+    def parse_trf_scoresystem(self, tournament, line, scoretype):
         scoresystem = {}
         trans = {
             "W": "W",
@@ -836,14 +838,7 @@ class trf2json(chessjson.chessjson):
             if sym in trans:
                 # print(sym, pts)
                 scoresystem[trans[sym]] = pts
-        self.scores.add_scoresystem(scoretyp, scoresystem)
-
-        # p = list(filter(lambda result: scoresystem[result] == scoresystem['P'], ['W','D','L']))
-        # if len(p) > 0:
-        #    scoresystem['P'] = p[0]
-        # u = list(filter(lambda result: scoresystem[result] == scoresystem['P'], ['W','D','L']))
-        # if len(u) > 0:
-        #    scoresystem['U'] = u[0]
+        self.scores.add_scoresystem(scoretype, scoresystem)
 
     def parse_trf_natsupport(self, tournament, line):
         national = self.national
@@ -952,7 +947,8 @@ class trf2json(chessjson.chessjson):
         oooteam = parse_int(line[8:11])
         otherteam = parse_int(line[12:15])
         for i in range(20, len(line) + 1, 5):
-            order.append(parse_int(line[i - 4 : i]))
+            if len(line[i - 4:].strip()):
+                order.append(parse_int(line[i - 4 : i]))
         ooo = {"round": rnd, "oooteam": oooteam, "otherteam": otherteam, "order": order}
         self.ooolist.append(ooo)
         # print(ooo)
@@ -1367,7 +1363,7 @@ class trf2json(chessjson.chessjson):
             cplayers = competitor["cplayers"]
             competitor["cplayers"] = []
             for pcid in cplayers:
-                cplayer = self.pcompetitors[pcid]
+                cplayer = self.pcompetitors[pcid["cid"]]
                 competitor["cplayers"].append(cplayer)
                 tids[cplayer["teamId"]]["players"].append(cplayer["profileId"])
 
@@ -1419,408 +1415,28 @@ class trf2json(chessjson.chessjson):
     def prepare_team_section(self, tournament, haspointsupdated):
         # update players in teams
 
+        
         cteam = self.cteam
         for cid, team in self.tcompetitors.items():
             for player in team["cplayers"]:
                 cteam[player["cid"]] = cid
-
-        self.merge_matches(tournament)
+        options = {
+            "byelist": self.byelist,
+            "forfeitedlist": self.forfeitedlist,
+            "ooolist": self.ooolist,
+            "current_id": self.current_id
+            }
+        g2m = games2matches.games2matches(self.scores, tournament, options)
+        matches = g2m.merge_matches()
+        self.current_id = g2m.get_current_id()
+        tournament["matchList"] = [match for key, match in matches.items()]
+        # self.merge_matches(tournament)
 
         # tournament['matchList'] = sorted(list(matches.values()), key=lambda g: (g['id']))
         tournament["competitors"] = sorted(list(self.tcompetitors.values()), key=lambda g: (g["cid"]))
         if not haspointsupdated:
             self.update_team_score(tournament)
 
-    # merge matches build a match list based on a games list.
-    #
-    # Step 1. For each game, create a match identification, and add the game to a list.
-    # Step 2. Find the board order and calculate the result.
-    # Step 3. Add games to match list.
-
-    def merge_matches(self, tournament):
-        matchid = 0
-        numboards = 0
-        games = sorted(tournament["gameList"][:], key=lambda g: (g["round"]))
-        matches = {}
-        byes = {}
-        cteam = self.cteam
-        tindex = {"W": "white", "B": "black"}
-        tother = {"W": "B", "B": "W"}
-        # json_output('-', cplayer[1])
-
-        cplayer = self.tcompetitors
-        # Step 1
-        # Create the identification,
-        #     a game in round 3 between team 4 and 8 is identified by 3-8-4 regardless of white and black
-        #     a game in round 6 with team 12 and no opponent is identified by 6-12-0
-
-        for game in games:
-            game["board"] = 0
-            rnd = game["round"]
-            wt = cteam[game["white"]]
-            bt = cteam[game["black"]] if "black" in game and game["black"] > 0 else 0
-            if wt > bt:
-                index = str(rnd) + "-" + str(wt) + "-" + str(bt)
-            else:
-                index = str(rnd) + "-" + str(bt) + "-" + str(wt)
-            if bt > 0:
-                if not (index in matches):
-                    matchid += 1
-                    matches[index] = {"id": matchid, "games": []}
-                matches[index]["games"].append(game)
-                if len(matches[index]["games"]) > numboards:
-                    numboards = len(matches[index]["games"])
-            else:
-                if not index in byes:
-                    matchid += 1
-                    byes[index] = {"id": matchid, "games": []}
-                byes[index]["games"].append(game)
-
-        #    json.dump(byes, f, indent=2)
-        # json_output('c:/temp/matched.json', matches)
-        # json_output('c:/temp/byes.json', byes)
-
-        # Step 2
-        # Calculate the team size
-        # Normally this is already set
-
-        teamsize = tournament["teamSize"]
-        if teamsize == 0:
-            for key, tmatch in matches.items():
-                teamsize = max(teamsize, len(tmatch["games"]))
-            tournament["teamSize"] = teamsize
-        seq = tournament["teamSequence"] if "teamSequence" in tournament else "".join(["WB"] * ((teamsize + 1) // 2))[0:teamsize]
-        # bseq =''.join([tother[elem] for elem in list(seq)])
-        wcol = seq[0]
-
-        # Step 3
-        # Add Forfeited matches to the list
-        # If outOfOrder records gives information, so use it
-        # This is both for out of order games and for spare players
-
-        for bye in self.byelist:
-            key = str(bye["round"]) + "-" + str(bye["competitor"]) + "-0"
-            if key not in matches:
-                matchid += 1
-                games = []
-                gamescore = self.scores.get_score(tournament, "match", bye["type"] + "G")
-                tcompetitor = self.tcompetitors[bye["competitor"]]
-                for gameno in []:  # Dont fill game list TODO  range(tournament["teamSize"]):
-                    game = {
-                        "id": self.next_game(), 
-                        "round": bye["round"], 
-                        "white": tcompetitor["cplayers"][gameno]["cid"], 
-                        "black": 0, "played": bye["type"] == "P", 
-                        "rated": False, "wResult": bye["gameResults"][gameno], 
-                        "board": gameno + 1
-                    }
-                    tournament["gameList"].append(game)
-                    games.append(game)
-                wres = bye["wResult"] if "wResult" in bye else "Z"
-                byetrans = {"Z": "Z", "H": "D", "F": "W", "P": "P"  }
-                wres = byetrans[bye["type"]]
-
-                matches[key] = {
-                    "id": matchid, 
-                    "games": games, 
-                    "round": bye["round"], 
-                    "white": bye["competitor"], 
-                    "black": 0, "played": bye["type"] == "P", 
-                    "wResult": wres
-                }
-                # print("Match", matches[key] )
-            else:
-                pass
-
-                # raise guess this is OK TODO??
-
-        for forfeited in self.forfeitedlist:
-            key = str(forfeited["round"]) + "-" + str(max(forfeited["white"], forfeited["black"])) + "-" + str(min(forfeited["white"], forfeited["black"]))
-            if key not in matches:
-                matchid += 1
-                for gameno in []:  # None range(tournament["teamSize"]):
-                    game = {"id": self.next_game(), "round": bye["round"], "white": 0, "black": 0, "played": True, "rated": False, "wResult": "D", "board": gameno + 1}
-                    games.append(game)
-                matches[key] = {"id": matchid, "white": forfeited["white"], "black": forfeited["black"], "games": games}
-
-        for ooo in self.ooolist:
-            key = str(ooo["round"]) + "-" + str(max(ooo["oooteam"], ooo["otherteam"])) + "-" + str(min(ooo["oooteam"], ooo["otherteam"]))
-            if key not in matches:
-                matchid += 1
-                matches[key] = {"id": matchid, "games": []}
-
-        # Step 4
-        # Merge games from bye list into match list
-        # Example
-        # Before:
-        # matches: 8-17-4 contains 3 games, byes: 8-17-0 contains two Z-byes, 8-4-0 contains one forfeited win and
-        # one Z-bye
-        # After:
-        # matches: 8-17-4 contains 7 games, byes: none
-
-        for key, value in matches.items():
-            (rnd, p1, p2) = key.split("-")
-            arg = int(p1)
-            b1 = rnd + "-" + p1 + "-" + "0"
-            b2 = rnd + "-" + p2 + "-" + "0"
-            if b1 in byes:
-                value["games"].extend(byes.pop(b1)["games"])
-            if b2 in byes:
-                value["games"].extend(byes.pop(b2)["games"])
-
-        # with open('c:/temp/byes.json', 'w') as f:
-        #    json.dump(byes, f, indent=2)
-
-        """
-        for key, tmatch in byes.items():
-            nmatch = {
-                'id': byes[key]['id'],
-                'games': []
-                }
-            zero = []
-
-            for game in tmatch['games']:
-                if game['wResult'] == 'Z':
-                    zero.append(game)
-                else:
-                    nmatch['games'].append(game)
-            for i in range(0, len(zero)-1):
-                for j in range(i+1, len(zero)):
-                    if self.cboard[zero[j]['white']] < self.cboard[zero[i]['white']]:
-                        (zero[i], zero[j]) = (zero[j], zero[i])
-            while len(nmatch['games']) < teamsize:
-                if len(zero) > 0:
-                    game = zero[0]
-                    zero.pop(0)
-                else:
-                    game = {
-                         'id': chessjson.next_game(),
-                         'round': rnd,
-                         'white': 0,
-                         'black': 0,
-                         'played': false,
-                         'rated': false,
-                         'wResult': 'Z'
-                         }
-                nmatch['games'].append(game)
-            matches[key] = nmatch
-       """
-
-        # Step 5
-        # Add byes to match list
-
-        for key in byes.keys():
-            matches[key] = byes[key]
-
-        # Step 6
-        # Create a pointer dict tmatches such that this is an index for round and team
-        # 8-17-4 got two pointers 8-17 and 8-4
-
-        tmatches = {}
-        for key, tmatch in matches.items():
-            (rnd, p1, p2) = key.split("-")
-            tkey = rnd + "-" + p1
-            tmatches[tkey] = tmatch
-            if int(p2) > 0:
-                tkey = rnd + "-" + p2
-                tmatches[tkey] = tmatch
-
-        # Step 7
-        # Update out of order
-
-        for ooo in self.ooolist:
-            tmatch = tmatches[str(ooo["round"]) + "-" + str(ooo["oooteam"])]
-            for i in range(teamsize):
-                player = ooo["order"][i]
-                if player > 0:
-                    list(filter(lambda game: game["white"] == player or game["black"] == player, tmatch["games"]))[0]["board"] = i + 1
-                    # json_output('-', tmatch['games'])
-
-        # Step 8
-        # Sort games according to strength and previous ooo-list
-
-        for key, tmatch in matches.items():
-            (rnd, p1, p2) = key.split("-")
-            arg = int(p1)
-            teams = {}
-            for game in tmatch["games"]:
-                for col in ["white", "black"]:
-                    if game[col] > 0:
-                        tcol = self.cteam[game[col]]
-                        if tcol not in teams:
-                            teams[tcol] = []
-                        teams[tcol].append(game)
-            # if int(rnd) == 12 and arg == 30:
-            #    print('Teams', teams)
-            for key, games in teams.items():
-                # if int(rnd) == 12 and arg == 30:
-                #    print('GamesA', games)
-                # games = sorted(games, key=lambda game: (game['round'] == 0, game['round'], game['black'] == 0,
-                # game['black'] == 0 and game['wResult'] == 'Z' )  )
-                games = sorted(
-                    games,
-                    key=lambda game: (
-                        game["board"] == 0,
-                        game["board"],
-                        game["black"] == 0 and game["wResult"] == "Z",
-                        self.cboard[game["white"]] if self.cteam[game["white"]] == arg else self.cboard[game["black"]],
-                    ),
-                )
-
-                # if arg == 11:
-                #    for game in games:
-                #        print('GamesB', rnd, game['white'], game['black'], game['board'] == 0, game['board'],
-                #        game['black'] == 0 and game['wResult'] == 'Z', self.cboard[game['white']] if self.cteam[
-                #        game['white']] == arg else self.cboard[game['black']] )
-
-                for i in range(teamsize):
-                    sg = list(filter(lambda game: game["board"] == i + 1 or game["board"] == 0, games))
-                    # if int(rnd) == 12 and arg == 30:
-                    #    print('TSg', sg)
-                    sg[0]["board"] = i + 1
-            # if int(rnd) == 12 and arg == 30:
-            #    print('Teams', teams)
-
-            if len(teams) == 2:
-                (team1, team2) = teams.keys()
-                forfeitedlist = list(
-                    filter(
-                        lambda forfeited: int(rnd) == forfeited["round"] and (team1 == forfeited["white"] or team2 == forfeited["white"]),
-                        self.forfeitedlist,
-                    )
-                )
-                # print('Test', rnd, team1, team2)
-                # if (False and team1 == 33 and team2 ==23):
-                # print(forfeitedlist, self.forfeitedlist[0])
-                #    pp = True
-
-                if len(forfeitedlist) > 0:
-                    forfeited = forfeitedlist[0]
-                    if team2 == forfeited[tindex[wcol]]:
-                        (team2, team1) = (team1, team2)
-                else:
-                    for i in range(teamsize):
-                        col = seq[i]
-                        pair = list(filter(lambda game: game["board"] == i + 1, tmatch["games"]))
-                        if len(pair) < 2:
-                            continue
-                        (pairw, pairb) = pair
-                        if pairw["id"] == pairb["id"]:
-                            teamw = self.cteam(pairw["white"])
-                            # teamb = self.cteam(pairb["black"])
-                            if (wcol == "W") ^ (wcol == col) ^ (teamw == team1):
-                                (team2, team1) = (team1, team2)
-                                break
-
-                for i in range(teamsize):
-                    col = seq[i]
-                    pair = list(filter(lambda game: game["board"] == i + 1, tmatch["games"]))
-                    if len(pair) < 2:
-                        continue
-                    (pairw, pairb) = pair
-                    if pairw["id"] != pairb["id"]:
-                        teamw = self.cteam[pairw["white"]]
-                        # teamb = self.cteam[pairb['black']]
-                        if (wcol == "W") ^ (wcol == col) ^ (teamw == team1):
-                            (pairb, pairw) = (pairw, pairb)
-                        pairw["black"] = pairb["white"]
-                        pairw["bResult"] = pairb["wResult"]
-                        pairb["id"] = 0
-                    # if self.cteam(pairw['white']) == team2
-            tmatch["games"] = list(filter(lambda game: game["board"] != 0, tmatch["games"]))
-        tournament["gameList"] = list(filter(lambda game: game["id"] != 0, tournament["gameList"]))
-
-        # Step 9
-        # Decide score
-
-        for key, tmatch in matches.items():
-            (rnd, p1, p2) = key.split("-")
-            arg = int(p1)
-            games = sorted(tmatch["games"], key=lambda game: (game["board"] == 0, game["board"]))
-            # print(rnd, p1, p2)
-            # print("TM",      tmatch)
-            if len(games) > 0:
-                white = self.cteam[games[0]["white"]]
-                black = self.cteam[games[0]["black"]]
-                tmatch["round"] = games[0]["round"]
-                tmatch["white"] = white
-                tmatch["black"] = black
-                tmatch["games"] = [game["id"] for game in games]
-                played = False
-                wscore = 0
-                bscore = 0
-                # if (len(games) < numboards):
-                #    print(numboards, key, tmatch, len(games))
-                ind = 0
-                preres = None
-                # print('GEO:', games)
-                for i in range(0, teamsize):
-                    ind += 1
-                    game = None
-                    g0 = list(filter(lambda game: "board" in game and game["board"] == ind, games))
-                    # if len(g0) ==  0:
-                    game = g0[0]
-                    # else:
-                    #    g1 =  list(filter(lambda game: game['black'] > 0 or game['wResult'] != 'L' or game['played'] ,
-                    #    games))
-                    #    if len(g1) > 0:
-                    #        game = g1[0]
-                    #    else:
-                    #        game = games[0]
-                    # game['board'] = ind
-                    if preres is None:
-                        preres = game["wResult"]
-                    played = played or game["played"]
-                    # print('Sel', game)
-                    ws = self.get_score(self.scores.score["game"], game, "white")
-                    bs = self.get_score(self.scores.score["game"], game, "black") if "bResult" in game else 0
-                    if self.cteam[game["white"]] == white:
-                        wscore += ws
-                        bscore += bs
-                    else:
-                        wscore += bs
-                        bscore += ws
-                    games.remove(game)
-                    # if ind == 4:
-                    #    break
-                tmatch["played"] = played
-            else:
-                # tmatch["games"] = []
-                black = tmatch["black"]
-            wResult = wcol.lower() + "Result"
-            bResult = tother[wcol].lower() + "Result"
-            if black > 0:
-                if wscore > bscore:
-                    tmatch[wResult] = "W"
-                    tmatch[bResult] = "L"
-                elif bscore > wscore:
-                    tmatch[wResult] = "L"
-                    tmatch[bResult] = "W"
-                elif wscore > 0 and bscore > 0:
-                    tmatch[wResult] = "D"
-                    tmatch[bResult] = "D"
-                else:
-                    tmatch[wResult] = "L"
-                    tmatch[bResult] = "L"
-            else:
-                if "wResult" not in tmatch:
-                    raise
-                    tmatch["wResult"] = "D"
-        # with open('c:/temp/matches.json', 'w') as f:
-        #    json.dump(matches, f, indent=2)
-
-        rnd = 0
-        board = 0
-
-        for key, tmatch in matches.items():
-            if tmatch["round"] != rnd:
-                rnd = tmatch["round"]
-                board = 0
-            board += 1
-            tmatch["board"] = board
-            self.append_result(tournament["matchList"], tmatch)
-        # json_output('c:/temp/nmatches.json', tournament['matchList'])
-        # json_output('c:/temp/ngames.json', tournament['gameList'])
 
     def update_team_score(self, tournament):
         for competitor in tournament["competitors"]:

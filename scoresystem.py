@@ -199,18 +199,15 @@ class scoresystem:
         score = {key: value for (key, value) in self.score[stype].items()}
         defscore = self.default_score[stype].copy()
         defscore.update(score)
+        exponent = 0
+        for res in ["W", "D", "L"]:
+            if isinstance(defscore[res], Decimal):
+                exponent = min(exponent, defscore[res].as_tuple()[2])
+        for res in defscore: 
+            if isinstance(defscore[res], Decimal):
+                defscore[res] = round(defscore[res], -exponent)
         return defscore
 
-        defscore = self.defualt_score["game"].copy()
-        defscore.update(score)
-        trans = {}
-        for result in ["W", "D", "L", "Z"]:
-            trans[defscore[result]] = result
-        for result in ["F", "H", "P", "A", "U"]:
-            if isinstance(defscore[result], Decimal):
-                defscore[result] = trans[defscore[result]]
-        self.score["game"] = defscore
-        return defscore
 
     def update_gamescore(self, chessjson, tournament, equations, istrf25):
         # score = helpers.solve_scoresystem(equations)  -- added record 162 to solve this
@@ -245,7 +242,7 @@ class scoresystem:
                             checksum += num * val
                     # print(eq)
                     if eq["sum"] != checksum:
-                        msg = "Incorrect score in line " + str(lineno+1)
+                        msg = "Incorrect score for player " + str(lineno+1)
                         chessjson["status"]["error"].append(msg)
                         eqok = False
                 # print("-EQOK", eqok, version, "162" in self.all_lines)
@@ -265,7 +262,7 @@ class scoresystem:
 
     def get_score(self, tournament, scorename, scoretype):
         score = self.score[scorename]
-
+        
         points = score[scoretype]
         if isinstance(points, Decimal):
             pass

@@ -349,6 +349,7 @@ class commonmain:
                 if params["verbose"] > 0:
                     raise
                 else:
+                    self.chessfile.put_status(481, 'Program error: "' + "unknown error" + '"')
                     self.error(510, "Program error")
                 break
     
