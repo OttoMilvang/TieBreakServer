@@ -72,7 +72,7 @@ class tiebreak:
     TIEBREAK_RULES = {
         0 : "2022-01-01",
         1 : "2024-08-01",
-        2 : "2126-02-01",   # New rules for tiebreaks , not approved yet
+        2 : "2026-03-01",   # Approved by FIDE Council on 02/02/2026
         } 
 
     # constructor function
