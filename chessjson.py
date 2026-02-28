@@ -23,7 +23,7 @@ class chessjson:
             "published": "",
             "status": {"code": 0, "error": []},
             "event": {
-                "eventName": "",
+                "name": "",
                 "eventInfo": {},
                 "ratingLists": [{"listName": "Rating"}],
                 "profiles": [],

@@ -162,11 +162,11 @@ class ts2json(chessjson.chessjson):
             if key == "Dataversion":
                 pass
             elif key == "Producer":
-                event["origin"] = value
+                self.chessjson["origin"] = value
             elif key == "TeamEvent":
                 self.isteam = other["teamEvent"] = value == "Y"
             elif key == "Event":
-                event["eventName"] = value
+                event["name"] = value
                 event["eventInfo"]["fullName"] = value
             elif key == "Organiser":
                 self.parse_ts_arbiter(org, value)
@@ -369,6 +369,7 @@ class ts2json(chessjson.chessjson):
         for key, value in attrib.items():
             if key == "Event":
                 tournament["name"] = value
+                info["fullName"] = self.chessjson["event"]["name"] + (", " if len(value.strip()) > 0 else "") + value.strip()
             elif key == "Site":
                 info["site"] = value
             elif key == "Arbiter":
@@ -392,7 +393,7 @@ class ts2json(chessjson.chessjson):
             elif key == "RatingFactorC":
                 other["ratingFactorC"] = helpers.parse_float(value)
             elif key == "MaxMeets":
-                tournament["maxMeet"] = helpers.parse_int(value)
+                tournament["maxMeets"] = helpers.parse_int(value)
             elif key == "PairingAccellerated":
                 if value == "Y":
                     tournament["accelerated"] = { "name" : "BAKU2016", "values": []}
@@ -520,6 +521,17 @@ class ts2json(chessjson.chessjson):
                 clast["period"] = periodno + 1
                 cround["timeControl"]["periods"].append(clast)
                 tournament["rounds"].append(cround)
+        if roundno > 0:
+            tournament["timeControl"] = tournament["rounds"][0]["timeControl"] 
+            desc = ""
+            sep = ""
+            for period in tournament["timeControl"]["periods"]:
+                desc = sep + str(period["baseTime"]) + "min/" +(str(period["moves"]) if period["moves"] > 0 else "all")
+                if period["increment"] > 0: 
+                    desc += "+" + str(period["increment"]) + "sec/move"
+                sep = ", "
+
+            tournament["timeControl"]["description"] = desc
         return
 
     def parse_ts_group_timecontrol(self, tc, periods, increment):
@@ -812,6 +824,7 @@ class ts2json(chessjson.chessjson):
                 profile["email"] = value
             else:
                 self.print_warning("parse_ts_player attrib: " + key + " not matched")
+        profile["fideName"] = helpers.ascii_name(profile["lastName"]) + ", " + helpers.ascii_name(profile["firstName"])  
         return
 
     def parse_ts_game(self, game, cresults, playerno, isteam):
@@ -956,7 +969,7 @@ class ts2json(chessjson.chessjson):
             arbiter["firstName"] = nameparts[1].strip()
         else:
             nameparts = line.split(" ")
-            arbiter["lastName"] = nameparts[-1:]
+            arbiter["lastName"] = " ".join(nameparts[-1:])
             arbiter["firstName"] = " ".join(nameparts[0:-1])
         arbiter["id"] = 0
         return

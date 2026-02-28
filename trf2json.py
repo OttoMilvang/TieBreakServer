@@ -6,6 +6,7 @@ Created on Mon Aug  7 16:48:53 2023
 import json
 import sys
 import time
+import re
 from decimal import Decimal
 
 import berger
@@ -748,12 +749,12 @@ class trf2json(chessjson.chessjson):
         linelen = len(line.rstrip())
         if linelen == 3:
             return
-        fideid = 0
-        if linelen == 48:
-            fideid = int(line[37:48])
-            line = line[4:37].rstrip()
-        else:
-            line = line[4:].rstrip()
+        numbers = re.findall(r'\d+', line)
+        maxval = max([int(n) for n in numbers] )
+        fideid = maxval if maxval > 100000 else 0
+        if fideid:
+            line = line.replace(str(fideid), "")
+        line = line[4:].rstrip()
         nameparts = line.split(" ")
         sname = 0
         otitle = ""
@@ -1505,7 +1506,7 @@ class trf2json(chessjson.chessjson):
         #
 
         self.chessjson["event"] = event
-        tournament = self.get_tournament(1)
+        tournament = self.get_tournament(tournamentno)
         self.scores = scoresystem.scoresystem()
         self.scores.score = tournament["scoreSystem"]
         self.profiles = {p["id"]: p for p in self.chessjson["event"]["profiles"]}
@@ -1582,13 +1583,16 @@ class trf2json(chessjson.chessjson):
         return ""
 
     def output_trf_player(self, tournament, trfkey):
-        resw = [{"W": "+", "D": "D", "L": "-", "Z": "-"}, {"W": "1", "D": "=", "L": "0", "Z": "0"}]
-        resb = [{"W": "-", "D": "D", "L": "+", "Z": "+"}, {"W": "0", "D": "=", "L": "1", "Z": "1"}]
-        unpl = [{"W": "F", "D": "H", "L": "Z", "Z": "Z"}, {"W": "U", "D": "U", "L": "U", "Z": "U"}]
+        resw = [{"W": "+", "D": "D", "L": "-", "Z": "-", "A": "?"}, {"W": "1", "D": "=", "L": "0", "Z": "0", "A": "?"}]
+        resb = [{"W": "-", "D": "D", "L": "+", "Z": "+", "A": "?"}, {"W": "0", "D": "=", "L": "1", "Z": "1", "A": "?"}]
+        unpl = [{"W": "F", "D": "H", "L": "Z", "Z": "Z", "A": "?"}, {"W": "U", "D": "U", "L": "U", "Z": "U", "A": "?"}]
 
         t001 = ""
         for cmp in sorted(tournament["competitors"], key=lambda c: c["cid"]):
             profile = self.profiles[cmp["profileId"]]
+            if len(profile['federation']) > 3: 
+                self.put_status(402, "Error when writing trf-file, Federation = "+ profile['federation'])
+                return ""
             line = (
                 f"001 {cmp['cid']:>4} "
                 + f"{profile['sex']:1}"
@@ -1621,7 +1625,6 @@ class trf2json(chessjson.chessjson):
                         opp = game["white"]
                         col = "b"
                         res = resw[played][game["bResult"]] if "bResult" in game else resb[played][game["wResult"]]
-
                     line += f"  {opp:>4} {col:1} {res:1}"
                 else:
                     line += "          "
@@ -1635,7 +1638,9 @@ class trf2json(chessjson.chessjson):
             info = "site"
         elif trfkey == "032":
             info = "federation"
-        return trfkey + " " + self.chessjson["event"]["eventInfo"][info] + "\n" if info in self.chessjson["event"]["eventInfo"] else ""
+        txt = trfkey + " " + self.chessjson["event"]["eventInfo"][info] + "\n" if self.chessjson["event"].get("eventInfo", {}).get(info, "") != "" else ""
+        txt = trfkey + " " + tournament["tournamentInfo"][info] + "\n" if tournament.get("tournamentInfo", {}).get(info, "") != "" else txt
+        return(txt )
 
     def output_trf_datetime(self, tournament, trfkey):
         keyword = "startDate" if trfkey == "042" else "endDate"
@@ -1656,21 +1661,39 @@ class trf2json(chessjson.chessjson):
     def output_trf_arbiter(self, tournament, trfkey):
         line = ""
         if trfkey == "102":
-            profile = safe([tournament, self.chessjson["event"]], ["eventInfo", "arbiters", "chiefArbiter"], 0)
+            profile = tournament.get("tournamentInfo", {}).get("arbiters", {}).get("chiefArbiter", 0) or \
+                      self.chessjson["event"].get("eventInfo", {}).get("arbiters", {}).get("chiefArbiter", 0)
             if profile > 0:
                 line = "102 " + format_name(self.profiles[profile]) + "\n"
-        elif trfkey == "102":
+        elif trfkey == "112":
+            profiles = tournament.get("tournamentInfo", {}).get("arbiters", {}).get("arbiters", None) or \
+                       self.chessjson["event"].get("eventInfo", {}).get("arbiters", {}).get("arbiters", [])
             arbiters = safe([tournament, self.chessjson["event"]], ["eventInfo", "arbiters", "arbiters"], [])
             for arbiter in arbiters:
                 line += "112 " + format_name(self.profiles[arbiter]) + "\n"
         return line
             
     def output_trf_timecontrol(self, tournament, trfkey):
-        line = "122 " + tournament["timeControl"]["description"] + "\n"
+        line = ""
+        if "timeControl" in tournament:
+            line = "122 " + tournament["timeControl"]["description"] + "\n"
         return line
     
     def output_trf_dates(self, tournament, trfkey):
-        return ""
+        line = "" 
+        if "rounds" in tournament:
+            line = "132 " +(" "*(85+10*tournament["numRounds"]))
+            for round in tournament["rounds"]:
+                start = round["startTime"]
+                rno = round["roundNo"]
+                seg = "  " + start[2:4] + "/" + start[5:7] + "/" + start[8:10]
+                first =  79 + rno*10
+                last = first + 10 
+                line = line[:first] + seg + line[last:]
+            line +=  "\n"            
+        return line
+
+
 
     def output_trf_numrounds(self, tournament, trfkey):
         line = "142 " + str(tournament["numRounds"]) + "\n"

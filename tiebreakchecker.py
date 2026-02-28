@@ -50,7 +50,6 @@ class tiebreakchecker(commonmain):
             help="Use rules for tournament with pre-determined pairing",
         )
         self.parser.add_argument("-s", "--swiss", required=False, action="store_true", help="Use rules for swiss tournament")
-        self.parser.add_argument("-r", "--rank", required=False, action="store_true", help="Sort on rank order")
         self.parser.add_argument("-u", "--unrated", required=False, default=0, help="rating for unrated players")
         self.parser.add_argument(
             "-t",
@@ -103,9 +102,10 @@ class tiebreakchecker(commonmain):
             self.filetype = "tiebreak"
         chessfile = self.chessfile
         if chessfile.get_status() == 0:
+            tournament = chessfile.get_tournament(self.tournamentno)
             if self.tournamentno > 0:
-                tb = tiebreak(chessfile, self.tournamentno, params["number_of_rounds"], params)
-                tb.compute_tiebreaks(chessfile, self.tournamentno, params)
+                tb = tiebreak(tournament, params["number_of_rounds"], params)
+                chessfile.result = tb.compute_tiebreaks(tournament, params)
             else:
                 tb = tiebreak(chessfile, self.tournamentno, params["number_of_rounds"], params)
         self.core = tb

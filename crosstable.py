@@ -34,6 +34,7 @@ C7 = qdefs.C7.value
 N8 = qdefs.N8.value
 C8 = qdefs.C8.value
 C9 = qdefs.C9.value
+MM = qdefs.MM.value
 C10 = qdefs.C10.value
 C11 = qdefs.C11.value
 C12 = qdefs.C12.value
@@ -105,11 +106,12 @@ class crosstable:
         }
         self.scalars = [C6, N8, C9, C10, C11, C12, C13, C14, C15, C16, C17, S1, S2, IW]
 
-    def init_engine(self, chessfile, tournamentno, rnd, maxmeet, topcolor, unpaired):
+    def init_engine(self, tournament, rnd, maxmeets, topcolor, unpaired, rank):
         self.rnd = rnd
-        self.maxmeet = maxmeet
+        self.maxmeets = maxmeets
         self.topcolor = topcolor
-        cmps = self.compute_tiebreak(chessfile, tournamentno, rnd)
+        self.rank = rank
+        cmps = self.compute_tiebreak(tournament, rnd)
         ncmps = len(cmps)
         self.C = 100  # digits
         if ncmps > 97:
@@ -123,20 +125,19 @@ class crosstable:
             self.R = 100
         self.Cbits = ncmps.bit_length()
         self.Rbits = rnd.bit_length()
-        prohibited = chessfile.get_tournament(tournamentno).get("prohibited", [])
-        edges = self.list_edges(cmps, maxmeet, topcolor, unpaired, prohibited)
+        prohibited = tournament.get("prohibited", [])
+        edges = self.list_edges(cmps, maxmeets, topcolor, unpaired, prohibited)
         return edges
 
-    def compute_tiebreak(self, chessfile, tournamentno, rnd):
-        tb = tiebreak(chessfile, tournamentno, rnd - 1, None)
-        if chessfile.get_status() == 0:
-            tblist = ["PTS", "ACC", "RFP", "NUM", "RIP", "COD", "COP", "CSQ", "FLT", "TOP"]
-            for pos in range(0, len(tblist)):
-                mytb = tb.parse_tiebreak(pos + 1, tblist[pos])
-                tb.compute_tiebreak(mytb)
+    def compute_tiebreak(self, tournament, rnd):
+        tb = tiebreak(tournament, rnd - 1, None)
+        tblist = ["PTS", "ACC", "RFP", "NUM", "RIP", "COD", "COP", "CSQ", "FLT", "TOP"]
+        for pos in range(0, len(tblist)):
+            mytb = tb.parse_tiebreak(pos + 1, tblist[pos])
+            tb.compute_tiebreak(mytb)
         return tb.cmps
 
-    def list_edges(self, cmps, maxmeet, topcolor, unpaired, prohibited):
+    def list_edges(self, cmps, maxmeets, topcolor, unpaired, prohibited):
         self.cmps = cmps
         self.size = self.BLOB = len(cmps.keys()) + 1
         self.ilen = 0
@@ -153,6 +154,7 @@ class crosstable:
             tbval = cmps[i]["tiebreakDetails"] if i in cmps else None
             cr[i] = {
                 "cid": i,
+                "rnk": cmps[i]["orgrank"] if i in cmps else i,
                 "pts": tbval[PTS]["val"] if tbval else Decimal("0.0"),
                 "acc": tbval[ACC]["val"] if tbval else Decimal("-1.0"),
                 "rfp": tbval[RFP]["val"] != "" if tbval and i not in unpaired else False,
@@ -175,15 +177,22 @@ class crosstable:
         self.level2score = acc = sorted(set([c["acc"] for c in cr if c["rfp"] or c["cid"] == 0]))
         self.score2level = score2level = {acc[i]: i for i in range(len(acc))}
 
-        # update tpn, give tps to players that have been paired at least once.
-        tpn = 0
+
+        # update scorelevel
         cr[0]["scorelevel"] = 0
         for i in range(1, size):
             cr[i]["scorelevel"] = score2level[cr[i]["acc"]] if cr[i]["rfp"] else 0
-            if cr[i]["rfp"] or cr[i]["rip"]:
-                tpn += 1
-                cr[i]["tpn"] = tpn
         cr[size]["scorelevel"] = -1
+
+        # update tpn, give tps to players that have been paired at least once.
+        tpn = 0
+        rr = sorted(cr, key=lambda s: (s[self.rank]))
+        for i in range(1, size):
+            if rr[i]["rfp"] or rr[i]["rip"]:
+                tpn += 1
+                rr[i]["tpn"] = tpn
+
+
 
         # Invariant c['ca'] < c['cb']
 
@@ -215,6 +224,7 @@ class crosstable:
             if  elem["firstRound"] <= self.rnd <= elem["lastRound"]:
                 for c1, c2 in list(combinations(elem["competitors"], 2)):
                     cr[c1]["opp"][c2]["canmeet"] = False
+                    cr[c1]["opp"][c2]["qc"] = False
                     
                         
         edges = [edge for edge in edges if edge["canmeet"]]
@@ -223,9 +233,9 @@ class crosstable:
     def levels(self):
         return self.level2score
 
-    def create_edge(self, nodea, nodeb, bhasmet=[]):
+    def create_edge(self, nodea, nodeb, bhasmet = None):
         (a, b) = (nodea, nodeb) if nodea["cid"] <= nodeb["cid"] else (nodeb, nodea)
-        played = bhasmet.count(a["cid"])
+        played = bhasmet.count(a["cid"]) if bhasmet is not None else 0
         ca = a["cid"]
         cb = b["cid"]
         sa = a["scorelevel"]
@@ -249,7 +259,7 @@ class crosstable:
             "qc": False,
         }
         # C3 not-topscorers with absolute color preference cannot meet
-        canmeet = played < self.maxmeet and ca != cb and a["rfp"] and b["rfp"] or cb == self.BLOB
+        canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or cb == self.BLOB
         for col in ["w", "b"]:
             col2 = col + "2"
             if a["cop"] == col2 and b["cop"] == col2 and (not a["top"]) and (not b["top"]):
@@ -303,7 +313,8 @@ class crosstable:
             q[N8] = 0
             q[C8] = [0] * (maxpsd + 1)
             q[C9] = 0
-            for elem in range(C9, C18):
+            q[MM] = [0] * (self.maxmeets-1)
+            for elem in range(C10, C18):
                 q[elem] = 0
             for elem in range(C18, C21 + 1):
                 q[elem] = [0] * maxpsd
@@ -324,6 +335,9 @@ class crosstable:
                 if pab and b["scorelevel"] == 0:
                     q[C9] = self.rnd - 1 - a["num"]
                     cweight += weight[C9] * q[C9]
+
+                if c["canmeet"] and c["played"] > 0 and self.maxmeets > 1:
+                    q[MM][c["played"]-1] = 1  
 
                 # Topscorere
 
@@ -414,7 +428,7 @@ class crosstable:
                     q[C8][maxpsd + 1 - level] = 1
                     cweight += weight[C8][maxpsd + 1 - level]
 
-            c["qc"] = (sum(q[C9:C11 + 1]) + sum(q[C14:C17 + 1]) + sum(q[C18]) + sum(q[C19]) + sum(q[C20]) + sum(q[C21])) == 0
+            c["qc"] = q[C9] + sum(q[MM]) + (sum(q[C10:C11 + 1]) + sum(q[C14:C17 + 1]) + sum(q[C18]) + sum(q[C19]) + sum(q[C20]) + sum(q[C21])) == 0
             c["cweight"] = cweight
         self.L = maxpsd
 
@@ -539,6 +553,7 @@ class crosstable:
         rr = str(R)[1:]
         c7len = psd
         c8len = psd + 1
+        mmlen = self.maxmeets -1
         self.weight = weight = [0] * QS
 
         self.Cweight = (
@@ -552,6 +567,8 @@ class crosstable:
             + str([rr for v in [0] * c8len]).replace("'", "")  # C8
             + "-"
             + rr  # C9
+            + "-"
+            + str([rr for v in [0] * mmlen]).replace("'", "")  # MM
             + "-"
             + rr  # C10
             + "-"
@@ -589,6 +606,9 @@ class crosstable:
         for i in range(c8len):
             weight[C8][i] = int(num := num[: -len(rr)])
         weight[C9] = int(num := num[: -len(rr)])
+        weight[MM] = [0] * mmlen
+        for i in range(mmlen):  
+            weight[MM][i] = int(num := num[: -len(rr)])
         weight[C10] = int(num := num[: -len(rr)])
         weight[C11] = int(num := num[: -len(rr)])
         weight[C12] = int(num := num[: -len(cc)])
@@ -748,17 +768,19 @@ class crosstable:
     """
 
     def color_allocation(self, a, b, c):
+        rank = self.rank  # "cid" or "rnk"
         other = {"w": "b", "b": "w", " ": " "}
         (acid, bcid) = (a["cid"], b["cid"])
+        (arank, brank) = (a[rank], b[rank])
         (acp, acs) = list(a["cop"])
         (bcp, bcs) = list(b["cop"])
         acd = a["cod"]
         bcd = b["cod"]
 
         # PAB, always set player to white
-        if acid == 0:
+        if arank == 0:
             return {"w": bcid, "b": acid, "e-rule": "pab"}  # ('b', 'w', 'pab')
-        if bcid == 0:
+        if brank == 0:
             return {"w": acid, "b": bcid, "e-rule": "pab"}  # ('w', 'b', 'pab')
 
         # E.1

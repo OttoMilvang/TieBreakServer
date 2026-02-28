@@ -142,15 +142,15 @@ Structre
 class pairing:
 
     # constructor function
-    def __init__(self, chessfile, tournamentno, rnd, topcolor, unpaired, maxmeet, experimental, verbose):
+    def __init__(self, tournament, rnd, topcolor, unpaired, rank, experimental, verbose):
 
         # helpers.json_output(sys.stdout, cmps[12]['tiebreakDetails'])
-        self.chessfile = chessfile
-        self.tournamentno = tournamentno
+        self.tournament = tournament
         self.rnd = rnd
         self.topcolor = topcolor
         self.unpaired = [helpers.parse_int(u) for u in unpaired]
-        self.maxmeet = maxmeet
+        self.nummeets = int((rnd-1) * tournament.get("maxMeets", 1) / tournament["numRounds"]) + 1
+        self.rank = "rnk" if rank else "cid"
         self.experimental = experimental
         self.verbose = verbose
         self.optimize = "weighted" not in experimental
@@ -176,12 +176,12 @@ class pairing:
         self.crosstable = crosstable(self.experimental, self.checkonly, self.verbose)
         t0 = time.time()
         (nodes, edges) = self.crosstable.init_engine(
-            self.chessfile, self.tournamentno, self.rnd, self.maxmeet, self.topcolor, self.unpaired
+            self.tournament, self.rnd, self.nummeets, self.topcolor, self.unpaired, self.rank 
         )
         t1 = time.time()
         if self.verbose:
             print("Init engine:", t1 - t0, "s")
-        # edges = self.crosstable.list_edges(self.cmps, self.maxmeet, self.topcolor, self.unpaired)
+        # edges = self.crosstable.list_edges(self.cmps, self.nummeets, self.topcolor, self.unpaired)
         self.levels = levels = len(self.crosstable.levels())
 
         (competitors, edges) = self.list_competitors(self.crosstable.crosstable, edges)
@@ -317,7 +317,7 @@ class pairing:
         return new_edges
 
     def list_competitors(self, nodes, edges):
-        mod_nodes = sorted([node for node in nodes if node["rfp"]], key=lambda s: (-s["scorelevel"], s["cid"]))
+        mod_nodes = sorted([node for node in nodes if node["rfp"]], key=lambda s: (-s["scorelevel"], s[self.rank]))
         mod_edges = self.get_edges(mod_nodes, edges)
         mod_edges = sorted(
             mod_edges, key=lambda edge: (-min(edge["sa"], edge["sb"]), -max(edge["sa"], edge["sb"]), edge["ca"], edge["cb"])
@@ -886,12 +886,13 @@ class pairing:
     def pair_simple_round(self, bracket, nodes, edges, hetrogenious, numpairs, mdp, category):
 
         testlevel = -1
+
         scorelevel = bracket["scorelevel"]
         hthis = self.hammilton[scorelevel]
         hnext = self.hammilton[scorelevel-1] if scorelevel > 0  else {}
-        
-        # Don't run if not optimizez, or rest cvan not be paired
-        if (not self.optimize) or hnext.get("rem_unpaired",1) > 1:
+
+        # Don't run if not optimizez, or rest can not be paired
+        if category == 0 or (not self.optimize) or hnext.get("rem_unpaired",1) > 1:
             return (False, 1, None)
 
         # Don't bother try this with less than 20 players

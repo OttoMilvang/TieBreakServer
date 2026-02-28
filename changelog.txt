@@ -1,3 +1,45 @@
+2026-02-28
+Pass "tournament" stucture to pairing and tiebreak instead of "chessfile" and "tournamentno"
+This stress the fact that these routines works on tournamentlevel only.
+
+Add -r , --rank to pairing 
+This will build tournament pairing number based according to the rank instead of start-id 
+
+Add -M, --multiplemeets
+Experimental, allow multiple meets
+
+chessjson.py
+Change mamber name from eventName to name
+
+crosstable.py
+Fix error that may accour with prohobited players 
+
+commonmain.py
+Rewritten main loop to be more readable
+
+pairing.py:
+Fix pairing error that came in 0.2% of tournaments with more than 300 players
+
+tournamentgenerator.py
+Change symbol for switches from -r , --rating and -s , -- statistics to capital letters -R and -S 
+-r, --rank is new switch to generate tournaments according to rank  
+-x fakerank  is added  to doublecheck the algorith (this will renumber all players and games according to rank)
+New dynamic default values for rating and statistics 
+
+trf2json.py
+Fix bug in FIDE-id exstraction in arbiter records 102 and 112
+Unknown result are written as ? 
+Output 032 record will use name from both event and tournament
+Fix 122 error in output
+Add 132 record in  output
+
+ts2json.py
+Add timec/date per round
+Fix error in parsing arbiter name
+Add Fidename, translation isolatin1 to ascii
+
+
+
 2026-01-29
 
 LICENSE

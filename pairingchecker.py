@@ -393,15 +393,6 @@ class pairingchecker(commonmain):
         # if not eq: breakpoint()
         return eq
 
-    def compute_tiebreak(self, chessfile, tb, eventno, params):
-        if chessfile.get_status() == 0:
-            tblist = ["PTS", "ACC", "RFP", "NUM", "RIP", "COD", "COP", "CSQ", "FLT", "TOP"]
-            for pos in range(0, len(tblist)):
-                mytb = tb.parse_tiebreak(pos + 1, tblist[pos])
-                tb.compute_tiebreak(mytb)
-            # for i in range(0, len(tb.rankorder)):
-            #     t = tb.rankorder[i]
-
     def compute_pairs(self, pairing):
         # pairing = analyze if pairing is None or len(pairing) == 0 else pairing
         pairs = []
@@ -455,6 +446,9 @@ class pairingchecker(commonmain):
             if self.tournamentno > 0:
                 tournament = chessfile.get_tournament(self.tournamentno)
                 currentround = tournament["currentRound"]
+                maxmeets = int(self.params["maxmeets"])
+                if maxmeets > 0:
+                    tournament["maxMeets"] = maxmeets
                 numrounds = tournament["numRounds"]
                 firstround = lastround = params["number_of_rounds"]
                 self.dopairing = params["pairing"]
@@ -477,15 +471,12 @@ class pairingchecker(commonmain):
                     raise
                 topcolor = chessjson.get_topcolor(chessfile, self.tournamentno, params["top_color"])
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
-                    tb = tiebreak(chessfile, self.tournamentno, rnd - 1, None)
-                    self.compute_tiebreak(chessfile, tb, self.tournamentno, params)
                     cpairing = pairing(
-                        chessfile,
-                        self.tournamentno,
+                        tournament,
                         rnd,
                         topcolor,
                         params["unpaired"],
-                        1,
+                        params["rank"],
                         params["experimental"],
                         params["verbose"],
                     )

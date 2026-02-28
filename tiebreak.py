@@ -6,6 +6,7 @@ Created on Fri Aug  11 11:43:23 2023
 import math
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
+import chessjson as chessjson
 import rating as rating
 
 """
@@ -75,7 +76,7 @@ class tiebreak:
         } 
 
     # constructor function
-    def __init__(self, chessevent, tournamentno, currentround, params):
+    def __init__(self, tournament, currentround, params):
         self.tiebreaklist = {
             "NUL":   {"name": "NUL",   "func": self.get_nul,                             "rev": False, "desc": "Null"},
             "PTS":   {"name": "POINTS","func": self.get_builtin,                         "rev": True , "desc": "Points (default)"},
@@ -130,14 +131,14 @@ class tiebreak:
             "BBE":   {"name": "BBE",   "func": self.compute_top_bottom_board,            "rev": False, "desc": "Board count"},
             "SSSC":  {"name": "SSSC",  "func": self.compute_score_strength_combination,  "rev": True , "desc": "Score strength combination"},
             "STD":   {"name": "STD",   "func": self.compute_std,                         "rev": True , "desc": "Stanard score system"},
-            "ACC":   {"name": "ACC",   "func": self.compute_acc,                         "rev": True , "desc": "	Points + accellerated points"},
+            "ACC":   {"name": "ACC",   "func": self.compute_acc,                         "rev": True , "desc": "Points + accellerated points"},
             "FLT":   {"name": "FLT",   "func": self.compute_flt,                         "rev": True , "desc": "Float (8=df 4=uf in prev round, 2=df 1=uf in 2 rounds before)"},
             "RFP":   {"name": "RFP",   "func": self.compute_rfp,                         "rev": True , "desc": "Registered for round"},
-            "TOP":   {"name": "TOP",   "func": self.compute_top,                         "rev": True , "desc": "	Is player a top-scorer in last round"},
+            "TOP":   {"name": "TOP",   "func": self.compute_top,                         "rev": True , "desc": "Is player a top-scorer in last round"},
             }
-            
-        self.chessevent = chessevent
-        self.tournament = tournament = chessevent.get_tournament(tournamentno)
+
+        chessevent = chessjson.chessjson()    
+        self.tournament = tournament
         self.tiebreaks = []
         if tournament is None:
             return
@@ -154,8 +155,6 @@ class tiebreak:
         chessevent.update_tournament_random(tournament, self.isteam)
         self.rounds = tournament["numRounds"]
         self.currentround = currentround if currentround >= 0 else self.rounds
-        self.get_score = chessevent.get_score
-        self.is_vur = chessevent.is_vur
         self.maxboard = 0
         self.lastplayedround = 0
         self.primaryscore = None  # use default
@@ -206,6 +205,39 @@ class tiebreak:
     def zero(self, scorename):
         return self.matchscore["Z"] if scorename == "match" else self.gamescore["Z"]
 
+    # get_score
+    # return a float value from result struct and color
+
+    def get_score(self, slist, result, color):
+        if color[0] + "Result" in result:
+            res = result[color[0] + "Result"]
+        elif result["black"] > 0:
+            res = self.reverse[result[color[0] + "Result"]]
+        else:
+            # print("get_score" ,  slist, result, color, "Null")
+            return Decimal("0.0")
+        while res in slist:
+            if res == "L" and result["played"] is False:
+                res = "Z"
+            res = slist[res]
+        # print("get_score" ,  slist, result, color, res)
+        return res
+
+    def is_vur(self, result, color):  #
+        if result["played"]:
+            return False
+
+        if color[0] + "Result" in result:
+            res = result[color[0] + "Result"]
+        elif result["black"] > 0:
+            res = self.reverse[result[color[0] + "Result"]]
+        else:
+            return Decimal("0.0")
+        # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
+        if res == "W":
+            return False
+        return True
+
     """
     compute_tiebreaks(self, chessfile, tournamentno, params)
     chessfile - Chessfile structure
@@ -213,39 +245,39 @@ class tiebreak:
     params - Parameters from core
     """
 
-    def compute_tiebreaks(self, chessfile, tournamentno, params):
+    def compute_tiebreaks(self, tournament, params):
         # run tiebreak
-        if chessfile.get_status() == 0:
-            tm = chessfile.get_tournament(tournamentno)
-            self.find_tmversion(tm)
-            tblist = params["tie_break"]
-            if len(tblist) == 0 and "rankOrder" in tm:
-                tblist = tm["rankOrder"]
-                params["tie_break"] = tblist
-            for pos in range(0, len(tblist)):
-                mytb = self.parse_tiebreak(pos + 1, tblist[pos])
-                self.compute_tiebreak(mytb)
-        if chessfile.get_status() == 0:
-            tm["rankOrder"] = self.tiebreaks
-            jsoncmps = tm["competitors"]
-            correct = True
-            competitors = []
-            for cmp in jsoncmps:
-                competitor = {}
-                competitor["cid"] = startno = cmp["cid"]
-                correct = correct and cmp["rank"] == self.cmps[startno]["rank"]
-                competitor["rank"] = cmp["rank"] = self.cmps[startno]["rank"]
-                if self.isteam:
-                    competitor["boardPoints"] = self.cmps[startno]["tbval"]["gpoints_" + "bp"]
-                competitor["tiebreakDetails"] = self.cmps[startno]["tiebreakDetails"]
-                competitor["tiebreakScore"] = cmp["tiebreakScore"] = self.cmps[startno]["tiebreakScore"]
-                competitors.append(competitor)
-            chessfile.result = {
-                "check": correct, 
-                "rules": self.TIEBREAK_RULES[self.rulesversion],
-                "tiebreaks": self.tiebreaks, 
-                "competitors": competitors
-            }
+        tm = tournament
+        self.find_tmversion(tm)
+        tblist = params["tie_break"]
+        if len(tblist) == 0 and "rankOrder" in tm:
+            tblist = tm["rankOrder"]
+            params["tie_break"] = tblist
+        for pos in range(0, len(tblist)):
+            mytb = self.parse_tiebreak(pos + 1, tblist[pos])
+            self.compute_tiebreak(mytb)
+        
+        tm["rankOrder"] = self.tiebreaks
+        jsoncmps = tm["competitors"]
+        correct = True
+        competitors = []
+        for cmp in jsoncmps:
+            competitor = {}
+            competitor["cid"] = startno = cmp["cid"]
+            correct = correct and cmp["rank"] == self.cmps[startno]["rank"]
+            competitor["rank"] = cmp["rank"] = self.cmps[startno]["rank"]
+            if self.isteam:
+                competitor["boardPoints"] = self.cmps[startno]["tbval"]["gpoints_" + "bp"]
+            competitor["tiebreakDetails"] = self.cmps[startno]["tiebreakDetails"]
+            competitor["tiebreakScore"] = cmp["tiebreakScore"] = self.cmps[startno]["tiebreakScore"]
+            competitors.append(competitor)
+        result = {
+            "check": correct, 
+            "rules": self.TIEBREAK_RULES[self.rulesversion],
+            "tiebreaks": self.tiebreaks, 
+            "competitors": competitors
+        } 
+        return result 
         
 
     def prepare_competitors(self, tournament, scorename):
@@ -1548,64 +1580,6 @@ class tiebreak:
         tiebreak = self.tiebreaklist[tbname] if tbname in self.tiebreaklist else self.tiebreaklist["NUL"]        
         tb["modifiers"]["rev"] = tb["modifiers"]["rev"] ^ tiebreak["rev"]
         tbname = tiebreak["func"](tb, cmps, self.currentround)
-        
-        """
-        match tb["name"]:
-            case "PTS" | "MPTS" | "GPTS":
-                tbname = self.get_builtin(tb, cmps, self.currentround)
-            case "MPVGP":
-                tbname = self.reverse_pointtype(tb, cmps, self.currentround)
-            case "SNO" | "RANK" | "RND":
-                tb["modifiers"]["reverse"] = False
-                tbname = self.get_builtin(tb, cmps, self.currentround)
-            case "DF": 
-                tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
-            case "DE":
-                tb["modifiers"]["reverse"] = False
-                tbname = self.compute_direct_encounter(tb, cmps, self.currentround)
-            case "EDE" | "EDEC" | "EDET" | "EDEB" | "EDEBT" | "EDEBB":
-                tb["modifiers"]["reverse"] = False
-                tbname = self.compute_ext_direct_encounter(tb, cmps, self.currentround)
-            case "WIN" | "WON" | "BPG" | "BWG" | "GE" | "REP" | "RIP" | "VUR" | "NUM" | "COP" | "COD" | "CSQ" | "RTG":
-                tbname = self.get_builtin(tb, cmps, self.currentround)
-            case "PS":
-                tbname = self.compute_progressive_score(tb, cmps, self.currentround)
-            case "KS":
-                tbname = self.compute_koya(tb, cmps, self.currentround)
-            case "BH" | "FB" | "SB" | "ABH" | "AFB":
-                tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, self.currentround)
-            case "AOB":
-                tbname = self.compute_average_of_buchholz(tb, cmps, self.currentround)
-            case "ARO" | "TPR" | "PTP":
-                tbname = self.compute_ratingperformance(tb, cmps, self.currentround)
-            case "APRO":
-                tbname = self.compute_average_rating_performance(tb, cmps, self.currentround)
-            case "APPO":
-                tbname = self.compute_average_perfect_performance(tb, cmps, self.currentround)
-            case "ESB" | "EMMSB" | "EMGSB" | "EGMSB" | "EGGSB":
-                tbname = self.compute_ext_sonneborn_berger(tb, cmps, self.currentround)
-            case "BC":
-                tb["modifiers"]["reverse"] = False
-                tbname = self.compute_boardcount(tb, cmps, self.currentround)
-            case "TBR" | "BBE":
-                tb["modifiers"]["reverse"] = False
-                tbname = self.compute_top_bottom_board(tb, cmps, self.currentround)
-            case "SSSC":
-                tbname = self.compute_score_strength_combination(tb, cmps, self.currentround)
-            case "STD":
-                tbname = self.compute_std(tb, cmps, self.currentround)
-            case "ACC":
-                tbname = self.compute_acc(tb, cmps, self.currentround)
-            case "FLT":
-                tbname = self.compute_flt(tb, cmps, self.currentround)
-            case "RFP":
-                tbname = self.compute_rfp(tb, cmps, self.currentround)
-            case "TOP":
-                tbname = self.compute_top(tb, cmps, self.currentround)
-            case _:
-                tbname = None
-                return
-        """
         
         self.tiebreaks.append(tb)
         index = len(self.tiebreaks) - 1

@@ -77,6 +77,8 @@ class commonmain:
         "-b": "encoding ascii, utf-8, cp1252 ...",
         "-e": "tournament number in file, start at 1",
         "-n": "Number of rounds, overrides file value",
+        "-M": "The maximum number of meets",
+        "-r": "Sort on rank order",
         "-d": "Delimiter in output text, T=tab, B=blank, S=semicolon, C=comma, txt=txt",
         "-x": "Add experimental stuff",
         "-v": "Verbose and debug",
@@ -93,8 +95,10 @@ class commonmain:
         parser.add_argument("-b", "--encoding", required=False, default="", help=self.helptxt["-b"])
         parser.add_argument("-e", "--tournament-number", required=False, default=str(self.tournamentno), help=self.helptxt["-e"])
         parser.add_argument("-n", "--number-of-rounds", type=int, default=-1, help=self.helptxt["-n"])
+        parser.add_argument("-r", "--rank", required=False, action="store_true", help=self.helptxt["-r"])
         # parser.add_argument("-g", "--game-score", required=False, nargs="*", help=self.helptxt['-g'])
         # parser.add_argument("-m", "--match-score", required=False, nargs="*", help=self.helptxt['-m'])
+        parser.add_argument("-M", "--maxmeets", required=False, default="0", help=self.helptxt["-M"])
         parser.add_argument("-d", "--delimiter", required=False, help=self.helptxt["-d"])
         parser.add_argument("-x", "--experimental", required=False, nargs="*", default=[], help=self.helptxt["-x"])
         parser.add_argument("-v", "--verbose", required=False, action="count", default=0, help=self.helptxt["-v"])
@@ -205,6 +209,7 @@ class commonmain:
             chessfile.put_status(401, 'Error reading file: "' + filename + '"')
             raise
 
+
     def write_output_file(self):
         fileopen = False
         try:
@@ -308,60 +313,56 @@ class commonmain:
                 f.write(line + "\r\n")
                 
 
-    def common_main(self):
-        # Read command line
-        while not self.exit:
-            try:
-                self.read_command_line()
-            except:
+    def test_tournamentno(self):
+        params = self.params
+        if "tournament_number" not in self.params:
                 raise
-                self.error(500, "Bad command line")
-                break
-            params = self.params
-            try:
-                self.read_input_file()
-            except:
-                if params["verbose"] > 0:
-                    raise
+        self.tournamentno = helpers.parse_int(self.params["tournament_number"])
+        if self.tournamentno < 0 or self.tournamentno > len(self.chessfile.chessjson["event"]["tournaments"]):
+                raise
+ 
+    def add_score(self):
+        params = self.params
+        # Add command line parameters
+        for score in ["game", "match"]:
+            if score + "_score" in params and params[score + "_score"] is not None:
+                for arg in params[score + "_score"]:
+                    self.chessfile.parse_score_system(score, arg)
+
+
+
+    def do_command(self, func, errcode, errtxt):
+        if self.exit:
+            return
+        params = self.params
+        try:
+            func()
+        except:
+            if errcode == 500 or params["verbose"] > 0:
+                raise
+            if errcode < 500:
+                self.chessfile.put_status(errcode, errtxt)
+                self.error(510, "Program error")
+            else:    
                 stat = self.chessfile.chessjson["status"]
                 if stat["code"] > 0:
                     self.error(stat["code"], stat["error"])
-                self.error(502, "Error when reading file: " + params["input_file"])
-                
-                break
+                self.error(errcode, errtxt)
 
-            if "tournament_number" not in self.params:
-                self.error(501, "Missing parameter --tournament-number")
-            self.tournamentno = helpers.parse_int(self.params["tournament_number"])
-            if self.tournamentno < 0 or self.tournamentno > len(self.chessfile.chessjson["event"]["tournaments"]):
-                self.error(501, "Invalid parameter --tournament-number")
-                break
-    
-            # Add command line parameters
-            for score in ["game", "match"]:
-                if score + "_score" in params and params[score + "_score"] is not None:
-                    for arg in params[score + "_score"]:
-                        self.chessfile.parse_score_system(score, arg)
-    
-            try:
-                self.do_checker()
-            except:
-                if params["verbose"] > 0:
-                    raise
-                else:
-                    self.chessfile.put_status(481, 'Program error: "' + "unknown error" + '"')
-                    self.error(510, "Program error")
-                break
-    
-            try:
-                code = self.write_output_file()
-                if "DUMP" in params["experimental"]:
-                    self.chessfile.dumpresults()
-            except:
-                if params["verbose"] > 0:
-                    raise
-                self.error(503, "Error when writing file: " + params["output_file"])
-            break
+
+
+    def common_main(self):
+        # Read command line
+        self.do_command(self.read_command_line, 500, "Bad command line")
+        params = self.params
+        self.do_command(self.read_input_file, 502, "Error when reading file: " + params["input_file"])
+        self.do_command(self.test_tournamentno, 501, "Invalid parameter --tournament-number")
+        self.do_command(self.add_score, 503, "Invalid parameter - scoresystem")
+        self.do_command(self.do_checker, 481, 'Program error: "' + "unknown error" + '"')
+        #self.do_command(self.apply_result, 482, 'Program error: "' + "unknown error" + '"')
+        self.do_command(self.write_output_file, 503, "Error when writing file: " + params["output_file"])
+        if "DUMP" in params["experimental"]:
+            self.chessfile.dumpresults()
         if self.exit:
             self.write_error_file()
         return self.chessfile.chessjson["status"]["code"]

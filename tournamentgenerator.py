@@ -65,8 +65,9 @@ class tournamentgenerator(commonmain):
     def read_command_line(self):
         self.helptxt.update({
             "-a": "Baku accelleration",
-            "-r": "Rating, -r <highest rating> <rating step> [<sigma>]",
-            "-s": "statistics, -s <rate zpb> <rate hpb> <rate forfeited>",
+            "-R": "Rating, -r <highest rating> <rating step> [<sigma>]",
+            "-S": "statistics, -s <rate zpb> <rate hpb> <rate forfeited>",
+            "-m": "dutch | berger",
             })
         
         self.parser.add_argument("-a", "--acceleration", required=False, action="store_true", default=False, help=self.helptxt["-a"])
@@ -76,10 +77,9 @@ class tournamentgenerator(commonmain):
                             help="Do pairing")
         self.parser.add_argument("-T", "--members", required=False, default="1",
                             help="Team members")
-        self.parser.add_argument("-r", "--rating", required=False, nargs="*", default=["2200", "10", "0"], help=self.helptxt["-r"])
-        self.parser.add_argument("-s", "--statistics", required=False, nargs="*", default=["0.01", "0.05", "0.02"], help=self.helptxt["-s"])
-        self.parser.add_argument("-m", "--method", required=False, default="dutch",
-                            help="dutch | berger")
+        self.parser.add_argument("-R", "--rating", required=False, nargs="*", default=[], help=self.helptxt["-R"])
+        self.parser.add_argument("-S", "--statistics", required=False, nargs="*", default=["0.01", "0.05", "0.02"], help=self.helptxt["-S"])
+        self.parser.add_argument("-m", "--method", required=False, default="dutch", help=self.helptxt["-m"])
         self.parser.add_argument("-t", "--top-color", required=False,
             default=' ',
             help="Color on top board" )
@@ -118,9 +118,26 @@ class tournamentgenerator(commonmain):
         members = int(self.params["members"])
         tournament = ch.add_tournament(1, False, rounds)
         rating = params["rating"]
-        rtop = 2200 if len(rating) < 1 else int(rating[0])
-        rstep = 10 if len(rating) < 2 else int(rating[1])
-        sigma = 50.0 if len(rating) < 3 else float(rating[2])
+        if players < 65:
+            rtop = 2200
+            rstep = 10
+            sigma = 50.0
+        elif players < 85:
+            rtop = 2200 + 10 * (players-64)
+            rstep = 10
+            sigma = 50.0
+        elif players < 700:
+            rtop = 2400
+            rstep = 600.0/players
+            sigma = 100.0
+        else:
+            rtop = 2000
+            rstep = 0
+            sigma = 200.0
+
+        rtop = rtop if len(rating) < 1 else parse_int(rating[0])
+        rstep = rstep if len(rating) < 2 else parse_int(rating[1])
+        sigma = sigma if len(rating) < 3 else float(parse_float(rating[2]))
 
         stat = params["statistics"]
         zpb = 0.01 if len(stat) < 1 else float(stat[0])
@@ -132,7 +149,7 @@ class tournamentgenerator(commonmain):
         exp = " ".join(self.params["experimental"])
         ch.get_event()["eventInfo"] = {
             "fullName": "tournamentgenerator ver." + version.version()["version"] + " " + exp,
-            "site": f"rating={rtop}, step={rstep}, sigma={sigma:4.1f}, zpb={zpb:4.2f}, hpb={hpb:4.2f}, forfeited={forfeited:4.2f}" ,
+            "site": f"rating={rtop}, step={rstep:4.1f}, sigma={sigma:4.1f}, zpb={zpb:4.2f}, hpb={hpb:4.2f}, forfeited={forfeited:4.2f}" ,
             "federation": "FID",
             "startDate": today,
             "endDate": today,
@@ -146,13 +163,14 @@ class tournamentgenerator(commonmain):
 
 
         for player in range(1, players + 1):
-            rating = rtop - rstep*player
+            rating = int(rtop - rstep*player)
             profile = ch.create_profile(rating, f"Player {player:4}", "", "u", "FID") 
             tournament["competitors"].append({
                 "cid": player,
                 "profileId": profile,
                 "present": True,
                 "gamePoints": parse_float("0.0"),
+                "orgrank": player,
                 "rank": player,
                 "realRating": rating,
                 "rating": self.statistics.add_sigma(rating),
@@ -174,11 +192,15 @@ class tournamentgenerator(commonmain):
 
     def do_pairing(self, ch, tournament, rnd):
         tr = {"Z": "Z", "H": "D", "+": "W", "-": "Z" }
+        rounds = int(self.params["number_of_rounds"])
+        maxmeets = int(self.params["maxmeets"])
         self.params['is_rr'] = False
         self.docheck = False
         self.doanalyze = False
-        self.dopairing = True
+        self.dopairing = True  
         tournament["currentRound"] =  rnd
+        if maxmeets > 0:
+            tournament["maxMeets"] =  maxmeets
         pcompetitors = {c["cid"] : c for c in tournament["competitors"] }
         numcompetitors = 0
         for competitor in tournament["competitors"]:
@@ -215,13 +237,13 @@ class tournamentgenerator(commonmain):
                 }
                 tournament["accelerated"]["values"].append(value)
         
-        cpairing  = pairing(ch, 1, rnd, 
+        cpairing  = pairing(tournament, rnd, 
                             tournament["topColor"], 
                             self.params['unpaired'], 
-                            1, 
+                            "fakerank" not in self.params["experimental"] and self.params['rank'],
                             self.params['experimental'], 
                             self.params['verbose'])
-        result = self.compute_pairing(ch, cpairing, self.params) 
+        result = self.compute_pairing(cpairing, self.params) 
         for level in result['checker']:
             for pair in level['pairs']:
                 w = pcompetitors[pair["w"]]
@@ -248,12 +270,33 @@ class tournamentgenerator(commonmain):
                     "bResult": bResult,
                     }
                 ch.append_result(tournament["gameList"], game)
-        
 
-    def compute_pairing(self, chessfile, pairingengine, params):
+    def fakerank(self, tm, trans, pairing):
+        for competitor in tm["competitors"]:
+            competitor["cid"] = trans[competitor["cid"]]
+        for game in tm["gameList"]:
+            game["white"] = trans[game["white"]]
+            game["black"] = trans[game["black"]]
+        tm["competitors"] = sorted(tm["competitors"], key=lambda c: c["cid"])
+        for cpairing in pairing:
+            for pair in cpairing["pairs"]:
+                pair["w"] = trans[pair["w"]]
+                pair["b"] = trans[pair["b"]] if pair["b"] > 0 else 0
+                pair["ca"] = trans[pair["ca"]]
+                pair["cb"] = trans[pair["cb"]] if pair["cb"] > 0 else 0 
+
+    def compute_pairing(self, pairingengine, params):
         #print('PARAMS', params)
         self.pairingengine = pairingengine
+        tm = pairingengine.tournament
         analyze = pairing = [] 
+        if "fakerank" in params["experimental"]:
+            fwd = [0]*(len(tm["competitors"])+1)
+            inv = [0]*(len(tm["competitors"])+1)
+            for i, c in enumerate(tm["competitors"]):
+                fwd[c["cid"]] = c["rank"]
+                inv[c["rank"]] = c["cid"]
+            self.fakerank(tm, fwd, pairing)
         acompetitors = pcompetitors = {} 
         if self.doanalyze or (self.docheck and not self.doanalyze and not self.dopairing):
             analyze = pairingengine.compute_pairing(True)
@@ -262,6 +305,8 @@ class tournamentgenerator(commonmain):
         if self.dopairing or (self.docheck and not self.doanalyze and not self.dopairing):
             pairing = pairingengine.compute_pairing(False)
             pcompetitors = sorted([{key: value for (key, value) in c.items() if key != 'opp'} for c in pairingengine.crosstable.crosstable], key=lambda c: (c['cid']))                         
+        if "fakerank" in params["experimental"]:
+            self.fakerank(tm, inv, pairing)
         result = {
             'round' : pairingengine.rnd,
             'check': self.docheck,

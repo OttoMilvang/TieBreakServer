@@ -78,6 +78,8 @@ class chessserver(commonmain):
         params = self.params
         self.core = None
         service = params["service"]
+        chessfile = self.chessfile
+        tournament = chessfile.get_tournament(self.tournamentno)
         
         if service == "convert":
                 self.core = None
@@ -85,13 +87,12 @@ class chessserver(commonmain):
                 # result = None
                 if params["check"]:
                     self.filetype = "tiebreak"
-                chessfile = self.chessfile
                 if chessfile.get_status() == 0:
                     if self.tournamentno > 0:
-                        tb = tiebreak(chessfile, self.tournamentno, params["number_of_rounds"], params)
-                        tb.compute_tiebreaks(chessfile, self.tournamentno, params)
+                        tb = tiebreak(tournament, params["number_of_rounds"], params)
+                        tb.compute_tiebreaks(tournament, params)
                     else:
-                        tb = tiebreak(chessfile, self.tournamentno, params["number_of_rounds"], params)
+                        tb = tiebreak(tournament, params["number_of_rounds"], params)
                 self.core = tb
         else:
                 self.core = None
