@@ -7,6 +7,8 @@
 - **Install python 3, min version 3.8**<br>
 3.8 becase this is the last python distribution that runs on Win7
 
+- **Install dependencies** - See `requirements.txt`
+
 - **python pairingchecker.py**
 - **python tiebreakchecker.py**
 - **python tournamentgenerator.py**
