@@ -304,7 +304,7 @@ class tournamentgenerator(commonmain):
                      
         if self.dopairing or (self.docheck and not self.doanalyze and not self.dopairing):
             pairing = pairingengine.compute_pairing(False)
-            pcompetitors = sorted([{key: value for (key, value) in c.items() if key != 'opp'} for c in pairingengine.crosstable.crosstable], key=lambda c: (c['cid']))                         
+            pcompetitors = sorted(pairingengine.crosstable.competitors, key=lambda c: (c['cid']))                         
         if "fakerank" in params["experimental"]:
             self.fakerank(tm, inv, pairing)
         result = {
