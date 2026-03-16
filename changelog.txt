@@ -1,3 +1,13 @@
+2026-03-16
+Bug fix: Fix error with 260 record, that caused error for some tournaments
+
+Restructuring of code.
+Checkmode will skip weighted pairing, in fackt check mode is the current pairing. 
+Spilt crosstable into competitors and opponents.
+The awkward construction crosstable[playerA]["opp"][playerB]["quality"] => opponents[plalerA][playerB]["quality"]
+Selection of colors are postponded to after pairing
+Add option -x fakerank to verify rank order switch -r
+
 2026-02-28
 Pass "tournament" stucture to pairing and tiebreak instead of "chessfile" and "tournamentno"
 This stress the fact that these routines works on tournamentlevel only.

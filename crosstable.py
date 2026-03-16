@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Feb 18 07:39:55 2025
+@author: Otto Milvang, sjakk@milvang.no
 
-@author: Otto
+The main purpose of crosstable is to work on the structures
+competitors - One-dimentional array of size [0..P+1] of competitor objects 
+opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects 
+
+
 """
 
 from decimal import Decimal
@@ -67,8 +72,8 @@ class crosstable:
     """
     init_crosstable / update crosstable
         Update competitors first from cmps[i]['tiebreakDetails']
-        THe crosstable is an virtual crosstable of opp[] elements.
-        A game between player a and b is described in the crosstable elsement self.cmps[a]['opp'][b] === self.cmps[b]['opp'][a]
+        The crosstable is an virtual crosstable of  elements.
+        A game between player a and b is described in the crosstable elsement self.cmps[a][b] === self.cmps[b][a]
         init_crosstable updates:
             For all pairs in the crosstable
             canmeet - True if they are alowd to meet, False othewise
@@ -126,8 +131,13 @@ class crosstable:
         self.Cbits = ncmps.bit_length()
         self.Rbits = rnd.bit_length()
         prohibited = tournament.get("prohibited", [])
-        edges = self.list_edges(cmps, maxmeets, topcolor, unpaired, prohibited)
-        return edges
+        (competitors, opponents) = self.list_edges(cmps, maxmeets, topcolor, unpaired, prohibited)
+        return (competitors, opponents)
+
+    def get_edge_quality(self, edge):
+        if edge["qlevel"] != self.scorelevel or edge["cb"] == self.BLOB:
+            self.update_edge(edge)
+        return edge           
 
     def compute_tiebreak(self, tournament, rnd):
         tb = tiebreak(tournament, rnd - 1, None)
@@ -145,14 +155,14 @@ class crosstable:
         self.level2score = None
         checkonly = self.checkonly
 
-        edges = []
         cmps = self.cmps
         size = self.size
-        cr = self.crosstable = [None] * (size + 1)
+        opponents = self.opponents = [None] * (size + 1)
+        competitors = self.competitors = [None] * (size + 1)
         self.numtop = 0
         for i in range(size + 1):
             tbval = cmps[i]["tiebreakDetails"] if i in cmps else None
-            cr[i] = {
+            competitors[i] = {
                 "cid": i,
                 "rnk": cmps[i]["orgrank"] if i in cmps else i,
                 "pts": tbval[PTS]["val"] if tbval else Decimal("0.0"),
@@ -169,24 +179,23 @@ class crosstable:
                 "csq": " " + tbval[CSQ]["val"] if tbval else " ",
                 "flt": tbval[FLT]["val"] if tbval else 0,
                 "top": tbval[TOP]["val"] if tbval else False,
-                "mdp": 0,
-                "opp": [None] * (size + 1),
             }
+            opponents[i] = [None] * (size + 1)
 
-            cr[0]["rfp"] ^= cr[i]["rfp"]
-        self.level2score = acc = sorted(set([c["acc"] for c in cr if c["rfp"] or c["cid"] == 0]))
+            competitors[0]["rfp"] ^= competitors[i]["rfp"]
+        self.level2score = acc = sorted(set([c["acc"] for c in competitors if c["rfp"] or c["cid"] == 0]))
         self.score2level = score2level = {acc[i]: i for i in range(len(acc))}
 
 
         # update scorelevel
-        cr[0]["scorelevel"] = 0
+        competitors[0]["scorelevel"] = 0
         for i in range(1, size):
-            cr[i]["scorelevel"] = score2level[cr[i]["acc"]] if cr[i]["rfp"] else 0
-        cr[size]["scorelevel"] = -1
+            competitors[i]["scorelevel"] = score2level[competitors[i]["acc"]] if competitors[i]["rfp"] else 0
+        competitors[size]["scorelevel"] = -1
 
         # update tpn, give tps to players that have been paired at least once.
         tpn = 0
-        rr = sorted(cr, key=lambda s: (s[self.rank]))
+        rr = sorted(competitors, key=lambda s: (s[self.rank]))
         for i in range(1, size):
             if rr[i]["rfp"] or rr[i]["rip"]:
                 tpn += 1
@@ -195,22 +204,20 @@ class crosstable:
 
 
         # Invariant c['ca'] < c['cb']
-
         for i in range(size + 1):
-            b = cr[i]
+            b = competitors[i]
             bhasmet = [opp for (key, opp) in b["met"].items() if key != "val"]
-            for j in range(i + 1):
-                a = cr[j]
-                c = a["opp"][i] = b["opp"][j] = self.create_edge(a, b, bhasmet)
-                edges.append(c)
+            for j in range(i+1):
+                a = competitors[j]
+                opponents[j][i] = opponents[i][j] = self.create_edge(a, b, bhasmet)
 
         # Set c["w] and c["b"]
-        if checkonly:
+        if self.checkonly:
             for i in range(size):
-                a = cr[i]
+                a = competitors[i]
                 for j in range(size):
-                    b = cr[j]
-                    c = a["opp"][j]
+                    b = competitors[j]
+                    c = opponents[i][j]
                     if a["pop"] == j:
                         c["canmeet"] = True
                         if a["pco"] == "w" or b["pco"] == "w":
@@ -223,12 +230,12 @@ class crosstable:
         for elem in prohibited:
             if  elem["firstRound"] <= self.rnd <= elem["lastRound"]:
                 for c1, c2 in list(combinations(elem["competitors"], 2)):
-                    cr[c1]["opp"][c2]["canmeet"] = False
-                    cr[c1]["opp"][c2]["qc"] = False
+                    opponent = opponents[c1][c2]
+                    opponent["canmeet"] = False
+                    opponent["qc"] = False
                     
                         
-        edges = [edge for edge in edges if edge["canmeet"]]
-        return (self.crosstable, edges)
+        return (competitors, opponents)
 
     def levels(self):
         return self.level2score
@@ -247,9 +254,11 @@ class crosstable:
             "sb": sb,
             # C1 and C2 meetmax = 1
             "canmeet": False,
-            "isblob": a["cid"] == self.BLOB,
+            "isblob": b["cid"] == self.BLOB,
             "played": played,
-            "quality": [None] * QL,
+            "bun": self.rnd - 1 - b["num"], # Unplayd games by b, for c9-calculations
+            "qlevel": -1, # quality was calulated for scorelevel ...
+            "quality": None,
             "weight": 0,
             "cweight": 0,
             "eweight": 0,
@@ -259,7 +268,7 @@ class crosstable:
             "qc": False,
         }
         # C3 not-topscorers with absolute color preference cannot meet
-        canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or cb == self.BLOB
+        canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
         for col in ["w", "b"]:
             col2 = col + "2"
             if a["cop"] == col2 and b["cop"] == col2 and (not a["top"]) and (not b["top"]):
@@ -272,37 +281,45 @@ class crosstable:
         return c
 
     """
-    init_crosstable / update crosstable
+    update crosstable
         Update competitors first from cmps[i]['tiebreakDetails']
-        THe crosstable is an virtual crosstable of opp[] elements.
-        A game between player a and b is described in the crosstable elsement self.cmps[a]['opp'][b] === self.cmps[b]['opp'][a]
-        init_crosstable updates:
-            For all pairs in the crosstable
-            canmeet - True if they are alowd to meet, False othewise
-            played - Number of times they have met
-            psd - The differnce in scorelevels between the players (array)
         update_crosstable updates:
             For all pairs in a scorebracket
             c10 - c21 - The rules
 
 
     """
+    def set_scorelevel(self, scorelevel):
+        self.scorelevel = scorelevel
 
-    def update_crosstable(self, scorelevel, nodes, edges, pab, update_maxpsd=True):
-        testlevel = -3
-        coltrans = {"  ": "n", "w0": "w", "w1": "W", "w2": "W", "b0": "b", "b1": "B", "b2": "B"}
-        # experimental = self.experimental
-        # print ("CheckAnlyse --", scorelevel, pab)
+
+    def update_crosstable(self, scorelevel, nodes, edges, pablevel, update_maxpsd=True):
+        self.pablevel = pablevel
         if update_maxpsd:
             self.maxpsd = max([node["scorelevel"] for node in nodes]) - scorelevel
+            self.mdp = [0] * self.maxpsd
+            for node in nodes:
+                psd = node["scorelevel"] - scorelevel
+                if psd <= 0:
+                    break
+                self.mdp[psd-1] += 1
             self.init_cweights(scorelevel, self.maxpsd)
+        self.L = self.maxpsd
+        # print("Update scorelevel", scorelevel, len(nodes), len(edges), pablevel, update_maxpsd, self.maxpsd)
+            
+            
+    def update_edge(self, edge):
+        c = edge
+        if c["qlevel"] == self.scorelevel and c["cb"] < self.BLOB:
+            return
+        c["qlevel"] = self.scorelevel
+        c["quality"] = [None] * QL
+        coltrans = {"  ": "n", "w0": "w", "w1": "W", "w2": "W", "b0": "b", "b1": "B", "b2": "B"}
         maxpsd = self.maxpsd
-        for node in nodes:
-            node["mdp"] = node["scorelevel"] - scorelevel
-        # print("Update scorelevel", scorelevel, "maxpsd", maxpsd)
-        for c in [c for c in edges if c["canmeet"]]:
-            a = self.crosstable[c["ca"]]
-            b = self.crosstable[c["cb"]]
+        scorelevel = self.scorelevel
+        if c["canmeet"]:
+            a = self.competitors[c["ca"]]
+            b = self.competitors[c["cb"]]
             weight = self.weight
             cweight = 0
             if a["scorelevel"] < b["scorelevel"]:
@@ -323,16 +340,7 @@ class crosstable:
 
             c14 = c15 = c16 = c17 = 0
             if a["scorelevel"] >= scorelevel and b["scorelevel"] == scorelevel:
-                # print(scorelevel, c['ca'], c['cb'], c['canmeet'], a['cid'] == 0, 'w' in c, a['mdp'],  b['mdp'])
-                pair = self.color_allocation(a, b, c)
-                if self.checkonly:
-                    if "b" not in c:
-                        c["b"] = 0
-                    (c["e-rule"], c["e-ok"]) = (pair["e-rule"], c["w"] == pair["w"] and (c["b"] == pair["b"]))
-                else:
-                    (c["w"], c["b"], c["e-rule"], c["e-ok"]) = (pair["w"], pair["b"], pair["e-rule"], True)
-
-                if pab and b["scorelevel"] == 0:
+                if self.pablevel and b["scorelevel"] == 0:
                     q[C9] = self.rnd - 1 - a["num"]
                     cweight += weight[C9] * q[C9]
 
@@ -342,24 +350,41 @@ class crosstable:
                 # Topscorere
 
                 if (a["top"] or b["top"]) and a["cid"] > 0 and b["cid"] > 0:
+                    # if scorelevel == 9 and a["cid"] ==3 and b["cid"] == 9: breakpoint()
 
                     # c10 minimize the number of topscorers who get color diff > +2 or < -2
                     # print(c, a['cod'], b['cod'])
-                    apf = a["cod"] + 1 if a["cid"] == c["w"] else a["cod"] - 1
-                    bpf = b["cod"] + 1 if b["cid"] == c["w"] else b["cod"] - 1
+                    # apf = a["cod"] + 1 if a["cid"] == c["w"] else a["cod"] - 1
+                    # bpf = b["cod"] + 1 if b["cid"] == c["w"] else b["cod"] - 1
                     # q[C10] = 1 if abs(apf) > 2 and abs(bpf) >= 2 or abs(apf) >= 2 and abs(bpf) > 2 else 0
 
-                    if abs(apf) > 2 or abs(bpf) > 2:
+                    acod = a["cod"]
+                    bcod = b["cod"]
+                    if acod == bcod == 2 and abs(acod) >= 2:
                         q[C10] = 1
                         cweight += weight[C10]
 
                     # c11 minimize the number of topscorers who get same color three times in a row
-                    asq = a["csq"][-2:] + ("w" if a["cid"] == c["w"] else "b")
-                    bsq = b["csq"][-2:] + ("w" if b["cid"] == c["w"] else "b")
-                    if asq == "www" or bsq == "www" or asq == "bbb" or bsq == "bbb":
-                        q[C11] = 1
-                        cweight += weight[C11]
-                    # print(a['cid'], b['cid'], q[C11], asq, a['csq'][-2:], bsq, b['csq'][-2:])
+                    # asq = a["csq"][-2:] + ("w" if a["cid"] == c["w"] else "b")
+                    # bsq = b["csq"][-2:] + ("w" if b["cid"] == c["w"] else "b")
+                    acop = a["cop"]
+                    bcop = b["cop"]
+                    opp = {"w": "bb", "b":"ww", " ":"  "}[acop[0]]
+
+                    if acop[0] == bcop[0] == "w" or acop[0] == bcop[0] == "b":
+                        opp = {"w": "bb", "b":"ww"}[acop[0]]
+                        anp = int(acop[1])
+                        bnp = int(bcop[1])
+
+                        if a["csq"][-2:] == b["csq"][-2:] and (a["csq"][-2:] == "ww" or b["csq"][-2:] == "bb") or \
+                           anp > bnp and b["csq"][-2:] == opp or bnp > anp and a["csq"][-2:] == opp or \
+                           (anp == bnp == 2 and (abs(acod) > abs(bcod) and b["csq"][-2:] == opp or abs(bcod) > abs(acod) and a["csq"][-2:] == opp)):
+                            q[C11] = 1
+                            cweight += weight[C11]
+
+                    if scorelevel == -1:
+                         print(f"A: {a['cid']:2} {a['cod']:2} {a['csq'][-2:]} {a['cop']},   B: {b['cid']:2} {b['cod']:2} {b['csq'][-2:]} {b['cop']},  Q10: {q[C10]} Q11: {q[C11]}")
+
 
                 # c12 minimize the number of players who do not get their color preference
                 if a["cop"] != "  " and a["cop"][0].lower() == b["cop"][0].lower():
@@ -393,7 +418,7 @@ class crosstable:
                     q[C7][maxpsd - level] = 1
                     cweight += weight[C7][maxpsd - level]
 
-                if pab and b["scorelevel"] == 0:
+                if self.pablevel and b["scorelevel"] == 0:
                     q[C9] = self.rnd - 1 - a["num"]
                     cweight += weight[C9] * q[C9]
 
@@ -430,24 +455,23 @@ class crosstable:
 
             c["qc"] = q[C9] + sum(q[MM]) + (sum(q[C10:C11 + 1]) + sum(q[C14:C17 + 1]) + sum(q[C18]) + sum(q[C19]) + sum(q[C20]) + sum(q[C21])) == 0
             c["cweight"] = cweight
-        self.L = maxpsd
 
-    def update_hetrogenious(self, scorelevel, edges, mdp, bsn):
-        M = self.M = mdp
-
+    def update_hetrogenious(self, scorelevel, nodes, edges, bsn):
+        M = self.M = sum(self.mdp)
         self.ilen = 0
         weight = self.weight
         self.init_eweights(scorelevel, 0)
         e1weight = sum([weight[E1][i] for i in range(M)])
         for c in edges:
             (ca, cb) = (c["ca"], c["cb"])
-            q = c["quality"]
-            q[E1] = q[E2] = [0] * M
+            q = self.get_edge_quality(c)["quality"]
+            q[E1] = [0] * M
+            q[E2] = [0] * M
             eweight = 0
 
-            ascl = self.crosstable[ca]["scorelevel"]
-            bscl = self.crosstable[cb]["scorelevel"]
-            # print(self.crosstable[ca])
+            ascl = self.competitors[ca]["scorelevel"]
+            bscl = self.competitors[cb]["scorelevel"]
+            # print(self.competitors[ca])
             if ascl > scorelevel and bscl == scorelevel or ascl == scorelevel and bscl > scorelevel:
                 absn = bsn[ca]
                 bbsn = bsn[cb]
@@ -476,19 +500,18 @@ class crosstable:
         s4weight = sum([weight[S4][i] for i in range(B4)])
         for c in edges:
             (ca, cb) = (c["ca"], c["cb"])
-            q = c["quality"]
+            q = self.get_edge_quality(c)["quality"]
             q[S1] = 0
             q[S2] = 0
             q[S3] = [0] * B3
             q[S4] = [1] * B4
             q[S5] = [0] * B5
             sweight = s4weight
-            ascl = self.crosstable[ca]["scorelevel"]
-            bscl = self.crosstable[cb]["scorelevel"]
+            ascl = self.competitors[ca]["scorelevel"]
+            bscl = self.competitors[cb]["scorelevel"]
             if ascl == scorelevel and bscl == scorelevel:
                 absn = bsn[ca]
                 bbsn = bsn[cb]
-
                 if absn > bbsn:
                     (absn, bbsn, ascl, bscl) = (bbsn, absn, bscl, ascl)
 
@@ -509,9 +532,9 @@ class crosstable:
                     # if c['quality'][S5] != [bbsn if absn == i+1 else 0 for i in range(B)]: breakpoint()
             c["sweight"] = sweight
 
-    def update_bipartite(self, scorelevel, pairs, bsn, s2start, s2stop, mdp):
+    def update_bipartite(self, scorelevel, pairs, bsn, s2start, s2stop):
         H = self.H = len(bsn) // 2
-        M = self.M = mdp
+        M = self.M = mdp = sum(self.mdp)
        # print ("BO:", B, S, self.S)
 
         # print("CheckAnlyse", scorelevel, "M="+str(M), "P="+str(P), "N="+str(N), "S="+str(S), "B="+str(B) )
@@ -522,7 +545,8 @@ class crosstable:
             bweight = 0
             if s2start <= ca <= s2stop:
                 (ca, cb) = (cb, ca)
-            q = self.crosstable[ca]["opp"][cb]["quality"]
+            c = self.get_edge_quality(self.opponents[ca][cb])
+            q = c["quality"]
             if q[E1] is None or len(q[E1]) != M:
                 q[E1] = [0] * M
                 q[E2] = [0] * M
@@ -536,7 +560,7 @@ class crosstable:
                 bbsn = bsn[cb]
                 q[S5][absn] = bbsn
                 bweight = weight[S5][absn] * bbsn
-            self.crosstable[ca]["opp"][cb]["bweight"] = bweight
+            c["bweight"] = bweight
 
     # Compute weight
     # mode 'E' - Hetrogenous
@@ -711,9 +735,11 @@ class crosstable:
         quality = [None] * QL
         quality[N8] = 0
 
-        # down =  [d['opp'][0] for d in downfloaters]
+        # down =  [d[0] for d in downfloaters]
         for c in wpairs:
             # print(c['ca'], c['cb'], c['quality'][N8])
+            
+            self.get_edge_quality(c)
             q = c["quality"]
             for elem in range(QL):
                 if elem < E1 or (c.get("mode", "") == "E" and elem < S1) or (c.get("mode", "") == "S" and elem >= S1):
@@ -757,71 +783,3 @@ class crosstable:
         for edge in edges:
             edge["iweight"] = edge["sb"] if edge["ca"] == 0 else 0
 
-    """
-    color_allocation(a, b, c)
-    Implement section E
-    a - competitor a
-    b - competitor b
-    c - crosstable element
-
-
-    """
-
-    def color_allocation(self, a, b, c):
-        rank = self.rank  # "cid" or "rnk"
-        other = {"w": "b", "b": "w", " ": " "}
-        (acid, bcid) = (a["cid"], b["cid"])
-        (arank, brank) = (a[rank], b[rank])
-        (acp, acs) = list(a["cop"])
-        (bcp, bcs) = list(b["cop"])
-        acd = a["cod"]
-        bcd = b["cod"]
-
-        # PAB, always set player to white
-        if arank == 0:
-            return {"w": bcid, "b": acid, "e-rule": "pab"}  # ('b', 'w', 'pab')
-        if brank == 0:
-            return {"w": acid, "b": bcid, "e-rule": "pab"}  # ('w', 'b', 'pab')
-
-        # E.1
-
-        if acp == "w" and bcp != "w" or acp != "b" and bcp == "b":
-            return {"w": acid, "b": bcid, "e-rule": "E.1"}  # ('w', 'b', 'E.1')
-        if acp == "b" and bcp != "b" or acp != "w" and bcp == "w":
-            return {"w": bcid, "b": acid, "e-rule": "E.1"}  # ('b', 'w', 'E.1')
-        # E.2
-        if (acp == "w" and bcp == "w" and acs > bcs) or (acp == "b" and bcp == "b" and acs < bcs):
-            return {"w": acid, "b": bcid, "e-rule": "E.2"}  # ('w', 'b', 'E.2')
-        if (acp == "b" and bcp == "b" and acs > bcs) or (acp == "w" and bcp == "w" and acs < bcs):
-            return {"w": bcid, "b": acid, "e-rule": "E.2"}  # ('b', 'w', 'E.2')
-        if acd != bcd and acs == bcs:  # both have absolute color preference, se if there are different color difference
-            return {"w": acid, "b": bcid, "e-rule": "E.2"} if acd < bcd else {"w": bcid, "b": acid, "e-rule": "E.2"}
-            # return ('w', 'b', 'E.2') if acd < bcd else ('b', 'w', 'E.2')
-        # E.3
-        asq = a["csq"]
-        bsq = b["csq"]
-        for i in range(1, min(len(asq), len(bsq))):
-            ac = asq[-i]
-            bc = bsq[-i]
-            if ac != bc:
-                if ac == "b" or bc == "w":
-                    return {"w": acid, "b": bcid, "e-rule": "E.3"}  # ('w', 'b', 'E.3')
-                if ac == "w" or bc == "b":
-                    return {"w": bcid, "b": acid, "e-rule": "E.3"}  # ('b', 'w', 'E.3')
-        # E.4
-        (atpn, btpn) = (a["tpn"], b["tpn"])
-        (highcid, hightpn) = (
-            (acid, atpn)
-            if a["scorelevel"] > b["scorelevel"] or a["scorelevel"] == b["scorelevel"] and atpn < btpn
-            else (bcid, btpn)
-        )
-        lowcid = acid + bcid - highcid
-        if acp == "w" or acp == "b":
-            # print("S2", acp, min(acid, bcid), max(acid, bcid), {acp : min(acid, bcid), other[acp] : max(acid, bcid) , "e-rule": 'E.4'})
-            return {acp: highcid, other[acp]: lowcid, "e-rule": "E.4"}  # (acp, other[acp], 'E.4')
-        # if a['tpn'] > b['tpn'] and (acp == 'w' or acp == 'b'):
-        #    return (other[acp], acp, 'E.4')
-        # E.5
-        tc = self.topcolor
-        rev = hightpn % 2 == 0
-        return {tc: (lowcid if rev else highcid), other[tc]: (highcid if rev else lowcid), "e-rule": "E.5"}

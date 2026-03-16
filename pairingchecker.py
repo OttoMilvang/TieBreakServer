@@ -410,14 +410,16 @@ class pairingchecker(commonmain):
         if self.doanalyze or (self.docheck and not self.doanalyze and not self.dopairing):
             analyze = pairingengine.compute_pairing(True, self.doanalyze)
             acompetitors = sorted(
-                [{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.crosstable],
+                #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.competitors],
+                pairingengine.crosstable.competitors,
                 key=lambda c: (c["cid"]),
             )
 
         if self.dopairing or (self.docheck and not self.doanalyze and not self.dopairing):
             pairing = pairingengine.compute_pairing(False, self.dopairing)
             pcompetitors = sorted(
-                [{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.crosstable],
+                #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.crosstable],
+                pairingengine.crosstable.competitors,
                 key=lambda c: (c["cid"]),
             )
         result = {
@@ -437,6 +439,27 @@ class pairingchecker(commonmain):
 
         # chessfile.chessjson["status"]["code"] = 1
         return result
+
+    def fakerank(self, tm, trans, roundpairing):
+        for competitor in tm["competitors"]:
+            competitor["cid"] = trans[competitor["cid"]]
+        for game in tm["gameList"]:
+            game["white"] = trans[game["white"]]
+            game["black"] = trans[game["black"]]
+        tm["competitors"] = sorted(tm["competitors"], key=lambda c: c["cid"])
+        for cround in roundpairing:
+            for key in ["pairs", "current"]:
+                for pair in cround[key]:
+                    pair = (trans[pair[0]], trans[pair[1]])
+            for key in ["analyze", "checker"]:
+                for level in cround[key]:
+                    for pair in level["pairs"]:
+                        pair["w"] = trans[pair["w"]]
+                        pair["b"] = trans[pair["b"]] if pair["b"] > 0 else 0
+                        pair["ca"] = trans[pair["ca"]]
+                        pair["cb"] = trans[pair["cb"]] if pair["cb"] > 0 else 0 
+
+
 
     def do_checker(self):
         params = self.params
@@ -470,18 +493,27 @@ class pairingchecker(commonmain):
                     chessfile.put_status(410, "Method '" + method + "' not implemented")
                     raise
                 topcolor = chessjson.get_topcolor(chessfile, self.tournamentno, params["top_color"])
+                if "fakerank" in params["experimental"]:
+                    fwd = [0]*(len(tournament["competitors"])+1)
+                    inv = [0]*(len(tournament["competitors"])+1)
+                    for i, c in enumerate(tournament["competitors"]):
+                        fwd[c["cid"]] = c["rank"]
+                        inv[c["rank"]] = c["cid"]
+                    self.fakerank(tournament, fwd, [])
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
                     cpairing = pairing(
                         tournament,
                         rnd,
                         topcolor,
                         params["unpaired"],
-                        params["rank"],
+                        "fakerank" not in self.params["experimental"] and self.params['rank'],
                         params["experimental"],
                         params["verbose"],
                     )
                     result = self.compute_pairing(chessfile, cpairing, params)
                     chessfile.result.append(result)
+                if "fakerank" in params["experimental"]:
+                    self.fakerank(tournament, inv, chessfile.result)
                     # print("================= Round #" + str(rnd )+ " =================")
         self.core = result
         # print('self.core')
@@ -493,9 +525,10 @@ class pairingchecker(commonmain):
 
 # run program
 if __name__ == "__main__":
-    sys.set_int_max_str_digits(15000)
+    sys.set_int_max_str_digits(20000)
     start_time = time.time()
     pch = pairingchecker()
     code = pch.common_main()
     if "time" in pch.params["experimental"]:
-        print("--- %s seconds ---" % (time.time() - start_time))
+        elapsed = (time.time() - start_time)
+        print(f"--- {elapsed:.3f} seconds ---")
