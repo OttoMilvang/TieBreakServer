@@ -315,23 +315,6 @@ class chessjson:
     # get_score
     # return a float value from result struct and color
 
-    def get_scorexx(self, name, result, color):
-        scoreSystem = (
-            self.scoreLists[name] if name in self.scoreLists else self.get_scoresystem(self.chessjson["event"]["scoreLists"], name)
-        )
-
-        reverse = self.scoreLists["_reverse"]
-        if color[0] + "Result" in result:
-            res = result[color[0] + "Result"]
-        elif result["black"] > 0:
-            res = reverse[result[color[0] + "Result"]]
-        else:
-            return Decimal("0.0")
-        while res in scoreSystem:
-            if res == "L" and result["played"] is False:
-                res = "Z"
-            res = scoreSystem[res]
-        return res
 
     def get_score(self, slist, result, color):
         if color[0] + "Result" in result:
@@ -401,18 +384,6 @@ class chessjson:
     # update_tournament_random
     # Update all competitors with random value
 
-    def xxpoints2score(self, tournament, match, points):
-        scorename = tournament["matchScoreSystem"] if match else tournament["gameScoreSystem"]
-        scoresystem = self.scoreLists[scorename]
-        score = "U"
-        for s in ["W", "D", "L", "Z"]:
-            if scoresystem[s] == points:
-                score = s
-        return score
-
-    # update_chessjson_format
-    # Remove  'teamSection' and 'playerSection'
-
     def update_tournament_random(self, tournament, isteam):
         update = False
         competitors = tournament["competitors"]
@@ -426,6 +397,9 @@ class chessjson:
             for competitor in ro:
                 rnd += 1
                 competitor["random"] = rnd
+
+    # update_chessjson_format
+    # Remove  'teamSection' and 'playerSection'
 
     def update_chessjson_format(self, tournament, isteam):
         pass

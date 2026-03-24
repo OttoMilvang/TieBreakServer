@@ -143,7 +143,6 @@ class pairing:
 
     # constructor function
     def __init__(self, tournament, rnd, topcolor, unpaired, rank, experimental, verbose):
-
         # helpers.json_output(sys.stdout, cmps[12]['tiebreakDetails'])
         self.tournament = tournament
         self.rnd = rnd
@@ -195,12 +194,12 @@ class pairing:
             print("Init nodes and edges:", f"{t1 - t0:.3f} s")
 
         t0 = time.time()
-        self.hammilton = self.compute_hammilton(nodes, edges)
-        if self.hammilton[levels - 1].get("rem_unpaired", 0) != 0:
+        self.hamilton = self.compute_hamilton(nodes, edges)
+        if self.hamilton[levels - 1].get("rem_unpaired", 0) != 0:
             return []
         t1 = time.time()
         if self.verbose > 1:
-            print("Init Hammilton:", f"{t1 - t0:3f} s")
+            print("Init Hamilton:", f"{t1 - t0:3f} s")
 
         t0 = time.time()
 
@@ -230,7 +229,7 @@ class pairing:
             raise            
         self.update_board(self.roundpairing)
         if self.verbose > 1:
-            print(f"Round {self.rnd}, {"check" if self.checkonly else "pairing"}:") 
+            print(f"Round {self.rnd}, {'check' if self.checkonly else 'pairing'}:") 
             print(f"--- btime {self.btime:.3f} s ---")
             print(f"--- etime {self.etime:.3f} s ---")
             print(f"--- stime {self.stime:.3f} s ---")
@@ -348,23 +347,23 @@ class pairing:
         mod_edges = sorted(edges, key=lambda edge: (-min(edge["sa"], edge["sb"]), -max(edge["sa"], edge["sb"]), edge["ca"], edge["cb"]))
         return mod_edges
 
-    # compute_hammilton
+    # compute_hamilton
     # for each scorelevel, compute the number of paired unpaired players
     # Returns an array of length levels, and for each level:
     # "rem_pairs" : total pairs that can be made from this scorelevel and below
     # "rem_unpaired" : total unpaired for this scorelevel and below
-    # "rem_hammilton" : >= 0 if an hammilton path exists,
+    # "rem_hamilton" : >= 0 if an hamilton path exists for this scorelevel and below
     # "cur_pairs" : number of pairs than maximum can be formed in this scorelevel
     # "cur_unpaired" : number of minimum unpaired players in this scorelevel
-    # "cur_hammilton" : >= 0 if an hammilton path exists for this scorelevel
-    # "cross_hammilton" : >= 0 if there are safe to downfloat one player
+    # "cur_hamilton" : >= 0 if an hamilton path exists for this scorelevel
+    # "cross_hamilton" : >= 0 if there are safe to downfloat one player
 
-    def compute_hammilton(self, nodes, edges):
+    def compute_hamilton(self, nodes, edges):
         levels = self.levels
-        hammilton = [{} for _ in range(levels)]
+        hamilton = [{} for _ in range(levels)]
         self.pablevel = -1
         if self.checkonly:
-            return hammilton
+            return hamilton
         # rest_nodes = nodes[::-1] if self.pablevel == 0 else nodes[-2::-1]
         rest_nodes = nodes[::-1]
         numnodes = len(rest_nodes)
@@ -394,26 +393,24 @@ class pairing:
 
         for i, edge in enumerate(rest_edges + [{"sa": levels, "sb": levels}]):
             if (firste := max(edge["sa"], edge["sb"])) > laste:
-                # update each scorelevel - hammilton
-                rest = hammilton[laste]
+                # update each scorelevel - hamilton
+                rest = hamilton[laste]
                 if laste > 0:
-                    (rest["cur_pairs"], rest["cur_unpaired"], rest["cur_hammilton"]) = self.is_complete(
+                    (rest["cur_pairs"], rest["cur_unpaired"], rest["cur_hamilton"]) = self.is_complete(
                         ll_nodes, None, weight=False, hist=ll_hist
                     )
                     (_, _, fh) = self.is_complete(ll_nodes, None, weight=False, hist=fl_hist)
                     (_, _, lh) = self.is_complete(ff_nodes, None, weight=False, hist=lf_hist)
-                    rest["cross_hammilton"] = min(fh, lh)
+                    rest["cross_hamilton"] = min(fh, lh)
                 # more to do?
                 # find if remaining is pairable. This in marked on lasteventlevel+1
-                # rest = hammilton[laste+1]
+                # rest = hamilton[laste+1]
                 test_nodes = rest_nodes[: nodeptr[laste + 1]]  # if laste >= self.pablevel else rest_nodes[nodeptr[firste]:-1]
-                (rest["rem_pairs"], rest["rem_unpaired"], rest["rem_hammilton"]) = self.is_complete(
-                    test_nodes, rest_edges[:i], hist=hist[: nodeptr[laste + 1]], pab=firste == levels
-                )
-                # print(laste, len(test_nodes), rest["rem_pairs"], rest["rem_unpaired"], rest["rem_hammilton"])
-                (rest["rem_pairs"], rest["rem_unpaired"], rest["rem_hammilton"]) = self.is_complete(
-                    test_nodes, rest_edges[:i], hist=hist[: nodeptr[laste + 1]], pab=firste == levels
-                )
+                (rest["rem_pairs"], rest["rem_unpaired"], rest["rem_hamilton"]) = \
+                    self.is_complete(test_nodes, rest_edges[:i], hist=hist[: nodeptr[laste + 1]], pab = firste == levels)
+                # print(laste, len(test_nodes), rest["rem_pairs"], rest["rem_unpaired"], rest["rem_hamilton"])
+                #(rest["rem_pairs"], rest["rem_unpaired"], rest["rem_hamilton"]) = \
+                #    self.is_complete(test_nodes, rest_edges[:i], hist=hist[: nodeptr[laste + 1]], pab = firste == levels)
                 if edge["sa"] == levels and edge["sb"] == levels:
                     break
                 laste = firste
@@ -436,7 +433,7 @@ class pairing:
         # laste += 1
         if bp:
             breakpoint()
-        return hammilton
+        return hamilton
 
     def pair_bracket(self, scorelevel, nodes, edges, testpab):
         bracket = {
@@ -456,9 +453,6 @@ class pairing:
         pabbracket = self.apply_c9(scorelevel, nodes, edges, testpab)
         t0 = time.time()
         category = self.get_category(scorelevel, nodes, edges)
-        self.crosstable.update_crosstable(scorelevel, nodes, edges, pabbracket)
-
-        t1 = time.time()
 
         if self.reportlevel >= 2 and scorelevel < len(self.crosstable.levels()):
             print("================================================")
@@ -466,10 +460,14 @@ class pairing:
             print("Bracket       = ", self.crosstable.levels()[scorelevel])
             print("Pabbracket    = ", pabbracket, "PAB" if scorelevel == self.pablevel else "")
             print("Category      = ", category)
-            print("Time          = ", t1 - t0)
         elif self.verbose:
             print("Scorelevel: ", scorelevel, ", bsn: ", len(bracket["bsne"]), ", nodes: ", len(nodes), ", edges: ", len(edges))
             print("Category      = ", category)
+
+        self.crosstable.update_crosstable(scorelevel, nodes, edges, pabbracket)
+        t1 = time.time()
+        if self.reportlevel >= 2 and scorelevel < len(self.crosstable.levels()):
+            print("Time          = ", t1 - t0)
 
         # print(nodes[0])
 
@@ -487,7 +485,6 @@ class pairing:
 
         for pairingmode in ["B", "E", "S"]:  # B = bipartite, E = hetrogenious, S = homogenious
             t0 = time.time()
-
             if pairingmode == "B":
                 (weighted, pairsleft, pairs) = self.pair_simple_round(bracket, nodes, edges, pairingmode, numpairs, category)
             else:
@@ -498,11 +495,12 @@ class pairing:
             if pairingmode == "E": self.etime += (t1-t0)
             if pairingmode == "S": self.stime += (t1-t0)
 
+            if self.verbose:
+                npairs = len(pairs) if pairs else 0
+                print(f"{'Check ' if self.checkonly else 'Pair  '} round: {self.rnd}, Scorelevel: {scorelevel:2}, Pairs: {pairingmode} - {npairs:2}, {t1-t0:.2f}s")
+
             if pairs is None:
                 continue
-
-            if self.verbose:
-                print("Pair round", self.rnd, "Scorelevel:", scorelevel, pairingmode, f"{t1-t0:.2f}")
             paired = []
             # if scorelevel ==1 and category > 0:breakpoint()
 
@@ -528,6 +526,10 @@ class pairing:
                 (nodes, edges, npaired) = self.remove_pairs(nodes, edges, paired)
             else:
                 npaired = []
+
+            for pair in bracket["pairs"]:
+                self.update_color(pair)
+
             if self.reportlevel > 1 and scorelevel < len(self.crosstable.levels()):
                 print("-Mode", pairingmode)
                 print("Competitors   = ", bcompetitors)
@@ -550,7 +552,7 @@ class pairing:
         cmp = self.competitors
         for bracket in roundpairing:
             for pair in bracket["pairs"]:
-                self.update_color(pair)
+                #self.update_color(pair)
                 (w, b) = (pair["w"], pair["b"])
                 (ws, bs) = (cmp[w]["acc"], cmp[b]["acc"])
                 ipab = w == 0 or b == 0
@@ -665,7 +667,7 @@ class pairing:
 
         # thislevel = sum([1 for node in nodes if node["scorelevel"] >= scorelevel])
         cat1 = False
-        hammilton = self.hammilton
+        hamilton = self.hamilton
         if scorelevel == testlevel:
             breakpoint()
         if len(edges) == 0:
@@ -674,50 +676,52 @@ class pairing:
             return -1  # There are no pairing for this scorebracket
         if edges[0]["sa"] == 1 and edges[0]["sb"] == 1:
             return 1  # Last scoregroup is always pairable
-        if hammilton[scorelevel].get("rem_unpaired", 2) > 1 or scorelevel < self.pablevel:
+        if hamilton[scorelevel].get("rem_unpaired", 2) > 1 or scorelevel < self.pablevel:
             return 0
 
-        shammilton = hammilton[scorelevel]
+        shamilton = hamilton[scorelevel]
         if scorelevel == 1:
-            return 1 if shammilton["rem_hammilton"] > 0 else 0
+            return 1 if shamilton["rem_hamilton"] > 0 else 0
         top_nodes = bot_nodes = nodes
         top_edges = bot_edges = edges
         for level in range(scorelevel, 0, -1):
             # if level == 1 or level <= self.pablevel: return 0
-            (top_nodes, top_edges) = self.select_nodes_and_edges(top_nodes, top_edges, level, self.levels)
-            lhammilton = hammilton[level]
-            (shammilton["this_pairs"], shammilton["this_rest"], shammilton["this_hammilton"]) = self.is_complete(
+            if scorelevel == testlevel:
+                breakpoint()
+            (top_nodes, top_edges) = self.select_nodes_and_edges(nodes, edges, level, self.levels)
+            lhamilton = hamilton[level]
+            (shamilton["this_pairs"], shamilton["this_rest"], shamilton["this_hamilton"]) = self.is_complete(
                 top_nodes, top_edges
             )
-            rhammilton = hammilton[level - 1]
-            if level == scorelevel and shammilton["this_rest"] == 0:
-                if rhammilton.get("rem_hammilton", -1) <= 0:
+            rhamilton = hamilton[level - 1]
+            if level == scorelevel and shamilton["this_rest"] == 0:
+                if rhamilton.get("rem_hamilton", -1) <= 0:
                     (bot_nodes, bot_edges) = self.select_nodes_and_edges(bot_nodes, bot_edges, 0, level - 1)
-                    (shammilton["mod_pairs"], shammilton["mod_unpaired"], _) = self.is_complete(bot_nodes, bot_edges)
-                    if shammilton["mod_unpaired"] > 0:
+                    (shamilton["mod_pairs"], shamilton["mod_unpaired"], _) = self.is_complete(bot_nodes, bot_edges)
+                    if shamilton["mod_unpaired"] > 0:
                         return 0  # Remaining can not be paired
-                if rhammilton.get("rem_hammilton", -1) > 0:
+                if rhamilton.get("rem_hamilton", -1) > 0:
                     if len(top_nodes) % 2:
                         raise
                     return 1
             tmeet = (
-                shammilton.get("this_hammilton", -1) > 0
-                and lhammilton.get("cur_hammilton", -1) > 0
-                and lhammilton.get("cross_hammilton", -1) >= 0
-                and lhammilton.get("rem_hammilton", -1) > 0
+                shamilton.get("this_hamilton", -1) > 0
+                and lhamilton.get("cur_hamilton", -1) > 0
+                and lhamilton.get("cross_hamilton", -1) >= 0
+                and lhamilton.get("rem_hamilton", -1) > 0
             )
             if scorelevel == testlevel:
                 print(
                     "Tmeet",
                     level,
                     tmeet,
-                    shammilton.get("this_hammilton", -1),
-                    lhammilton.get("cur_hammilton", -1),
-                    lhammilton.get("cross_hammilton", -1),
-                    lhammilton.get("rem_hammilton", -1),
+                    shamilton.get("this_hamilton", -1),
+                    lhamilton.get("cur_hamilton", -1),
+                    lhamilton.get("cross_hamilton", -1),
+                    lhamilton.get("rem_hamilton", -1),
                 )
             cat1 = cat1 and tmeet
-            if shammilton.get("rem_hammilton", -1) <= 0:
+            if shamilton.get("rem_hamilton", -1) <= 0:
                 return 1 if cat1 else 0  # Dont wait time to see if rest is complete
             if tmeet:
                 category = scorelevel - level + 1
@@ -817,8 +821,8 @@ class pairing:
         """
         pab = self.pablevel
         cmp = self.competitors
-        hammilton = self.hammilton
-        if self.optimize and pab == -1 and len(edges) > 0 and len(hammilton) > 0 and hammilton[-1]["rem_hammilton"] >= 0:
+        hamilton = self.hamilton
+        if self.optimize and pab == -1 and len(edges) > 0 and len(hamilton) > 0 and hamilton[-1]["rem_hamilton"] >= 0:
             # Note that edges are sorted on "ca" and then on "cb"
             # in the order scorelevel on a, scorelevel on b, cid
             pab = cmp[edges[-1]["cb"]]["scorelevel"] if cmp[0]["rfp"] else 0
@@ -856,7 +860,7 @@ class pairing:
             pairs = []
             pairsleft = (
                 len([node for node in nodes if node["scorelevel"] == scorelevel])
-                - self.hammilton[scorelevel - 1].get("rem_unpaired", 0)
+                - self.hamilton[scorelevel - 1].get("rem_unpaired", 0)
             ) // 2
         if pairs is None:
             while not full:  # Number of pairs must be correct in homogenious, otherwise rerun
@@ -920,8 +924,8 @@ class pairing:
         testlevel = -1
 
         scorelevel = bracket["scorelevel"]
-        hthis = self.hammilton[scorelevel]
-        hnext = self.hammilton[scorelevel-1] if scorelevel > 0  else {}
+        hthis = self.hamilton[scorelevel]
+        hnext = self.hamilton[scorelevel-1] if scorelevel > 0  else {}
 
         # Don't run if not optimizez, or rest can not be paired
         if category == 0 or (not self.optimize) or hnext.get("rem_unpaired",1) > 1:
@@ -948,7 +952,7 @@ class pairing:
         slen = s2len
         if scorelevel <= self.pablevel:
             slen -= 1
-        if slen % 2 == 1 and hnext.get("cur_hammilton", -1) < 2:
+        if slen % 2 == 1 and hnext.get("cur_hamilton", -1) < 2:
             return (False, 2, None)
 
         colordiff = self.analyze_colordiff(nodes[:s2len])
@@ -984,6 +988,7 @@ class pairing:
         # breakpoint()
         pairs = [(SE1[a], b) for (a, b) in enumerate(hetro)] + [(SS1[a], b) for (a, b) in enumerate(homo[0:len(SS1)])]
         tc12 = tc13 = 0
+        self.crosstable.B = slen
         self.crosstable.init_bweights(scorelevel, len(SS2))
         epairs = []
         spairs = []
@@ -1138,9 +1143,9 @@ class pairing:
         elif pairingmode == "B":
             bracket["bsnb"] = {node["cid"]: i + 1 for i, node in enumerate(modified_nodes)}
             self.crosstable.update_hetrogenious(scorelevel, modified_nodes, modified_edges, bracket["bsnb"])
-            #self.crosstable.update_bipartite(
-            #    scorelevel, modified_edges, bracket["bsnb"], nodes[len(nodes) // 2]["cid"], nodes[-1]["cid"]
-            #)
+            self.crosstable.update_bipartite(
+                scorelevel, modified_edges, bracket["bsnb"], nodes[len(nodes) // 2]["cid"], nodes[-1]["cid"]
+            )
         if self.reportlevel > 2:
             print("pair_weighted(" + pairingmode + "," + str(numpairs) + ") comp:", [c["cid"] for c in modified_nodes])
             print("edges", [(c["ca"], c["cb"]) for c in modified_edges])
@@ -1149,7 +1154,7 @@ class pairing:
             (wcid, bcid) = (c["ca"], c["cb"])
             weight = self.crosstable.update_weight(pairingmode, c)
             if self.reportlevel > 3:
-                print(pairingmode + "-Edge:", f"{wcid:3} {bcid:3} ", self.crosstable.format_weight(pairingmode, weight))
+                print(pairingmode + "-Edge:", f"{wcid:3} {bcid:3} ", self.crosstable.format_weight(pairingmode, weight), c["cweight"], c["eweight"], c["sweight"])
             nx_edges.append((wcid, bcid, weight))
 
 
@@ -1159,6 +1164,12 @@ class pairing:
         else:
             G.add_weighted_edges_from(nx_edges)
             wpairs = nx.min_weight_matching(G)
+            if self.reportlevel > 3:
+                print("-------------------------")
+                for pair in wpairs:
+                    c = self.opponents[pair[0]][pair[1]]
+                    (wcid, bcid) = (c["ca"], c["cb"])
+                    print(pairingmode + "-Minw:", f"{wcid:3} {bcid:3} ", self.crosstable.format_weight(pairingmode, c["weight"]), c["cweight"], c["eweight"], c["sweight"])
         t1 = time.time() 
         # print("Time:", t1 - t0)
         return wpairs
@@ -1179,21 +1190,21 @@ class pairing:
     is_copmplete(self, nodes, edges, offset=0, weight= True, hist=None)
         nodes - node list
         edges - edge list, consider to use get_edges from a commection of edges
-        offset - For test on hammilton_path only this must be (len(nodes)+1)//2
+        offset - For test on hamilton_path only this must be (len(nodes)+1)//2
         weight - use weightrd algoritm if first test fails
         hist - use precalculated histogram 
     returns:
-        (pairs, unpaired, hammilton)
+        (pairs, unpaired, hamilton)
         pairs - number of pairs that can be paired 
         unpaired - number of unpaired
-        hammilton - difference between sorthist[0] - limit
+        hamilton - difference between sorthist[0] - limit
  
         -1: No pairs can be formed
          0: pairing is not complete
          1: odd number of nodes that can be paired with (len(nodes)-1)/2 pairs
          2: even number of nodes that can be paired with len(nodes)/2 pairs
-         3: odd number of nodes that forms a hammilton path
-         4: even number of nodes that forms a hammilton path
+         3: odd number of nodes that forms a hamilton path
+         4: even number of nodes that forms a hamilton path
     """
 
     def is_complete(self, nodes, edges, offset=-1, weight=True, hist=None, pab=False):
@@ -1205,8 +1216,12 @@ class pairing:
         if hist is None:
             hist = self.compute_whohasmet_histogram(nodes, edges)
         sorthist = sorted(hist)
+        if len(sorthist) > len(nodes):
+            sorthist = sorthist[-len(nodes):]  
         if len(sorthist) == 0 or sorthist[-1] == 0:
             return (0, numnodes, -1)  # None can meet
+        if not pab and nodes[0]["cid"] == 0 and hist[0] > 1 and sorthist[1] >= limit:
+            return (numnodes // 2, numnodes % 2, sorthist[1] - limit - 1) 
         if sorthist[0] >= limit:
             return (numnodes // 2, numnodes % 2, sorthist[0] - limit)
         if offset == -1:

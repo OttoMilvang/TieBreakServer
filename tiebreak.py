@@ -573,6 +573,9 @@ class tiebreak:
     
                                     self.addtbval(tbscore[prefix + "cop"], rnd, ncol)
                                     tbscore[prefix + "cop"]["val"] = ncol
+                                    #cpa = "N"
+                                    #if pf < -1   osv
+                                    #tbscore[prefix + "cop"]["val"] = ncol
 
                             # last played game (or PAB)
                             if rnd > tbscore[prefix + "lp"]:
@@ -794,6 +797,7 @@ class tiebreak:
         changes = 1 if loopcount == 0 else 0
         if loopcount > 0 and len(subro) > 0:
             changes = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
+        # print(f"Loop={loopcount}, Changes={changes}")
         return changes
 
     """

@@ -219,20 +219,19 @@ class crosstable:
                     b = competitors[j]
                     c = opponents[i][j]
                     if a["pop"] == j:
-                        c["canmeet"] = True
+                        c["canmeet"] = c["qc"] = True
                         if a["pco"] == "w" or b["pco"] == "w":
                             c[a["pco"]] = i
                             c[b["pco"]] = j
                         # print(i, j, c['canmeet'], c['w'] if 'w' in c else '?', c['b'] if 'b' in c else '?' )
                     else:
-                        c["canmeet"] = False
+                        c["canmeet"] = c["qc"] = False
                         
         for elem in prohibited:
             if  elem["firstRound"] <= self.rnd <= elem["lastRound"]:
                 for c1, c2 in list(combinations(elem["competitors"], 2)):
                     opponent = opponents[c1][c2]
-                    opponent["canmeet"] = False
-                    opponent["qc"] = False
+                    opponent["canmeet"] = opponent["qc"] = False
                     
                         
         return (competitors, opponents)
@@ -296,14 +295,16 @@ class crosstable:
     def update_crosstable(self, scorelevel, nodes, edges, pablevel, update_maxpsd=True):
         self.pablevel = pablevel
         if update_maxpsd:
-            self.maxpsd = max([node["scorelevel"] for node in nodes]) - scorelevel
+            maxpsd = max([node["scorelevel"] for node in nodes]) - scorelevel
+            self.maxpsd = nodes[0]["scorelevel"] - scorelevel
+            if maxpsd != self.maxpsd: breakpoint()
             self.mdp = [0] * self.maxpsd
             for node in nodes:
                 psd = node["scorelevel"] - scorelevel
                 if psd <= 0:
                     break
-                self.mdp[psd-1] += 1
-            self.init_cweights(scorelevel, self.maxpsd)
+                self.mdp[self.maxpsd - psd] += 1
+            self.init_cweights(scorelevel, nodes)
         self.L = self.maxpsd
         # print("Update scorelevel", scorelevel, len(nodes), len(edges), pablevel, update_maxpsd, self.maxpsd)
             
@@ -360,7 +361,7 @@ class crosstable:
 
                     acod = a["cod"]
                     bcod = b["cod"]
-                    if acod == bcod == 2 and abs(acod) >= 2:
+                    if acod == bcod and abs(acod) >= 2:
                         q[C10] = 1
                         cweight += weight[C10]
 
@@ -459,31 +460,34 @@ class crosstable:
     def update_hetrogenious(self, scorelevel, nodes, edges, bsn):
         M = self.M = sum(self.mdp)
         self.ilen = 0
+        elen = len(bsn) + 1
         weight = self.weight
-        self.init_eweights(scorelevel, 0)
-        e1weight = sum([weight[E1][i] for i in range(M)])
+        self.init_eweights(scorelevel, bsn)
         for c in edges:
             (ca, cb) = (c["ca"], c["cb"])
             q = self.get_edge_quality(c)["quality"]
             q[E1] = [0] * M
             q[E2] = [0] * M
             eweight = 0
+            e1weight = sum(weight[E1])
 
             ascl = self.competitors[ca]["scorelevel"]
             bscl = self.competitors[cb]["scorelevel"]
+            absn = bsn.get(ca, elen)
+            bbsn = bsn.get(cb, elen)
+            if absn > bbsn:
+                (absn, bbsn, ascl, bscl) = (bbsn, absn, bscl, ascl)
             # print(self.competitors[ca])
-            if ascl > scorelevel and bscl == scorelevel or ascl == scorelevel and bscl > scorelevel:
-                absn = bsn[ca]
-                bbsn = bsn[cb]
-                if absn > bbsn:
-                    (absn, bbsn, ascl, bscl) = (bbsn, absn, bscl, ascl)
-                e1 = absn if absn <= M else 0
-                e2 = bbsn if absn <= M else 0
-                # print("H", wcid, bcid, wbsn, bbsn, e[E1], e[E2], N)
-                q[E1] = [0 if e1 == i + 1 else 1 for i in range(M)]
-                eweight += e1weight - weight[E1][e1 - 1]
-                q[E2][e1 - 1] = e2
-                eweight += weight[E2][e1 - 1] * e2
+            if ascl > scorelevel and bscl <= scorelevel:
+                e0 = absn
+                e1 = 1 if bbsn == elen else 0
+                e2 = bbsn - M if bbsn < elen else 0
+                #if bscl < scorelevel: breakpoint()
+                q[E1][e0-1] = e1
+                q[E2][e0-1] = e2
+                eweight += weight[E1][e0 - 1] * e1
+                eweight += weight[E2][e0-1] * e2
+
             c["eweight"] = eweight
 
     def update_homogenious(self, scorelevel, edges, bsn, S):
@@ -497,8 +501,10 @@ class crosstable:
         weight = self.weight
         self.init_sweights(scorelevel, S, mdp)
         # print("CheckAnlyse", scorelevel, "M="+str(M), "P="+str(P), "N="+str(N), "S="+str(S), "B="+str(B) )
-        s4weight = sum([weight[S4][i] for i in range(B4)])
+        # s4weight = sum([weight[S4][i] for i in range(B4)])
+        s4weight = sum(weight[S4])
         for c in edges:
+            c["sweight"] = 0
             (ca, cb) = (c["ca"], c["cb"])
             q = self.get_edge_quality(c)["quality"]
             q[S1] = 0
@@ -527,14 +533,15 @@ class crosstable:
                     else:
                         q[S4][absn - S - 1] = 0
                         sweight -= weight[S4][absn - S - 1]
-                    q[S5][absn - 1] = bbsn
-                    sweight += weight[S5][absn - 1] * bbsn
+                    q[S5][absn - 1] = bbsn - absn
+                    sweight += weight[S5][absn - 1] * (bbsn - absn)
                     # if c['quality'][S5] != [bbsn if absn == i+1 else 0 for i in range(B)]: breakpoint()
             c["sweight"] = sweight
 
     def update_bipartite(self, scorelevel, pairs, bsn, s2start, s2stop):
+        B = self.B = len(bsn)
         H = self.H = len(bsn) // 2
-        M = self.M = mdp = sum(self.mdp)
+        M = self.M = sum(self.mdp)
        # print ("BO:", B, S, self.S)
 
         # print("CheckAnlyse", scorelevel, "M="+str(M), "P="+str(P), "N="+str(N), "S="+str(S), "B="+str(B) )
@@ -558,8 +565,8 @@ class crosstable:
             if pno >= mdp:
                 absn = pno - mdp
                 bbsn = bsn[cb]
-                q[S5][absn] = bbsn
-                bweight = weight[S5][absn] * bbsn
+                q[S5][absn] = bbsn -absn
+                bweight = weight[S5][absn] * (bbsn - absn)
             c["bweight"] = bweight
 
     # Compute weight
@@ -568,150 +575,153 @@ class crosstable:
     # mode 'B' - Bipartite
     # mode 'A' - Add S-part
 
-    def init_cweights(self, scorelevel, psd):
-        C = self.C
-        R = self.R
-        # print ("BI:", B)
+    def cascade_weights(self, depth, start, stop):
+        w = 1
+        weight = self.weight
+        for cval in range(stop, start-1, -1):
+            if isinstance(depth[cval], int):
+                (w, weight[cval], depth[cval]) = (w*depth[cval], w, len(str(depth[cval])))
+            elif isinstance(depth[cval], list):
+                weight[cval] = [0]*len(depth[cval])
+                for eval in range(len(weight[cval])-1, -1, -1):
+                    (w, weight[cval][eval], depth[cval][eval]) = (w*depth[cval][eval], w, len(str(weight[cval][eval])))
+            else:
+                raise
+        return w
 
-        cc = str(C)[1:]
-        rr = str(R)[1:]
-        c7len = psd
-        c8len = psd + 1
+
+
+    def init_cweights(self, scorelevel, nodes):
+        # print(f"Init cweight, scorelevel: {scorelevel}")
+        cc = len(nodes) + 1
+        c7len = len(self.mdp)
+        c8len = c7len + 1
         mmlen = self.maxmeets -1
         self.weight = weight = [0] * QS
+        self.depth  = depth  = [0] * QS
+        scoregroup = [node for node in nodes if node["scorelevel"] >= scorelevel] 
+        nscoregroup = [node for node in nodes if node["scorelevel"] >= scorelevel-1] 
+        bsize = len(scoregroup)
+        depth[C6] = bsize +1
+        depth[C7] = [psd + 1 for psd in self.mdp ]
+        depth[N8] = len(nscoregroup) + 1
+        depth[C8] = [psd + 1 for psd in self.mdp ] + [bsize + 1 - sum(self.mdp) ] 
+        depth[C9] = bsize + 1 if scorelevel <= self.pablevel else 1
+        depth[MM] = [cc] * mmlen
+        for i in range(mmlen):  
+            depth[MM][i] = cc
+        depth[C10] = len([node for node in nodes if node["scorelevel"] >= scorelevel and node["top"]]) +1
+        depth[C11] = depth[C10]
+        depth[C12] = cc
+        depth[C13] = cc
+        depth[C14] = len([node for node in nodes if node["scorelevel"] >= scorelevel and (node["flt"] & DF1)]) +1
+        depth[C15] = len([node for node in nodes if node["scorelevel"] <= scorelevel and (node["flt"] & UF1)]) +1
+        depth[C16] = len([node for node in nodes if node["scorelevel"] >= scorelevel and (node["flt"] & DF2)]) +1
+        depth[C17] = len([node for node in nodes if node["scorelevel"] <= scorelevel and (node["flt"] & UF2)]) +1
+        depth[C18] = [psd + 1 for psd in self.mdp ]
+        depth[C19] = [psd + 1 for psd in self.mdp ]
+        depth[C20] = [psd + 1 for psd in self.mdp ]
+        depth[C21] = [psd + 1 for psd in self.mdp ]
+        # print(scorelevel, depth)
+        weight[C0] = self.cascade_weights(depth, C6, C21)
 
         self.Cweight = (
             "C 1--"
-            + rr  # C6
+            + "0"  # C6
             + "-"
-            + str([rr for v in [0] * c7len]).replace("'", "")  # C7
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # C7
             + "-"
-            + rr  # N8
+            + "0"  # N8
             + "-"
-            + str([rr for v in [0] * c8len]).replace("'", "")  # C8
+            + str(["0" for v in [0] * c8len]).replace("'", "")  # C8
             + "-"
-            + rr  # C9
+            + "0"  # C9
             + "-"
-            + str([rr for v in [0] * mmlen]).replace("'", "")  # MM
+            + str(["0" for v in [0] * mmlen]).replace("'", "")  # MM
             + "-"
-            + rr  # C10
+            + "0"  # C10
             + "-"
-            + rr  # C11
+            + "0"  # C11
             + "-"
-            + cc  # C12
+            + "0"  # C12
             + "-"
-            + cc  # C13
+            + "0"  # C13
             + "--"
-            + rr  # C14
+            + "0"  # C14
             + "-"
-            + rr  # C15
+            + "0"  # C15
             + "-"
-            + rr  # C16
+            + "0"  # C16
             + "-"
-            + rr  # C17
+            + "0"  # C17
             + "--"
-            + str([rr for v in [0] * c7len]).replace("'", "")  # C18
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # C18
             + "-"
-            + str([rr for v in [0] * c7len]).replace("'", "")  # C18
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # C18
             + "-"
-            + str([rr for v in [0] * c7len]).replace("'", "")  # C20
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # C20
             + "-"
-            + str([rr for v in [0] * c7len]).replace("'", "")
+            + str(["0" for v in [0] * c7len]).replace("'", "")
         )  # C21
 
-        num = "".join([c for c in list(self.Cweight) if c == "1" or c == "0"])
-        weight[C0] = int(num)
-        weight[C6] = int(num := num[: -len(rr)])
-        weight[C7] = [0] * c7len
-        for i in range(c7len):
-            weight[C7][i] = int(num := num[: -len(rr)])
-        weight[N8] = int(num := num[: -len(rr)])
-        weight[C8] = [0] * c8len
-        for i in range(c8len):
-            weight[C8][i] = int(num := num[: -len(rr)])
-        weight[C9] = int(num := num[: -len(rr)])
-        weight[MM] = [0] * mmlen
-        for i in range(mmlen):  
-            weight[MM][i] = int(num := num[: -len(rr)])
-        weight[C10] = int(num := num[: -len(rr)])
-        weight[C11] = int(num := num[: -len(rr)])
-        weight[C12] = int(num := num[: -len(cc)])
-        weight[C13] = int(num := num[: -len(cc)])
-        weight[C14] = int(num := num[: -len(rr)])
-        weight[C15] = int(num := num[: -len(rr)])
-        weight[C16] = int(num := num[: -len(rr)])
-        weight[C17] = int(num := num[: -len(rr)])
-        for cn in range(C18, C21 + 1):
-            weight[cn] = [0] * c7len
-            for i in range(c7len):
-                weight[cn][i] = int(num := num[: -len(rr)])
+ 
 
-    def init_eweights(self, scorelevel, psd):
-        R = self.R
+
+    def init_eweights(self, scorelevel, bsn):
+        # print(f"Init eweight, scorelevel: {scorelevel}")
         M = self.M
-        rr = str(R)[1:]
+        elen = len(bsn) + 1 - M
         weight = self.weight
+        depth = self.depth
+        depth[E1] = [2] * M
+        depth[E2] = [elen] * M
+        weight[E0] = self.cascade_weights(depth, E1, E2)
+        self.Eweight = "E 1--" + str(["0" for v in [0] * M]).replace("'", "") + "-" + str(["0" for v in [0] * M]).replace("'", "")
 
-        self.Eweight = "E 1--" + str([rr for v in [0] * M]).replace("'", "") + "-" + str([rr for v in [0] * M]).replace("'", "")
-
-        num = "".join([c for c in list(self.Eweight) if c == "1" or c == "0"])
-        weight[E0] = int(num)
-        for cn in range(E1, E2 + 1):
-            weight[cn] = [0] * M
-            for i in range(M):
-                weight[cn][i] = int(num := num[: -len(rr)])
 
     def init_sweights(self, scorelevel, S, mdp):
-        C = self.C
-        R = self.R
+        # print(f"Init sweight, scorelevel: {scorelevel}")
+        B = self.B # len of BSN
         B3 = self.B3
         B4 = self.B4
         B5 = self.B5
-
-        cc = str(C)[1:]
-        rr = str(R)[1:]
         weight = self.weight
+        depth = self.depth
 
+        depth[S1] = S + 1
+        depth[S2] = sum(list(range(B-1, S, -2)[:S])) + 1 # B-1 + B-3 + ... + B-(2*S-1) + 1, first S odd numbers starting from B-1 
+        depth[S3] = [2] * B3
+        depth[S4] = [2] * B4
+        depth[S5] = list(range(B5, 0, -1))
+        weight[S0] = self.cascade_weights(depth, S1, S5)
+ 
         self.Sweight = (
             "S 1--"
-            + rr
+            + "0"
             + "-"
-            + rr
-            + rr
+            + "0"
             + "-"
-            + str([cc for v in [0] * B3]).replace("'", "")
+            + str(["0" for v in [0] * B3]).replace("'", "")
             + "-"
-            + str([cc for v in [0] * B4]).replace("'", "")
+            + str(["0" for v in [0] * B4]).replace("'", "")
             + "-"
-            + str([cc for v in [0] * B5]).replace("'", "")
+            + str(["0" for v in [0] * B5]).replace("'", "")
         )
 
-        num = "".join([c for c in list(self.Sweight) if c == "1" or c == "0"])
-        weight[S0] = int(num)
-        weight[S1] = int(num := num[: -len(rr)])
-        weight[S2] = int(num := num[: -2 * len(rr)])
-        weight[S3] = [0] * B3
-        for i in range(B3):
-            weight[S3][i] = int(num := num[: -len(cc)])
-        weight[S4] = [0] * B4
-        for i in range(B4):
-            weight[S4][i] = int(num := num[: -len(cc)])
-        weight[S5] = [0] * B5
-        for i in range(B5):
-            weight[S5][i] = int(num := num[: -len(cc)])
-        # if scorelevel == 6: breakpoint()
+
+
 
     def init_bweights(self, scorelevel, s2nodes):
+        #print(f"Init bweight, scorelevel: {scorelevel}")
+        B = self.B
         C = self.C
         H = self.H = s2nodes
         cc = str(C)[1:]
-        self.Bweight = "B 1--" + str([cc for v in [0] * H]).replace("'", "")
-        num = "".join([c for c in list(self.Bweight) if c == "1" or c == "0"])
         weight = self.weight
-        weight[B0] = int(num)
-        weight[S5] = [0] * H
-        for i in range(H):
-            weight[S5][i] = int(num := num[: -len(cc)])
+        depth = self.depth
+        depth[S5] = [B + 1] * H
+        weight[S0] = self.cascade_weights(depth, S1, S5)
+        self.Bweight = "B 1--" + str(["0" for v in [0] * H]).replace("'", "")
 
     def update_weight(self, mode, c):
         # print ("BW:", B)
@@ -751,33 +761,57 @@ class crosstable:
                         quality[elem] += q[elem]
                     else:
                         for i in range(len(quality[elem])):
-                            quality[elem][i] += q[elem][i]
+                            try:
+                                quality[elem][i] += q[elem][i]
+                            except:
+                                breakpoint()
 
         return quality
 
-    def format_weight(self, mode, weight):
+    def format_wpart(self, f, wx, start, stop):
+        weight = self.weight
+        wres = []
+        for welem in range(start, stop+1):
+            warr = weight[welem]
+            if isinstance(warr, int):
+                warr = [warr]
+            for wfac in warr:
+                we = wx // wfac
+                wx = wx % wfac
+                wres.append(we)
+    
+        index = [i for i, c in enumerate(f) if c == "0"]
+        if len(wres) != len(index):
+            breakpoint()
+            raise
+        ptr = list(f)
+        for i, c in enumerate(wres):
+            ptr[index[i]] = str(c)
+        return "".join(ptr)
+    
+
+    def format_weight(self, mode, w):
+        weight = self.weight
         f = self.Cweight
         # match (mode):
         if mode == "E":
-                f += " " + self.Eweight
-                weight += self.weight[C0] * self.weight[E0]
+                cw = w // weight[E0]
+                ew = w % weight[E0]
+                return self.format_wpart(self.Cweight, cw, C6, C21) + " " + self.format_wpart(self.Eweight, ew, E1, E2)
         elif mode == "S":
                 f += " " + self.Sweight
-                weight += self.weight[C0] * self.weight[S0]
+                cw = w // weight[S0]
+                sw = w % weight[S0]
+                return self.format_wpart(self.Cweight, cw, C6, C21) + " " + self.format_wpart(self.Sweight, sw, S1, S5)
         elif mode == "B":
                 f += " " + self.Bweight
-                weight += self.weight[C0] * self.weight[B0]
+                cw = w // weight[B0]
+                bw = w % weight[B0]
+                return self.format_wpart(self.Cweight, cw, C6, C21) + " " + self.format_wpart(self.Bweight, bw, S5, S5)
         else:
-                weight += self.weight[C0]
+                cw = w
+                return self.format_wpart(self.Cweight, cw, C6, C21)
 
-        w = str(weight)[1:]
-        index = [i for i, c in enumerate(f) if c == "0"]
-        if len(w) != len(index):
-            raise
-        ptr = list(f)
-        for i, c in enumerate(w):
-            ptr[index[i]] = c
-        return "".join(ptr)
 
     def compute_pab_weight(self, edges):
         for edge in edges:
