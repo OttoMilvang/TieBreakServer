@@ -58,10 +58,10 @@ Structre
             'b': '17',        # cid of black, 0 if no opponent
             'quality': [...]  # array of quality variables
             '?weight': 0,     # Weight used in weighted pairing
-            'qc': True,       # true if 'canmeet' and C9-C11 == 0 and C14-C21 == 0
+            'qc': True,       # true if 'canmeet' and QC9-QC11 == 0 and QC14-QC21 == 0
             'colordff': 'BB', # color difference for pair. 
-            'e-rule': 'E.4',  # rules used to decide color
-            'mode': "S",      # selected from hetrogenios "E" of homogenios "S" pairs
+            'colorrule': 'E.4',  # rules used to decide color
+            'mode': "HO",      # selected from hetrogenios "HE" of homogenios "S" pairs
             'board': 19       # board number in pairing 
 |         }, 
 |         ...
@@ -76,7 +76,6 @@ Structre
            'pairs': []                  # Array of crosstable elements
            'mdp' []                     # Array of moveddown crosstable elements
            'psd' : lval,                # scorelevels of psd's value
-           'valid' : True
           },
            ...
     ]
@@ -87,20 +86,19 @@ Structre
          {
              'round': 4
              'check': True/False
-             'analyze': [       # Array of score brackets, anaalyze existing pairing
+             'analysis': [       # Array of score brackets, anaalyze existing pairing
                 {
                     'scorelevel': <level> ,     # Bracket level 
                     'competitors': [],          # Array of competitor objects   
                     'pairs': []                 # Pairs
                     'downfloaters':  [5, 11]    # Array of downfloated competitors
                     'remaining':  [23, 0]       # Array of remaining competitors
-                    'quality': [...]            # array C6-C21, E1-E2, S1-S5
+                    'quality': [...]            # array QC6-QC21, HE1-HE2, HO1-HO5
                     'pab': False,               # true if this is PAB scorelevel
-                    'valid': True,              # True if pairing is valid
                 },
                 .... more brackets                    
                 ],
-            'checker': [       # Array of score brackets, same structure as analyze
+            'checker': [       # Array of score brackets, same structure as analysis
                         ...
                         ]
             }
@@ -123,10 +121,10 @@ Structre
         R**P                    - c19 100**psdlevel 
         R**P                    - c20 100**psdlevel 
         R**P                    - c21 100**psdlevel 
-    E1-E2 hetrogenios
+    HE1-HE2 hetrogenios
         R**M                    - R**(bsn mdp)
         R**M                    - R**(bsn mdp)*(bsn opponent)
-    S1-S5 homogenious
+    HO1-HO5 homogenious
         R                       - 1 if bsn > r else 0
         R*R                     - bsn
         10**S                   - 10**bsn if wsn <=r
@@ -142,12 +140,11 @@ Structre
 class pairing:
 
     # constructor function
-    def __init__(self, tournament, rnd, topcolor, unpaired, rank, experimental, verbose):
+    def __init__(self, tournament, rnd, topcolor, rank, experimental, verbose):
         # helpers.json_output(sys.stdout, cmps[12]['tiebreakDetails'])
         self.tournament = tournament
         self.rnd = rnd
         self.topcolor = topcolor
-        self.unpaired = [helpers.parse_int(u) for u in unpaired]
         self.nummeets = int((rnd-1) * tournament.get("maxMeets", 1) / tournament["numRounds"]) + 1
         self.rank = "rnk" if rank else "cid"
         self.experimental = experimental
@@ -170,13 +167,13 @@ class pairing:
         if self.verbose:
             print("Round:", self.rnd, "Check:", "Yes" if checkonly else "No")
         self.checkonly = checkonly
-        self.reportlevel = reportlevel
+        self.reportlevel = reportlevel * self.verbose
         self.optimize = "weighted" not in self.experimental and not checkonly
         self.crosstable = crosstable(self.experimental, self.checkonly, self.verbose)
         self.get_edge_quality = self.crosstable.get_edge_quality
         t0 = time.time()
         (competitors, opponents) = self.crosstable.init_engine(
-            self.tournament, self.rnd, self.nummeets, self.topcolor, self.unpaired, self.rank 
+            self.tournament, self.rnd, self.nummeets, self.topcolor, self.rank 
         )
         self.competitors = competitors
         self.opponents = opponents
@@ -327,13 +324,13 @@ class pairing:
         return new_edges
 
     def get_modifiededges(self, nodeid1, nodeid2, edges, condition=None):
-        cmps1 = [False] * (self.crosstable.BLOB + 1)
-        cmps2 = [False] * (self.crosstable.BLOB + 1)
+        cmpHO1 = [False] * (self.crosstable.BLOB + 1)
+        cmpHO2 = [False] * (self.crosstable.BLOB + 1)
         for node in nodeid1:
-            cmps1[node] = True
+            cmpHO1[node] = True
         for node in nodeid2:
-            cmps2[node] = True
-        new_edges = [edge for edge in edges if cmps1[edge["ca"]] and cmps2[edge["cb"]]]
+            cmpHO2[node] = True
+        new_edges = [edge for edge in edges if cmpHO1[edge["ca"]] and cmpHO2[edge["cb"]]]
         return new_edges
 
     def list_nodes(self, competitors):
@@ -442,11 +439,10 @@ class pairing:
             "pairs": [],
             "downfloaters": [],
             "remaining": [],
-            "quality": [None] * qdefs.QL.value,
+            "quality": {q.name : None for q in qdefs },
             "bsne": self.update_bsn(scorelevel, nodes),
             "bsno": {},
             "pab": scorelevel == self.pablevel,
-            "valid": True,
         }
 
         self.crosstable.set_scorelevel(scorelevel)
@@ -483,17 +479,17 @@ class pairing:
         if self.reportlevel:
             bcompetitors = [c for c in bracket["competitors"]]
 
-        for pairingmode in ["B", "E", "S"]:  # B = bipartite, E = hetrogenious, S = homogenious
+        for pairingmode in ["BI", "HE", "HO"]:  # B = bipartite, E = hetrogenious, T = homogenious
             t0 = time.time()
-            if pairingmode == "B":
+            if pairingmode == "BI":
                 (weighted, pairsleft, pairs) = self.pair_simple_round(bracket, nodes, edges, pairingmode, numpairs, category)
             else:
                 (weighted, pairsleft, pairs) = self.pair_round(bracket, nodes, edges, pairingmode, numpairs, category)
 
             t1 = time.time()
-            if pairingmode == "B": self.btime += (t1-t0)
-            if pairingmode == "E": self.etime += (t1-t0)
-            if pairingmode == "S": self.stime += (t1-t0)
+            if pairingmode == "BI": self.btime += (t1-t0)
+            if pairingmode == "HE": self.etime += (t1-t0)
+            if pairingmode == "HO": self.stime += (t1-t0)
 
             if self.verbose:
                 npairs = len(pairs) if pairs else 0
@@ -504,8 +500,8 @@ class pairing:
             paired = []
             # if scorelevel ==1 and category > 0:breakpoint()
 
-            bipartite = pairingmode == "B"
-            hetro = pairingmode == "E"
+            bipartite = pairingmode == "BI"
+            hetro = pairingmode == "HE"
             for a, b in pairs:
                 c = self.opponents[a][b]
                 (alevel, blevel) = (c["sa"], c["sb"]) if c["sa"] >= c["sb"] else (c["sb"], c["sa"])
@@ -534,14 +530,14 @@ class pairing:
                 print("-Mode", pairingmode)
                 print("Competitors   = ", bcompetitors)
                 print("Pairs         = ", [(c["w"], c["b"]) for c in bracket["pairs"]])
-                if pairingmode == "S":
+                if pairingmode == "HO":
                     print("Down          = ", [c for c in bracket["downfloaters"]])
                 bcompetitors = [c for c in bracket["competitors"] if c not in npaired]
-            if pairingmode == "B" and pairsleft == 0:
+            if pairingmode == "BI" and pairsleft == 0:
                 break
         bracket["remaining"] = [c["cid"] for c in nodes if c["scorelevel"] < scorelevel]
         bracket["downfloaters"] = [c["cid"] for c in nodes if c["scorelevel"] >= scorelevel]
-        if len(bracket["pairs"]): #  and pairingmode != "B":
+        if len(bracket["pairs"]): #  and pairingmode != "BI":
             bracket["quality"] = self.crosstable.compute_weight(wpairs, bracket["quality"]) 
         else:
             testpab = False
@@ -614,12 +610,12 @@ class pairing:
     def apply_c9(self, scorelevel, nodes, edges, testpab):
         if scorelevel > self.pablevel:
             return False
-        # print("Testpab-I",  scorelevel, testpab, self.roundpairing[-1]["quality"][N8] if testpab else -1)
+        # print("Testpab-I",  scorelevel, testpab, self.roundpairing[-1]["quality"][QN8] if testpab else -1)
         if scorelevel <= 1:
             return True
         if not self.optimize and testpab and len(self.roundpairing) > 0:
-            #    print("Testpab-N", scorelevel, self.roundpairing[-1]["quality"][N8])
-            return self.roundpairing[-1]["quality"][qdefs.N8.value] == 1
+            #    print("Testpab-N", scorelevel, self.roundpairing[-1]["quality"][QN8])
+            return self.roundpairing[-1]["quality"][qdefs.QN8.name] == 1
         c9_nodes = [node for node in nodes if node["scorelevel"] >= scorelevel or node["cid"] == 0]
         # print("Testpab-F",  scorelevel, len(c9_nodes), [node["scorelevel"] for node in c9_nodes])
         if len(c9_nodes) % 2 == 1:
@@ -740,23 +736,23 @@ class pairing:
             print("Cat r", 0)
         return 0
 
-    def modify_edges(self, s1nodes, s2nodes, edges, scorelevel, category, condition):
+    def modify_edges(self, S1nodes, S2nodes, edges, scorelevel, category, condition):
         testlevel = -1
         if category == 0:
-            return (s1nodes, edges)
+            return (S1nodes, edges)
         new_edges = []
         add_edges = []
         cmp = self.competitors
-        orgs2nodes = s2nodes
+        orgS2nodes = S2nodes
 
         opponents = self.opponents
         lim = scorelevel - category + 1
-        nodeid1 = [node["cid"] for node in s1nodes if node["scorelevel"] >= lim]
-        if s2nodes is None:
-            (s2nodes, nodeid2) = (s1nodes, nodeid1)
+        nodeid1 = [node["cid"] for node in S1nodes if node["scorelevel"] >= lim]
+        if S2nodes is None:
+            (S2nodes, nodeid2) = (S1nodes, nodeid1)
             addblob = len(nodeid1) % 2 == 1
         else:
-            nodeid2 = [node["cid"] for node in s2nodes if node["scorelevel"] >= lim]
+            nodeid2 = [node["cid"] for node in S2nodes if node["scorelevel"] >= lim]
             addblob = len(nodeid1) < len(nodeid2)
         new_edges = self.get_modifiededges(nodeid1, nodeid2, edges)
         if testlevel == scorelevel:
@@ -764,19 +760,19 @@ class pairing:
         if addblob:
             blob = 0 if self.pablevel >= scorelevel else self.crosstable.BLOB
             nodeid1.append(blob)
-            s2nodesid = [node["cid"] for node in s2nodes if node["scorelevel"] == lim]
+            S2nodesid = [node["cid"] for node in S2nodes if node["scorelevel"] == lim]
 
             if blob == 0:
-                for node_id in s2nodesid:
+                for node_id in S2nodesid:
                     new_edge = opponents[node_id][0]
                     if new_edge[condition]:
                         add_edges.append(new_edge)
             else:
                 mid = self.edgeBinarySearch(edges, lim - 1)
                 for edge in edges[mid:]:
-                    if edge["ca"] in s2nodesid:
+                    if edge["ca"] in S2nodesid:
                         node_id = edge["ca"]
-                    elif edge["cb"] in s2nodesid:
+                    elif edge["cb"] in S2nodesid:
                         node_id = edge["cb"]
                     else:
                         continue
@@ -785,8 +781,8 @@ class pairing:
                         new_edge["qc"] = False
                     if new_edge[condition]:
                         add_edges.append(new_edge)
-                        s2nodesid.remove(node_id)
-                        if len(s2nodesid) == 0:
+                        S2nodesid.remove(node_id)
+                        if len(S2nodesid) == 0:
                             break
                 # breakpoint()
 
@@ -797,12 +793,12 @@ class pairing:
 
             new_edges += add_edges
             if len(add_edges) == 0:
-                return (s1nodes, edges)
-            new_nodes = [node for node in s1nodes if node["cid"] in nodeid1]
+                return (S1nodes, edges)
+            new_nodes = [node for node in S1nodes if node["cid"] in nodeid1]
             new_nodes.append(cmp[blob])
             self.crosstable.update_crosstable(scorelevel, new_nodes, add_edges, self.pablevel, False)
         else:
-            snodes = s1nodes + s2nodes if orgs2nodes is not None else s1nodes
+            snodes = S1nodes + S2nodes if orgS2nodes is not None else S1nodes
             new_nodes = [node for node in snodes if node["cid"] in nodeid1]
         new_nodes = sorted(new_nodes, key=lambda s: (-s["scorelevel"], s[self.rank]))
         return (new_nodes, new_edges)
@@ -844,7 +840,7 @@ class pairing:
             bracket - the current scorebracket
             nodes - the competitors to be paired
             edges - the legal pair candidates
-            pairingmode - hetrogenious pairing = "E", homogenious pairing = "S"
+            pairingmode - hetrogenious pairing = "HE", homogenious pairing = "HO"
             numpairs - Number of paires that can be made in bracket
             pdp - moved down players
             category - Number of scorelevels that must be used in the algorithm
@@ -856,7 +852,7 @@ class pairing:
         pairs = None
         full = False
         pairsleft = 0
-        if self.optimize and pairingmode == "E" and nodes[0]["scorelevel"] == scorelevel:
+        if self.optimize and pairingmode == "HE" and nodes[0]["scorelevel"] == scorelevel:
             pairs = []
             pairsleft = (
                 len([node for node in nodes if node["scorelevel"] == scorelevel])
@@ -865,7 +861,7 @@ class pairing:
         if pairs is None:
             while not full:  # Number of pairs must be correct in homogenious, otherwise rerun
                 pairs = self.pair_weighted_round(bracket, nodes, edges, pairingmode, numpairs, category)
-                if pairingmode == "S":
+                if pairingmode == "HO":
                     paired = len(
                         [
                             (a, b)
@@ -902,14 +898,13 @@ class pairing:
         nx_edges = [(edge["ca"], edge["cb"], 0) for edge in edges]
         G.add_weighted_edges_from(nx_edges)
         matching = nx.min_weight_matching(G)
-        # print("W826",len(nodes) - 2*len(matching))
         return len(nodes) - 2 * len(matching)
 
     def find_weighted_pab(self, nodes, edges):
         pablevel = 0
         G = nx.Graph()
         self.crosstable.compute_pab_weight(edges)
-        nx_edges = [(edge["ca"], edge["cb"], edge["iweight"]) for edge in edges]
+        nx_edges = [(edge["ca"], edge["cb"], edge["weight"]) for edge in edges]
         G.add_weighted_edges_from(nx_edges)
         wpairs = sorted([((a, b) if a < b else (b, a)) for (a, b) in nx.min_weight_matching(G)])
         if len(wpairs) < len(nodes) // 2:
@@ -947,63 +942,63 @@ class pairing:
         if nodeptr[0] == -1:
             nodeptr[0] = len(nodes)
 
-        s1len = nodeptr[scorelevel]
-        s2len = nodeptr[scorelevel - 1]
-        slen = s2len
+        HO1len = nodeptr[scorelevel]
+        HO2len = nodeptr[scorelevel - 1]
+        slen = HO2len
         if scorelevel <= self.pablevel:
             slen -= 1
         if slen % 2 == 1 and hnext.get("cur_hamilton", -1) < 2:
             return (False, 2, None)
 
-        colordiff = self.analyze_colordiff(nodes[:s2len])
+        colordiff = self.analysis_colordiff(nodes[:HO2len])
         c12 = colordiff["c12"]
         c13 = colordiff["c13"]
 
         # hetrogenious pairing
         hetro = []
-        SE1 = [node["cid"] for node in nodes[:s1len]]
-        SE2 = SER = [node["cid"] for node in nodes[s1len:s2len]]
-        if len(SE1):
-            hetro = self.simple_permute(scorelevel, nodes, edges, SE1, SE2, colordiff, False)
+        SHE1 = [node["cid"] for node in nodes[:HO1len]]
+        SHE2 = SER = [node["cid"] for node in nodes[HO1len:HO2len]]
+        if len(SHE1):
+            hetro = self.simple_permute(scorelevel, nodes, edges, SHE1, SHE2, colordiff, False)
             if len(hetro) == 0:
                 return (False, 3, None)
-            SER = [node for node in SE2 if node not in hetro]
+            SER = [node for node in SHE2 if node not in hetro]
 
         # homogenious pairing
         homo = []
         slen = len(SER)
         if scorelevel <= self.pablevel:
             slen -= 1
-        SS1 = SER[: slen // 2]
-        SS2 = SER[slen //2:]
-        if len(SS2) - len(SS1) > 1:
+        SHO1 = SER[: slen // 2]
+        SHO2 = SER[slen //2:]
+        if len(SHO2) - len(SHO1) > 1:
             return (False, 4, None)
-        if len(SS1):
+        if len(SHO1):
             # rpos = nodeptr[max(0, scorelevel - 2)]
-            homo = self.simple_permute(scorelevel, nodes, edges, SS1, SS2, colordiff, True)
+            homo = self.simple_permute(scorelevel, nodes, edges, SHO1, SHO2, colordiff, True)
             if len(homo) == 0:
                 return (False, 5, None)
-            # SS2 = [node for node in SS2 if node not in homo]
-            # SS2 = list(set(SS2)-set(homo))
+            # SHO2 = [node for node in SHO2 if node not in homo]
+            # SHO2 = list(set(SHO2)-set(homo))
         # breakpoint()
-        pairs = [(SE1[a], b) for (a, b) in enumerate(hetro)] + [(SS1[a], b) for (a, b) in enumerate(homo[0:len(SS1)])]
+        pairs = [(SHE1[a], b) for (a, b) in enumerate(hetro)] + [(SHO1[a], b) for (a, b) in enumerate(homo[0:len(SHO1)])]
         tc12 = tc13 = 0
         self.crosstable.B = slen
-        self.crosstable.init_bweights(scorelevel, len(SS2))
+        self.crosstable.init_bweights(scorelevel, len(SHO2))
         epairs = []
         spairs = []
         for a, b in pairs:
             edge = self.get_edge_quality(self.opponents[a][b])
-            if a in SE1:
+            if a in SHE1:
                 epairs.append(edge)
             else:
                 spairs.append(edge)
-            tc12 += edge["quality"][qdefs.C12.value]
-            tc13 += edge["quality"][qdefs.C13.value]
+            tc12 += edge["quality"][qdefs.QC12.name]
+            tc13 += edge["quality"][qdefs.QC13.name]
 
         bracket["bsno"] = self.update_bsn(scorelevel, [node for node in nodes if node["cid"] in SER])
         # self.crosstable.update_hetrogenious(scorelevel, epairs, bracket["bsne"])
-        # self.crosstable.update_bipartite(scorelevel, pairs, bracket["bsno"], SS2[0], SS2[-1]
+        # self.crosstable.update_bipartite(scorelevel, pairs, bracket["bsno"], SHO2[0], SHO2[-1]
         # self.crosstable.update_homogenious(scorelevel, spairs, bracket["bsne"], len(spairs))
 
 
@@ -1060,17 +1055,17 @@ class pairing:
             print("Max permute", numsub)
         return []
 
-    def canbepared(self, s1, s2, colordiff, depth):
-        edge = self.opponents[s1][s2]
+    def canbepared(self, S1, S2, colordiff, depth):
+        edge = self.opponents[S1][S2]
         self.get_edge_quality(edge)
         if edge["qc"] and self.try_and_update_colordiff(edge, colordiff):
             return True
         return False
 
-    def cannotbepared(self, s1, s2, colordiff, depth):
-        edge = self.opponents[s1][s2]
+    def cannotbepared(self, S1, S2, colordiff, depth):
+        edge = self.opponents[S1][S2]
         self.get_edge_quality(edge)
-        if s1 == 0:
+        if S1 == 0:
             raise
             # breakpoint()
         self.free_and_update_colordiff(edge, colordiff)
@@ -1078,44 +1073,44 @@ class pairing:
 
     # After a perfect match of simple pairing, is it possible to pair the remaining nodes ?
 
-    def tcanbecompleted(self, scorelevel, nodes, edges, s1, s2, permutations):
+    def tcanbecompleted(self, scorelevel, nodes, edges, S1, S2, permutations):
         t0 = time.time()
-        comp = self.canbecompleted(scorelevel, nodes, edges, s1, s2, permutations)
+        comp = self.canbecompleted(scorelevel, nodes, edges, S1, S2, permutations)
         t1 = time.time()
         if self.verbose:
             print(f"Can be compleeted: {t1 - t0:.3} s", comp)
         return comp
 
 
-    def canbecompleted(self, scorelevel, nodes, edges, s1, s2, permutations):
-        # restnodes = s2[len(permutations):]
-        restnodes = permutations[len(s1) :]
+    def canbecompleted(self, scorelevel, nodes, edges, S1, S2, permutations):
+        # restnodes = S2[len(permutations):]
+        restnodes = permutations[len(S1) :]
         if len(restnodes) == 0:
             return True
         if any([self.competitors[rest]["flt"] & (flt.DF1.value + flt.DF2.value) for rest in restnodes]):
             # print("FLT return", False)
             return False
         if scorelevel <= self.pablevel:
-            min_c9 = min([edge["bun"] for edge in edges if edge["ca"] == 0 and edge["canmeet"]])
+            min_c9 = min([edge["unplayed"] for edge in edges if edge["ca"] == 0 and edge["canmeet"]])
         for rest in restnodes:
             if scorelevel <= self.pablevel:
                 redge = self.opponents[rest][0]
                 if redge["canmeet"]:
-                    if redge["bun"] != min_c9:
+                    if redge["unplayed"] != min_c9:
                         return
                     mod_nodes = [node for node in nodes if node["cid"] != rest and node["cid"] != 0]
-                    mod_nodes = [node for node in mod_nodes if node["cid"] not in s1 and node["cid"] not in permutations[: len(s1)]]
+                    mod_nodes = [node for node in mod_nodes if node["cid"] not in S1 and node["cid"] not in permutations[: len(S1)]]
                     mod_edges = self.get_edges(mod_nodes, edges)
                     (_, unpaired, _) = self.is_complete(mod_nodes, mod_edges)
                     # print("PAB return", unpaired, unpaired == 0)
                     return unpaired == 0
             else:
-                rest_nodes = [node for node in nodes if node["cid"] not in s1 and node["cid"] not in permutations[: len(s1)]]
+                rest_nodes = [node for node in nodes if node["cid"] not in S1 and node["cid"] not in permutations[: len(S1)]]
                 for edge in self.opponents[rest]:
                     if edge["canmeet"] and (edge["sa"] == scorelevel - 1 or edge["sb"] == scorelevel - 1):
                         opp = edge["ca"] + edge["cb"] - rest
                         mod_nodes = [node for node in rest_nodes if node["cid"] != rest and node["cid"] != opp]
-                        # mod_nodes = [node for node in _nodes if node['cid'] not in s1 and node['cid'] not in permutations[:len(s1)]]
+                        # mod_nodes = [node for node in _nodes if node['cid'] not in S1 and node['cid'] not in permutations[:len(S1)]]
                         mod_edges = self.get_edges(mod_nodes, edges)
                         (_, unpaired, _) = self.is_complete(mod_nodes, mod_edges)
                         if unpaired == 0:
@@ -1134,13 +1129,13 @@ class pairing:
         if len(modified_nodes) == 0:
             return []
         #  match (pairingmode):
-        if pairingmode == "E":
+        if pairingmode == "HE":
             self.crosstable.update_hetrogenious(scorelevel, modified_nodes, modified_edges, bracket["bsne"])
-        elif pairingmode == "S":
+        elif pairingmode == "HO":
             # bracket['bsno'] = self.update_bsn(scorelevel, [node for node in modified_nodes if node['scorelevel'] <= scorelevel and node['lmb'] != scorelevel])
             bracket["bsno"] = self.update_bsn(scorelevel, [node for node in modified_nodes if node["scorelevel"] <= scorelevel])
             self.crosstable.update_homogenious(scorelevel, modified_edges, bracket["bsno"], numpairs)
-        elif pairingmode == "B":
+        elif pairingmode == "BI":
             bracket["bsnb"] = {node["cid"]: i + 1 for i, node in enumerate(modified_nodes)}
             self.crosstable.update_hetrogenious(scorelevel, modified_nodes, modified_edges, bracket["bsnb"])
             self.crosstable.update_bipartite(
@@ -1152,9 +1147,9 @@ class pairing:
         # category =0
         for c in [edge for edge in modified_edges]:
             (wcid, bcid) = (c["ca"], c["cb"])
-            weight = self.crosstable.update_weight(pairingmode, c)
+            weight = self.crosstable.update_weight(pairingmode, category, c)
             if self.reportlevel > 3:
-                print(pairingmode + "-Edge:", f"{wcid:3} {bcid:3} ", self.crosstable.format_weight(pairingmode, weight), c["cweight"], c["eweight"], c["sweight"])
+                print(pairingmode + "-Edge:", f"{wcid:3} {bcid:3} ", self.crosstable.format_weight(pairingmode, weight)) #, c["weight"], c["qcweight"], c["heweight"], c["howeight"])
             nx_edges.append((wcid, bcid, weight))
 
 
@@ -1169,7 +1164,7 @@ class pairing:
                 for pair in wpairs:
                     c = self.opponents[pair[0]][pair[1]]
                     (wcid, bcid) = (c["ca"], c["cb"])
-                    print(pairingmode + "-Minw:", f"{wcid:3} {bcid:3} ", self.crosstable.format_weight(pairingmode, c["weight"]), c["cweight"], c["eweight"], c["sweight"])
+                    print(pairingmode + "-Minw:", f"{wcid:3} {bcid:3} ", self.crosstable.format_weight(pairingmode, c["weight"])) #, c["weight"], c["qcweight"], c["heweight"], c["howeight"])
         t1 = time.time() 
         # print("Time:", t1 - t0)
         return wpairs
@@ -1179,7 +1174,7 @@ class pairing:
     When the number of players are much higher then the number of rounds
     we can try an pairing without exchanges and c12.
 
-    update_nummeet(self, s0, key, offset=1)
+    update_nummeet(self, HO0, key, offset=1)
     Returns 0 if we cannot garateee that pairing is possible
     othewise returns the minimum number of opponents you can meet
     Offset 1 since we add one downloaded player
@@ -1216,8 +1211,9 @@ class pairing:
         if hist is None:
             hist = self.compute_whohasmet_histogram(nodes, edges)
         sorthist = sorted(hist)
-        if len(sorthist) > len(nodes):
-            sorthist = sorthist[-len(nodes):]  
+        #  This attemt lead to wrong result for 1 of 100000 tournaments, and is not worth the risk of a wrong pairing
+        # if len(sorthist) > len(nodes):
+        #    sorthist = sorthist[-len(nodes):]  
         if len(sorthist) == 0 or sorthist[-1] == 0:
             return (0, numnodes, -1)  # None can meet
         if not pab and nodes[0]["cid"] == 0 and hist[0] > 1 and sorthist[1] >= limit:
@@ -1252,7 +1248,7 @@ class pairing:
             hist[node_id[edge["cb"]]] += 1
         return hist
 
-    # analyze_colordiff
+    # analysis_colordiff
     # nodes - list of nodes, all with a color preference "w2", "b2, "w1", "b1", "w0", "b0" of "  "
     # treat w2 + w1 as w1 and b2 + b1 as b1
     # Now pair as many of w1 vs b1
@@ -1278,7 +1274,7 @@ class pairing:
 
         return (c12, c13, pref)
 
-    def analyze_colordiff(self, nodes):
+    def analysis_colordiff(self, nodes):
         # Always even number
         # if (len(nodes)%2) == 1:
         #    breakpoint()
@@ -1310,8 +1306,8 @@ class pairing:
                 bc -= 1
             elif c == "B":
                 bc -= 1
-        # Start with C12 and C13, it the pair increases the minimum C12/C13,
-        # adjust with th C12 / C13 contrebution of current pair
+        # Start with QC12 and QC13, it the pair increases the minimum QC12/QC13,
+        # adjust with th QC12 / QC13 contrebution of current pair
         (c12, c13, pref) = self.calculate_c12_c13_pref((nc, w0, wc, b0, bc))
         cd12 = 1 if edge["colordiff"].lower() in ["ww", "bb"] else 0
         cd13 = 1 if edge["colordiff"] in ["WW", "BB"] else 0
@@ -1338,8 +1334,8 @@ class pairing:
                 bc += 1
             elif c == "B":
                 bc += 1
-        # Start with C12 and C13, it the pair increases the minimum C12/C13,
-        # adjust with th C12 / C13 contrebution of current pair
+        # Start with QC12 and QC13, it the pair increases the minimum QC12/QC13,
+        # adjust with th QC12 / QC13 contrebution of current pair
         (c12, c13, pref) = self.calculate_c12_c13_pref((nc, w0, wc, b0, bc))
         # cd12 = 1 if edge["colordiff"].lower() in ["ww", "bb"] else 0
         # cd13 = 1 if edge["colordiff"] in ["WW", "BB"] else 0
@@ -1348,8 +1344,8 @@ class pairing:
         colordiff.update({"nc": nc, "w0": w0, "wc": wc, "b0": b0, "bc": bc, "c12": c12, "c13": c13, "pref": pref})
         return True
 
-    def analyze_downfloat(self, scorelevel, s1nodes, s2nodes, edges, colordiff):
-        if s1nodes[-1]["scorelevel"] != scorelevel:
+    def analysis_downfloat(self, scorelevel, S1nodes, S2nodes, edges, colordiff):
+        if S1nodes[-1]["scorelevel"] != scorelevel:
             return 0
 
     """
@@ -1367,9 +1363,9 @@ class pairing:
         if self.checkonly:
             if "b" not in c:
                 c["b"] = 0
-            (c["e-rule"], c["e-ok"]) = (colres["e-rule"], c["w"] == colres["w"] and (c["b"] == colres["b"]))
+            (c["colorrule"], c["e-ok"]) = (colres["colorrule"], c["w"] == colres["w"] and (c["b"] == colres["b"]))
         else:
-            (c["w"], c["b"], c["e-rule"], c["e-ok"]) = (colres["w"], colres["b"], colres["e-rule"], True)
+            (c["w"], c["b"], c["colorrule"]) = (colres["w"], colres["b"], colres["colorrule"])
 
 
     def color_allocation(self, a, b):
@@ -1384,23 +1380,23 @@ class pairing:
 
         # PAB, always set player to white
         if arank == 0:
-            return {"w": bcid, "b": acid, "e-rule": "pab"}  # ('b', 'w', 'pab')
+            return {"w": bcid, "b": acid, "colorrule": "pab"}  # ('b', 'w', 'pab')
         if brank == 0:
-            return {"w": acid, "b": bcid, "e-rule": "pab"}  # ('w', 'b', 'pab')
+            return {"w": acid, "b": bcid, "colorrule": "pab"}  # ('w', 'b', 'pab')
 
         # E.1
 
         if acp == "w" and bcp != "w" or acp != "b" and bcp == "b":
-            return {"w": acid, "b": bcid, "e-rule": "E.1"}  # ('w', 'b', 'E.1')
+            return {"w": acid, "b": bcid, "colorrule": "E.1"}  # ('w', 'b', 'E.1')
         if acp == "b" and bcp != "b" or acp != "w" and bcp == "w":
-            return {"w": bcid, "b": acid, "e-rule": "E.1"}  # ('b', 'w', 'E.1')
+            return {"w": bcid, "b": acid, "colorrule": "E.1"}  # ('b', 'w', 'E.1')
         # E.2
         if (acp == "w" and bcp == "w" and acs > bcs) or (acp == "b" and bcp == "b" and acs < bcs):
-            return {"w": acid, "b": bcid, "e-rule": "E.2"}  # ('w', 'b', 'E.2')
+            return {"w": acid, "b": bcid, "colorrule": "E.2"}  # ('w', 'b', 'E.2')
         if (acp == "b" and bcp == "b" and acs > bcs) or (acp == "w" and bcp == "w" and acs < bcs):
-            return {"w": bcid, "b": acid, "e-rule": "E.2"}  # ('b', 'w', 'E.2')
+            return {"w": bcid, "b": acid, "colorrule": "E.2"}  # ('b', 'w', 'E.2')
         if acd != bcd and acs == bcs:  # both have absolute color preference, se if there are different color difference
-            return {"w": acid, "b": bcid, "e-rule": "E.2"} if acd < bcd else {"w": bcid, "b": acid, "e-rule": "E.2"}
+            return {"w": acid, "b": bcid, "colorrule": "E.2"} if acd < bcd else {"w": bcid, "b": acid, "colorrule": "E.2"}
             # return ('w', 'b', 'E.2') if acd < bcd else ('b', 'w', 'E.2')
         # E.3
         asq = a["csq"]
@@ -1410,9 +1406,9 @@ class pairing:
             bc = bsq[-i]
             if ac != bc:
                 if ac == "b" or bc == "w":
-                    return {"w": acid, "b": bcid, "e-rule": "E.3"}  # ('w', 'b', 'E.3')
+                    return {"w": acid, "b": bcid, "colorrule": "E.3"}  # ('w', 'b', 'E.3')
                 if ac == "w" or bc == "b":
-                    return {"w": bcid, "b": acid, "e-rule": "E.3"}  # ('b', 'w', 'E.3')
+                    return {"w": bcid, "b": acid, "colorrule": "E.3"}  # ('b', 'w', 'E.3')
         # E.4
         (atpn, btpn) = (a["tpn"], b["tpn"])
         (highcid, hightpn) = (
@@ -1422,11 +1418,11 @@ class pairing:
         )
         lowcid = acid + bcid - highcid
         if acp == "w" or acp == "b":
-            # print("S2", acp, min(acid, bcid), max(acid, bcid), {acp : min(acid, bcid), other[acp] : max(acid, bcid) , "e-rule": 'E.4'})
-            return {acp: highcid, other[acp]: lowcid, "e-rule": "E.4"}  # (acp, other[acp], 'E.4')
+            # print("S2", acp, min(acid, bcid), max(acid, bcid), {acp : min(acid, bcid), other[acp] : max(acid, bcid) , "colorrule": 'E.4'})
+            return {acp: highcid, other[acp]: lowcid, "colorrule": "E.4"}  # (acp, other[acp], 'E.4')
         # if a['tpn'] > b['tpn'] and (acp == 'w' or acp == 'b'):
         #    return (other[acp], acp, 'E.4')
         # E.5
         tc = self.topcolor
         rev = hightpn % 2 == 0
-        return {tc: (lowcid if rev else highcid), other[tc]: (highcid if rev else lowcid), "e-rule": "E.5"}
+        return {tc: (lowcid if rev else highcid), other[tc]: (highcid if rev else lowcid), "colorrule": "E.5"}

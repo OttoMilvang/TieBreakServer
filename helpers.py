@@ -3,16 +3,22 @@
 Created on Tue Oct 31 13:57:55 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
+import dataclasses
+import decimal
 import json
 import sys
-from decimal import Decimal
+import decimal
+from enum import Enum, EnumType
+import qdefs
 
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, Decimal.Decimal):
+        if isinstance(o, EnumType): 
+            return [str(q.name) for q in o]        
+        if isinstance(o, decimal.Decimal):
             return str(o)
-        return super().default(o)
+        return super(DecimalEncoder, self).default(o)
 
 
 # ==============================
@@ -78,13 +84,13 @@ def parse_int(txt):
 def parse_float(txt):
     txt = txt.strip()
     if len(txt) == 0:
-        return Decimal("0.0")
+        return decimal.Decimal("0.0")
     txt = txt.replace(",", ".")
-    return Decimal(txt)
+    return decimal.Decimal(txt)
 
 
 def to_base36(num):
-    b36 = min(abs(int(num * Decimal("2.0"))), 35)
+    b36 = min(abs(int(num * decimal.Decimal("2.0"))), 35)
     return "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[b36]
 
 
@@ -300,19 +306,14 @@ def query_yes_no(question, default="yes"):
 #
 
 
-def decimal_serializer(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-        return "_jpre_" + str(obj) + "_jpost_"
-    raise TypeError("Type not serializable")
-
 
 def json_input(file, json, obj):
     if isinstance(file, str):
         f = sys.stdin if file == "-" else open(file, "r")
     else:
         f = file
-    jsonout = json.dumps(obj, indent=2, default=decimal_serializer)
+    jsonout = json.dumps(obj, indent=2, cls=DecimalEncoder) # default=decimal_serializer)
+    f.write(jsonout)
     f.write(jsonout.replace('"_jpre_', "").replace('_jpost_"', "") + "\n")
     if isinstance(file, str) and file != "-":
         f.close()
@@ -323,8 +324,8 @@ def json_output(file, obj):
         f = sys.stdout if file == "-" else open(file, "w")
     else:
         f = file
-    jsonout = json.dumps(obj, indent=2, default=decimal_serializer)
-    f.write(jsonout.replace('"_jpre_', "").replace('_jpost_"', "") + "\n")
+    jsonout = json.dumps(obj, indent=2, cls=DecimalEncoder) # default=decimal_serializer)
+    f.write(jsonout)
     if isinstance(file, str) and file != "-":
         f.close()
 

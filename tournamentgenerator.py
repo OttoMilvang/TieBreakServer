@@ -196,7 +196,7 @@ class tournamentgenerator(commonmain):
         maxmeets = int(self.params["maxmeets"])
         self.params['is_rr'] = False
         self.docheck = False
-        self.doanalyze = False
+        self.doanalysis = False
         self.dopairing = True  
         tournament["currentRound"] =  rnd
         if maxmeets > 0:
@@ -289,7 +289,7 @@ class tournamentgenerator(commonmain):
         #print('PARAMS', params)
         self.pairingengine = pairingengine
         tm = pairingengine.tournament
-        analyze = pairing = [] 
+        analysis = pairing = [] 
         if "fakerank" in params["experimental"]:
             fwd = [0]*(len(tm["competitors"])+1)
             inv = [0]*(len(tm["competitors"])+1)
@@ -298,11 +298,11 @@ class tournamentgenerator(commonmain):
                 inv[c["rank"]] = c["cid"]
             self.fakerank(tm, fwd, pairing)
         acompetitors = pcompetitors = {} 
-        if self.doanalyze or (self.docheck and not self.doanalyze and not self.dopairing):
-            analyze = pairingengine.compute_pairing(True)
+        if self.doanalysis or (self.docheck and not self.doanalysis and not self.dopairing):
+            analysis = pairingengine.compute_pairing(True)
             acompetitors = sorted([{key: value for (key, value) in c.items() if key != 'opp'} for c in pairingengine.crosstable.crosstable], key=lambda c: (c['cid']))  
                      
-        if self.dopairing or (self.docheck and not self.doanalyze and not self.dopairing):
+        if self.dopairing or (self.docheck and not self.doanalysis and not self.dopairing):
             pairing = pairingengine.compute_pairing(False)
             pcompetitors = sorted(pairingengine.crosstable.competitors, key=lambda c: (c['cid']))                         
         if "fakerank" in params["experimental"]:
@@ -310,7 +310,7 @@ class tournamentgenerator(commonmain):
         result = {
             'round' : pairingengine.rnd,
             'check': self.docheck,
-            'analyze' : analyze,
+            'analysis' : analysis,
             'checker': pairing, 
             'competitors' : pcompetitors if len(pcompetitors) >= len(acompetitors) else acompetitors,
             'level2score' : pairingengine.crosstable.level2score,

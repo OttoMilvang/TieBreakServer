@@ -8,38 +8,38 @@ from enum import Enum
 
 # Quality constants
 
-
+c1 = 0
 class qdefs(Enum):
-    C6 = 0
-    C7 = 1
-    N8 = 2
-    C8 = 3
-    C9 = 4
-    MM = 5
-    C10 = 6
-    C11 = 7
-    C12 = 8
-    C13 = 9
-    C14 = 10
-    C15 = 11
-    C16 = 12
-    C17 = 13
-    C18 = 14
-    C19 = 15
-    C20 = 16
-    C21 = 17
-    E1 = 18
-    E2 = 19
-    S1 = 20
-    S2 = 21
-    S3 = 22
-    S4 = 23
-    S5 = 24
+    QC6 = 0
+    QC7 = 1
+    QN8 = 2
+    QC8 = 3
+    QC9 = 4
+    QMM = 5
+    QC10 = 6
+    QC11 = 7
+    QC12 = 8
+    QC13 = 9
+    QC14 = 10
+    QC15 = 11
+    QC16 = 12
+    QC17 = 13
+    QC18 = 14
+    QC19 = 15
+    QC20 = 16
+    QC21 = 17
+    HE1 = 18
+    HE2 = 19
+    HO1 = 20
+    HO2 = 21
+    HO3 = 22
+    HO4 = 23
+    HO5 = 24
     IW = 25
     QL = 26
-    C0 = 26
-    S0 = 27
-    E0 = 28
+    QC0 = 26
+    HE0 = 27
+    HO0 = 28
     B0 = 29
     QS = 30
 

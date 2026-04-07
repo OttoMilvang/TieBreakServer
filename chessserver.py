@@ -23,6 +23,7 @@ Request:
         "filetype": "TRF" | "TS" | < other known format >,
         "content": ["<lines with base 64 encoded file>"],
         "tournamentno": <0 or tournamentno to convert>,
+        "current_round": <int>,
         "number_of_rounds": <int>,
         // parameters for tiebreaks
             "tiebreaks" : [string list],
@@ -89,10 +90,10 @@ class chessserver(commonmain):
                     self.filetype = "tiebreak"
                 if chessfile.get_status() == 0:
                     if self.tournamentno > 0:
-                        tb = tiebreak(tournament, params["number_of_rounds"], params)
+                        tb = tiebreak(tournament, params["current_round"], params)
                         tb.compute_tiebreaks(tournament, params)
                     else:
-                        tb = tiebreak(tournament, params["number_of_rounds"], params)
+                        tb = tiebreak(tournament, params["current_round"], params)
                 self.core = tb
         else:
                 self.core = None

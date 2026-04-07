@@ -34,37 +34,37 @@ UF1 = 2
 UF2 = 8
 
 # Euality constants
-C6 = qdefs.C6.value
-C7 = qdefs.C7.value
-N8 = qdefs.N8.value
-C8 = qdefs.C8.value
-C9 = qdefs.C9.value
-MM = qdefs.MM.value
-C10 = qdefs.C10.value
-C11 = qdefs.C11.value
-C12 = qdefs.C12.value
-C13 = qdefs.C13.value
-C14 = qdefs.C14.value
-C15 = qdefs.C15.value
-C16 = qdefs.C16.value
-C17 = qdefs.C17.value
-C18 = qdefs.C18.value
-C19 = qdefs.C19.value
-C20 = qdefs.C20.value
-C21 = qdefs.C21.value
-E1 = qdefs.E1.value
-E2 = qdefs.E2.value
-S1 = qdefs.S1.value
-S2 = qdefs.S2.value
-S3 = qdefs.S3.value
-S4 = qdefs.S4.value
-S5 = qdefs.S5.value
-IW = qdefs.IW.value
+QC6 = qdefs.QC6.name
+QC7 = qdefs.QC7.name
+QN8 = qdefs.QN8.name
+QC8 = qdefs.QC8.name
+QC9 = qdefs.QC9.name
+QMM = qdefs.QMM.name
+QC10 = qdefs.QC10.name
+QC11 = qdefs.QC11.name
+QC12 = qdefs.QC12.name
+QC13 = qdefs.QC13.name
+QC14 = qdefs.QC14.name
+QC15 = qdefs.QC15.name
+QC16 = qdefs.QC16.name
+QC17 = qdefs.QC17.name
+QC18 = qdefs.QC18.name
+QC19 = qdefs.QC19.name
+QC20 = qdefs.QC20.name
+QC21 = qdefs.QC21.name
+HE1 = qdefs.HE1.name
+HE2 = qdefs.HE2.name
+HO1 = qdefs.HO1.name
+HO2 = qdefs.HO2.name
+HO3 = qdefs.HO3.name
+HO4 = qdefs.HO4.name
+HO5 = qdefs.HO5.name
+IW = qdefs.IW.name
 QL = qdefs.QL.value
-C0 = qdefs.C0.value
-E0 = qdefs.E0.value
-S0 = qdefs.S0.value
-B0 = qdefs.B0.value
+QC0 = qdefs.QC0.name
+HE0 = qdefs.HE0.name
+HO0 = qdefs.HO0.name
+B0 = qdefs.B0.name
 QS = qdefs.QS.value
 
 
@@ -99,19 +99,19 @@ class crosstable:
         self.verbose = verbose
         self.checkonly = checkonly
         self.experimental = {
-            "XC6": "XC6" in experimental,
-            "XC7": "XC7" in experimental,
-            "XC8": "XC8" in experimental,
-            "XC9": "XC9" in experimental,
-            "XC14": "XC14" in experimental,
-            "XC14M1": "XC14M1" in experimental,
-            "XC16": "XC16" in experimental,
-            "XC16M1": "XC16M1" in experimental,
+            "XQC6": "XQC6" in experimental,
+            "XQC7": "XQC7" in experimental,
+            "XQC8": "XQC8" in experimental,
+            "XQC9": "XQC9" in experimental,
+            "XQC14": "XQC14" in experimental,
+            "XQC14M1": "XQC14M1" in experimental,
+            "XQC16": "XQC16" in experimental,
+            "XQC16M1": "XQC16M1" in experimental,
             "XCTOPM1": "XTOPM1" in experimental,
         }
-        self.scalars = [C6, N8, C9, C10, C11, C12, C13, C14, C15, C16, C17, S1, S2, IW]
+        self.scalars = [QC6, QN8, QC9, QC10, QC11, QC12, QC13, QC14, QC15, QC16, QC17, HO1, HO2, IW]
 
-    def init_engine(self, tournament, rnd, maxmeets, topcolor, unpaired, rank):
+    def init_engine(self, tournament, rnd, maxmeets, topcolor, rank):
         self.rnd = rnd
         self.maxmeets = maxmeets
         self.topcolor = topcolor
@@ -131,7 +131,7 @@ class crosstable:
         self.Cbits = ncmps.bit_length()
         self.Rbits = rnd.bit_length()
         prohibited = tournament.get("prohibited", [])
-        (competitors, opponents) = self.list_edges(cmps, maxmeets, topcolor, unpaired, prohibited)
+        (competitors, opponents) = self.list_edges(cmps, maxmeets, topcolor, prohibited)
         return (competitors, opponents)
 
     def get_edge_quality(self, edge):
@@ -144,10 +144,10 @@ class crosstable:
         tblist = ["PTS", "ACC", "RFP", "NUM", "RIP", "COD", "COP", "CSQ", "FLT", "TOP"]
         for pos in range(0, len(tblist)):
             mytb = tb.parse_tiebreak(pos + 1, tblist[pos])
-            tb.compute_tiebreak(mytb)
+            tb.compute_single_tiebreak(mytb)
         return tb.cmps
 
-    def list_edges(self, cmps, maxmeets, topcolor, unpaired, prohibited):
+    def list_edges(self, cmps, maxmeets, topcolor, prohibited):
         self.cmps = cmps
         self.size = self.BLOB = len(cmps.keys()) + 1
         self.ilen = 0
@@ -167,7 +167,7 @@ class crosstable:
                 "rnk": cmps[i]["orgrank"] if i in cmps else i,
                 "pts": tbval[PTS]["val"] if tbval else Decimal("0.0"),
                 "acc": tbval[ACC]["val"] if tbval else Decimal("-1.0"),
-                "rfp": tbval[RFP]["val"] != "" if tbval and i not in unpaired else False,
+                "rfp": tbval[RFP]["val"] != "" if tbval else False,
                 "pop": int(tbval[RFP]["val"][0:-1]) if tbval and len(tbval[RFP]["val"]) > 1 else -1,
                 "pco": tbval[RFP]["val"][-1:] if tbval and len(tbval[RFP]["val"]) > 1 else "",
                 "hst": tbval[RFP] if tbval else {},
@@ -180,6 +180,8 @@ class crosstable:
                 "flt": tbval[FLT]["val"] if tbval else 0,
                 "top": tbval[TOP]["val"] if tbval else False,
             }
+            if i in cmps and not cmps[i]["present"] and not self.checkonly:
+                competitors[i]["rfp"] = False
             opponents[i] = [None] * (size + 1)
 
             competitors[0]["rfp"] ^= competitors[i]["rfp"]
@@ -251,22 +253,21 @@ class crosstable:
             "cb": cb,
             "sa": sa,
             "sb": sb,
-            # C1 and C2 meetmax = 1
+            # QC1 and QC2 meetmax = 1
             "canmeet": False,
             "isblob": b["cid"] == self.BLOB,
             "played": played,
-            "bun": self.rnd - 1 - b["num"], # Unplayd games by b, for c9-calculations
+            "unplayed": self.rnd - 1 - b["num"], # Unplayd games by b, for c9-calculations
             "qlevel": -1, # quality was calulated for scorelevel ...
             "quality": None,
             "weight": 0,
-            "cweight": 0,
-            "eweight": 0,
-            "sweight": 0,
-            "iweight": 0,
+            "qcweight": 0,
+            "heweight": 0,
+            "howeight": 0,
             "colordiff": "  ",
             "qc": False,
         }
-        # C3 not-topscorers with absolute color preference cannot meet
+        # QC3 not-topscorers with absolute color preference cannot meet
         canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
         for col in ["w", "b"]:
             col2 = col + "2"
@@ -275,7 +276,6 @@ class crosstable:
             if a["cod"] * b["cod"] >= 4 and (not a["top"]) and (not b["top"]):
                 canmeet = False
         # score diff
-        c["psd"] = abs(sa - sb)
         c["canmeet"] = c["qc"] = canmeet
         return c
 
@@ -314,7 +314,7 @@ class crosstable:
         if c["qlevel"] == self.scorelevel and c["cb"] < self.BLOB:
             return
         c["qlevel"] = self.scorelevel
-        c["quality"] = [None] * QL
+        c["quality"] = {q.name : None for q in qdefs if q.value < QL}
         coltrans = {"  ": "n", "w0": "w", "w1": "W", "w2": "W", "b0": "b", "b1": "B", "b2": "B"}
         maxpsd = self.maxpsd
         scorelevel = self.scorelevel
@@ -326,27 +326,27 @@ class crosstable:
             if a["scorelevel"] < b["scorelevel"]:
                 (a, b) = (b, a)
             q = c["quality"]
-            q[C6] = 0
-            q[C7] = [0] * (maxpsd)
-            q[N8] = 0
-            q[C8] = [0] * (maxpsd + 1)
-            q[C9] = 0
-            q[MM] = [0] * (self.maxmeets-1)
-            for elem in range(C10, C18):
-                q[elem] = 0
-            for elem in range(C18, C21 + 1):
-                q[elem] = [0] * maxpsd
+            q[QC6] = 0
+            q[QC7] = [0] * (maxpsd)
+            q[QN8] = 0
+            q[QC8] = [0] * (maxpsd + 1)
+            q[QC9] = 0
+            q[QMM] = [0] * (self.maxmeets-1)
+            for elem in range(qdefs.QC10.value, qdefs.QC18.value):
+                q[qdefs(elem).name] = 0
+            for elem in range(qdefs.QC18.value, qdefs.QC21.value + 1):
+                q[qdefs(elem).name] = [0] * maxpsd
 
             level = a["scorelevel"] - scorelevel
 
             c14 = c15 = c16 = c17 = 0
             if a["scorelevel"] >= scorelevel and b["scorelevel"] == scorelevel:
                 if self.pablevel and b["scorelevel"] == 0:
-                    q[C9] = self.rnd - 1 - a["num"]
-                    cweight += weight[C9] * q[C9]
+                    q[QC9] = self.rnd - 1 - a["num"]
+                    cweight += weight[QC9] * q[QC9]
 
                 if c["canmeet"] and c["played"] > 0 and self.maxmeets > 1:
-                    q[MM][c["played"]-1] = 1  
+                    q[QMM][c["played"]-1] = 1  
 
                 # Topscorere
 
@@ -357,13 +357,13 @@ class crosstable:
                     # print(c, a['cod'], b['cod'])
                     # apf = a["cod"] + 1 if a["cid"] == c["w"] else a["cod"] - 1
                     # bpf = b["cod"] + 1 if b["cid"] == c["w"] else b["cod"] - 1
-                    # q[C10] = 1 if abs(apf) > 2 and abs(bpf) >= 2 or abs(apf) >= 2 and abs(bpf) > 2 else 0
+                    # q[QC10] = 1 if abs(apf) > 2 and abs(bpf) >= 2 or abs(apf) >= 2 and abs(bpf) > 2 else 0
 
                     acod = a["cod"]
                     bcod = b["cod"]
                     if acod == bcod and abs(acod) >= 2:
-                        q[C10] = 1
-                        cweight += weight[C10]
+                        q[QC10] = 1
+                        cweight += weight[QC10]
 
                     # c11 minimize the number of topscorers who get same color three times in a row
                     # asq = a["csq"][-2:] + ("w" if a["cid"] == c["w"] else "b")
@@ -380,96 +380,97 @@ class crosstable:
                         if a["csq"][-2:] == b["csq"][-2:] and (a["csq"][-2:] == "ww" or b["csq"][-2:] == "bb") or \
                            anp > bnp and b["csq"][-2:] == opp or bnp > anp and a["csq"][-2:] == opp or \
                            (anp == bnp == 2 and (abs(acod) > abs(bcod) and b["csq"][-2:] == opp or abs(bcod) > abs(acod) and a["csq"][-2:] == opp)):
-                            q[C11] = 1
-                            cweight += weight[C11]
+                            q[QC11] = 1
+                            cweight += weight[QC11]
 
                     if scorelevel == -1:
-                         print(f"A: {a['cid']:2} {a['cod']:2} {a['csq'][-2:]} {a['cop']},   B: {b['cid']:2} {b['cod']:2} {b['csq'][-2:]} {b['cop']},  Q10: {q[C10]} Q11: {q[C11]}")
+                         print(f"A: {a['cid']:2} {a['cod']:2} {a['csq'][-2:]} {a['cop']},   B: {b['cid']:2} {b['cod']:2} {b['csq'][-2:]} {b['cop']},  Q10: {q[QC10]} Q11: {q[QC11]}")
 
 
                 # c12 minimize the number of players who do not get their color preference
                 if a["cop"] != "  " and a["cop"][0].lower() == b["cop"][0].lower():
-                    q[C12] = 1
-                    cweight += weight[C12]
+                    q[QC12] = 1
+                    cweight += weight[QC12]
 
                 # c13 minimize the number of players who do not get their strong color preference
-                if q[C12] == 1 and int(a["cop"][1]) > 0 and int(b["cop"][1]) > 0:
-                    q[C13] = 1
-                    cweight += weight[C13]
+                if q[QC12] == 1 and int(a["cop"][1]) > 0 and int(b["cop"][1]) > 0:
+                    q[QC13] = 1
+                    cweight += weight[QC13]
 
                 c["colordiff"] = coltrans.get(a["cop"], a["cop"][0].upper()) + coltrans.get(b["cop"], b["cop"][0].upper())
 
                 # c15 minimize the number of players who receive upfloft in the previous round
                 c15 = 1 if (a["acc"] < b["acc"]) and (a["flt"] & UF1) or (a["acc"] > b["acc"]) and (b["flt"] & UF1) else 0
                 if c15:
-                    q[C15] = 1
-                    cweight += weight[C15]
+                    q[QC15] = 1
+                    cweight += weight[QC15]
 
                 # c17 minimize the number of players who receive upfloft two rounds before
                 c17 = 1 if (a["acc"] < b["acc"]) and (a["flt"] & UF2) or (a["acc"] > b["acc"]) and (b["flt"] & UF2) else 0
                 if c17:
-                    q[C17] = 1
-                    cweight += weight[C17]
+                    q[QC17] = 1
+                    cweight += weight[QC17]
 
             elif a["scorelevel"] >= scorelevel and b["scorelevel"] < scorelevel:
-                q[C6] = 1
-                cweight += weight[C6]
+                q[QC6] = 1
+                cweight += weight[QC6]
                 if level > 0:
-                    # q[C7] = [1 if level == maxpsd - i else 0 for i in range(maxpsd)]
-                    q[C7][maxpsd - level] = 1
-                    cweight += weight[C7][maxpsd - level]
+                    # q[QC7] = [1 if level == maxpsd - i else 0 for i in range(maxpsd)]
+                    q[QC7][maxpsd - level] = 1
+                    cweight += weight[QC7][maxpsd - level]
 
                 if self.pablevel and b["scorelevel"] == 0:
-                    q[C9] = self.rnd - 1 - a["num"]
-                    cweight += weight[C9] * q[C9]
+                    q[QC9] = self.rnd - 1 - a["num"]
+                    cweight += weight[QC9] * q[QC9]
 
                 # c14 minimize the number of players who receive downfloat in the previous round
                 c14 = 1 if (a["flt"] & DF1) else 0
                 if c14 and scorelevel == a["scorelevel"]:
-                    q[C14] = 1
-                    cweight += weight[C14]
+                    q[QC14] = 1
+                    cweight += weight[QC14]
 
                 # c16 minimize the number of players who receive downfloat two rounds before
                 c16 = 1 if a["flt"] & DF2 else 0
                 if c16 and scorelevel == a["scorelevel"]:
-                    q[C16] = 1
-                    cweight += weight[C16]
+                    q[QC16] = 1
+                    cweight += weight[QC16]
 
             # c18-21 minimize the score difference of players who receive downfloat/upfloat in the previous round
-            for cnn, val in enumerate([(level if cxx else 0) for cxx in [c14, c15, c16, c17]], start=C18):
+            for cnn, val in enumerate([(level if cxx else 0) for cxx in [c14, c15, c16, c17]], start=qdefs.QC18.value):
                 if val > 0:
-                    q[cnn][maxpsd - val] = 1
-                    cweight += weight[cnn][maxpsd - val]
+                    q[qdefs(cnn).name][maxpsd - val] = 1
+                    cweight += weight[qdefs(cnn).name][maxpsd - val]
 
             scorelevel2 = scorelevel - 1
-            # print("N8", scorelevel2, a['cid'], b['cid'], a['scorelevel'], b['scorelevel'], "            ", a['scorelevel'] >= scorelevel2 and b['scorelevel'] < scorelevel2)
+            # print("QN8", scorelevel2, a['cid'], b['cid'], a['scorelevel'], b['scorelevel'], "            ", a['scorelevel'] >= scorelevel2 and b['scorelevel'] < scorelevel2)
             # if scorelevel == testlevel and update_maxpsd:
             #    breakpoint()
             if a["scorelevel"] >= scorelevel2 and b["scorelevel"] < scorelevel2:
-                q[N8] = 1
-                cweight += weight[N8]
+                q[QN8] = 1
+                cweight += weight[QN8]
                 level = max(a["scorelevel"], b["scorelevel"]) - scorelevel2
                 if level > 0:
-                    # q[C8] = [1 if level == maxpsd + 1 - i else 0 for i in range(maxpsd+1)]
-                    q[C8][maxpsd + 1 - level] = 1
-                    cweight += weight[C8][maxpsd + 1 - level]
+                    # q[QC8] = [1 if level == maxpsd + 1 - i else 0 for i in range(maxpsd+1)]
+                    q[QC8][maxpsd + 1 - level] = 1
+                    cweight += weight[QC8][maxpsd + 1 - level]
 
-            c["qc"] = q[C9] + sum(q[MM]) + (sum(q[C10:C11 + 1]) + sum(q[C14:C17 + 1]) + sum(q[C18]) + sum(q[C19]) + sum(q[C20]) + sum(q[C21])) == 0
-            c["cweight"] = cweight
+            c["qc"] = (q[QC9] + sum(q[QMM]) + q[QC10] + q[QC11] + q[QC14] + q[QC15] + q[QC16]+ q[QC17] \
+                    + sum(q[QC18]) + sum(q[QC19]) + sum(q[QC20]) + sum(q[QC21])) == 0
+            c["qcweight"] = cweight
 
     def update_hetrogenious(self, scorelevel, nodes, edges, bsn):
         M = self.M = sum(self.mdp)
         self.ilen = 0
         elen = len(bsn) + 1
         weight = self.weight
-        self.init_eweights(scorelevel, bsn)
+        self.init_heweights(scorelevel, bsn)
         for c in edges:
             (ca, cb) = (c["ca"], c["cb"])
             q = self.get_edge_quality(c)["quality"]
-            q[E1] = [0] * M
-            q[E2] = [0] * M
-            eweight = 0
-            e1weight = sum(weight[E1])
+            q[HE1] = [0] * M
+            q[HE2] = [0] * M
+            heweight = 0
+            e1weight = sum(weight[HE1])
 
             ascl = self.competitors[ca]["scorelevel"]
             bscl = self.competitors[cb]["scorelevel"]
@@ -483,12 +484,12 @@ class crosstable:
                 e1 = 1 if bbsn == elen else 0
                 e2 = bbsn - M if bbsn < elen else 0
                 #if bscl < scorelevel: breakpoint()
-                q[E1][e0-1] = e1
-                q[E2][e0-1] = e2
-                eweight += weight[E1][e0 - 1] * e1
-                eweight += weight[E2][e0-1] * e2
+                q[HE1][e0-1] = e1
+                q[HE2][e0-1] = e2
+                heweight += weight[HE1][e0 - 1] * e1
+                heweight += weight[HE2][e0-1] * e2
 
-            c["eweight"] = eweight
+            c["heweight"] = heweight
 
     def update_homogenious(self, scorelevel, edges, bsn, S):
         B = self.B = len(bsn)
@@ -499,20 +500,20 @@ class crosstable:
         self.ilen = 0
         # print ("BO:", B, S)
         weight = self.weight
-        self.init_sweights(scorelevel, S, mdp)
+        self.init_howeights(scorelevel, S, mdp)
         # print("CheckAnlyse", scorelevel, "M="+str(M), "P="+str(P), "N="+str(N), "S="+str(S), "B="+str(B) )
-        # s4weight = sum([weight[S4][i] for i in range(B4)])
-        s4weight = sum(weight[S4])
+        # HO4weight = sum([weight[HO4][i] for i in range(B4)])
+        HO4weight = sum(weight[HO4])
         for c in edges:
-            c["sweight"] = 0
+            c["howeight"] = 0
             (ca, cb) = (c["ca"], c["cb"])
             q = self.get_edge_quality(c)["quality"]
-            q[S1] = 0
-            q[S2] = 0
-            q[S3] = [0] * B3
-            q[S4] = [1] * B4
-            q[S5] = [0] * B5
-            sweight = s4weight
+            q[HO1] = 0
+            q[HO2] = 0
+            q[HO3] = [0] * B3
+            q[HO4] = [1] * B4
+            q[HO5] = [0] * B5
+            howeight = HO4weight
             ascl = self.competitors[ca]["scorelevel"]
             bscl = self.competitors[cb]["scorelevel"]
             if ascl == scorelevel and bscl == scorelevel:
@@ -523,22 +524,22 @@ class crosstable:
 
                 if c["canmeet"]:
                     if absn > S:
-                        q[S1] = 1
-                        sweight += weight[S1]
-                    q[S2] = absn - 1
-                    sweight += (absn - 1) * weight[S2]
+                        q[HO1] = 1
+                        howeight += weight[HO1]
+                    q[HO2] = absn - 1
+                    howeight += (absn - 1) * weight[HO2]
                     if absn <= S:
-                        q[S3][S - absn] = 1
-                        sweight += weight[S3][S - absn]
+                        q[HO3][S - absn] = 1
+                        howeight += weight[HO3][S - absn]
                     else:
-                        q[S4][absn - S - 1] = 0
-                        sweight -= weight[S4][absn - S - 1]
-                    q[S5][absn - 1] = bbsn - absn
-                    sweight += weight[S5][absn - 1] * (bbsn - absn)
-                    # if c['quality'][S5] != [bbsn if absn == i+1 else 0 for i in range(B)]: breakpoint()
-            c["sweight"] = sweight
+                        q[HO4][absn - S - 1] = 0
+                        howeight -= weight[HO4][absn - S - 1]
+                    q[HO5][absn - 1] = bbsn - absn
+                    howeight += weight[HO5][absn - 1] * (bbsn - absn)
+                    # if c['quality'][HO5] != [bbsn if absn == i+1 else 0 for i in range(B)]: breakpoint()
+            c["howeight"] = howeight
 
-    def update_bipartite(self, scorelevel, pairs, bsn, s2start, s2stop):
+    def update_bipartite(self, scorelevel, pairs, bsn, HO2start, HO2stop):
         B = self.B = len(bsn)
         H = self.H = len(bsn) // 2
         M = self.M = sum(self.mdp)
@@ -550,24 +551,24 @@ class crosstable:
         for pno, pair in enumerate(pairs):
             (ca, cb) = pair
             bweight = 0
-            if s2start <= ca <= s2stop:
+            if HO2start <= ca <= HO2stop:
                 (ca, cb) = (cb, ca)
             c = self.get_edge_quality(self.opponents[ca][cb])
             q = c["quality"]
-            if q[E1] is None or len(q[E1]) != M:
-                q[E1] = [0] * M
-                q[E2] = [0] * M
-            q[S1] = 0
-            q[S2] = 0
-            q[S3] = 0
-            q[S4] = 0
-            q[S5] = [0] * H
+            if q[HE1] is None or len(q[HE1]) != M:
+                q[HE1] = [0] * M
+                q[HE2] = [0] * M
+            q[HO1] = 0
+            q[HO2] = 0
+            q[HO3] = 0
+            q[HO4] = 0
+            q[HO5] = [0] * H
             if pno >= mdp:
                 absn = pno - mdp
                 bbsn = bsn[cb]
-                q[S5][absn] = bbsn -absn
-                bweight = weight[S5][absn] * (bbsn - absn)
-            c["bweight"] = bweight
+                q[HO5][absn] = bbsn -absn
+                bweight = weight[HO5][absn] * (bbsn - absn)
+            c["biweight"] = bweight
 
     # Compute weight
     # mode 'E' - Hetrogenous
@@ -577,16 +578,21 @@ class crosstable:
 
     def cascade_weights(self, depth, start, stop):
         w = 1
+        acc = {QC6: QC0, HE1: HE0, HO1: HO0}
+        let = {QC6: "C", HE1: "HE", HO1: "HO"}
+        # print("Deights", let[start], self.depth[start:stop+1])
         weight = self.weight
-        for cval in range(stop, start-1, -1):
-            if isinstance(depth[cval], int):
-                (w, weight[cval], depth[cval]) = (w*depth[cval], w, len(str(depth[cval])))
-            elif isinstance(depth[cval], list):
-                weight[cval] = [0]*len(depth[cval])
-                for eval in range(len(weight[cval])-1, -1, -1):
-                    (w, weight[cval][eval], depth[cval][eval]) = (w*depth[cval][eval], w, len(str(weight[cval][eval])))
+        for cval in range(stop.value, start.value-1, -1):
+            nval = qdefs(cval).name
+            if isinstance(depth[nval], int):
+                (w, weight[nval], depth[nval]) = (w*depth[nval], w, len(str(depth[nval])))
+            elif isinstance(depth[nval], list):
+                weight[nval] = [0]*len(depth[nval])
+                for eval in range(len(weight[nval])-1, -1, -1):
+                    (w, weight[nval][eval], depth[nval][eval]) = (w*depth[nval][eval], w, len(str(weight[nval][eval])))
             else:
                 raise
+        # print("Weights", let[start], self.weight[acc[start]], self.weight[start:stop+1])
         return w
 
 
@@ -597,90 +603,90 @@ class crosstable:
         c7len = len(self.mdp)
         c8len = c7len + 1
         mmlen = self.maxmeets -1
-        self.weight = weight = [0] * QS
-        self.depth  = depth  = [0] * QS
+        self.weight = weight = {q.name : 0 for q in qdefs}
+        self.depth  = depth  = {q.name : 0 for q in qdefs}
         scoregroup = [node for node in nodes if node["scorelevel"] >= scorelevel] 
         nscoregroup = [node for node in nodes if node["scorelevel"] >= scorelevel-1] 
         bsize = len(scoregroup)
-        depth[C6] = bsize +1
-        depth[C7] = [psd + 1 for psd in self.mdp ]
-        depth[N8] = len(nscoregroup) + 1
-        depth[C8] = [psd + 1 for psd in self.mdp ] + [bsize + 1 - sum(self.mdp) ] 
-        depth[C9] = bsize + 1 if scorelevel <= self.pablevel else 1
-        depth[MM] = [cc] * mmlen
+        depth[QC6] = bsize +1
+        depth[QC7] = [psd + 1 for psd in self.mdp ]
+        depth[QN8] = len(nscoregroup) + 1
+        depth[QC8] = [psd + 1 for psd in self.mdp ] + [bsize + 1 - sum(self.mdp) ] 
+        depth[QC9] = bsize + 1 if scorelevel <= self.pablevel else 1
+        depth[QMM] = [cc] * mmlen
         for i in range(mmlen):  
-            depth[MM][i] = cc
-        depth[C10] = len([node for node in nodes if node["scorelevel"] >= scorelevel and node["top"]]) +1
-        depth[C11] = depth[C10]
-        depth[C12] = cc
-        depth[C13] = cc
-        depth[C14] = len([node for node in nodes if node["scorelevel"] >= scorelevel and (node["flt"] & DF1)]) +1
-        depth[C15] = len([node for node in nodes if node["scorelevel"] <= scorelevel and (node["flt"] & UF1)]) +1
-        depth[C16] = len([node for node in nodes if node["scorelevel"] >= scorelevel and (node["flt"] & DF2)]) +1
-        depth[C17] = len([node for node in nodes if node["scorelevel"] <= scorelevel and (node["flt"] & UF2)]) +1
-        depth[C18] = [psd + 1 for psd in self.mdp ]
-        depth[C19] = [psd + 1 for psd in self.mdp ]
-        depth[C20] = [psd + 1 for psd in self.mdp ]
-        depth[C21] = [psd + 1 for psd in self.mdp ]
+            depth[QMM][i] = cc
+        depth[QC10] = len([node for node in nodes if node["scorelevel"] >= scorelevel and node["top"]]) +1
+        depth[QC11] = depth[QC10]
+        depth[QC12] = cc
+        depth[QC13] = cc
+        depth[QC14] = len([node for node in nodes if node["scorelevel"] >= scorelevel and (node["flt"] & DF1)]) +1
+        depth[QC15] = len([node for node in nodes if node["scorelevel"] <= scorelevel and (node["flt"] & UF1)]) +1
+        depth[QC16] = len([node for node in nodes if node["scorelevel"] >= scorelevel and (node["flt"] & DF2)]) +1
+        depth[QC17] = len([node for node in nodes if node["scorelevel"] <= scorelevel and (node["flt"] & UF2)]) +1
+        depth[QC18] = [psd + 1 for psd in self.mdp ]
+        depth[QC19] = [psd + 1 for psd in self.mdp ]
+        depth[QC20] = [psd + 1 for psd in self.mdp ]
+        depth[QC21] = [psd + 1 for psd in self.mdp ]
         # print(scorelevel, depth)
-        weight[C0] = self.cascade_weights(depth, C6, C21)
+        weight[QC0] = self.cascade_weights(depth, qdefs.QC6, qdefs.QC21)
 
-        self.Cweight = (
+        self.QCweight = (
             "C 1--"
-            + "0"  # C6
+            + "0"  # QC6
             + "-"
-            + str(["0" for v in [0] * c7len]).replace("'", "")  # C7
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # QC7
             + "-"
-            + "0"  # N8
+            + "0"  # QN8
             + "-"
-            + str(["0" for v in [0] * c8len]).replace("'", "")  # C8
+            + str(["0" for v in [0] * c8len]).replace("'", "")  # QC8
             + "-"
-            + "0"  # C9
+            + "0"  # QC9
             + "-"
-            + str(["0" for v in [0] * mmlen]).replace("'", "")  # MM
+            + str(["0" for v in [0] * mmlen]).replace("'", "")  # QMM
             + "-"
-            + "0"  # C10
+            + "0"  # QC10
             + "-"
-            + "0"  # C11
+            + "0"  # QC11
             + "-"
-            + "0"  # C12
+            + "0"  # QC12
             + "-"
-            + "0"  # C13
+            + "0"  # QC13
             + "--"
-            + "0"  # C14
+            + "0"  # QC14
             + "-"
-            + "0"  # C15
+            + "0"  # QC15
             + "-"
-            + "0"  # C16
+            + "0"  # QC16
             + "-"
-            + "0"  # C17
+            + "0"  # QC17
             + "--"
-            + str(["0" for v in [0] * c7len]).replace("'", "")  # C18
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # QC18
             + "-"
-            + str(["0" for v in [0] * c7len]).replace("'", "")  # C18
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # QC18
             + "-"
-            + str(["0" for v in [0] * c7len]).replace("'", "")  # C20
+            + str(["0" for v in [0] * c7len]).replace("'", "")  # QC20
             + "-"
             + str(["0" for v in [0] * c7len]).replace("'", "")
-        )  # C21
+        )  # QC21
 
  
 
 
-    def init_eweights(self, scorelevel, bsn):
-        # print(f"Init eweight, scorelevel: {scorelevel}")
+    def init_heweights(self, scorelevel, bsn):
+        # print(f"Init heweight, scorelevel: {scorelevel}")
         M = self.M
         elen = len(bsn) + 1 - M
         weight = self.weight
         depth = self.depth
-        depth[E1] = [2] * M
-        depth[E2] = [elen] * M
-        weight[E0] = self.cascade_weights(depth, E1, E2)
-        self.Eweight = "E 1--" + str(["0" for v in [0] * M]).replace("'", "") + "-" + str(["0" for v in [0] * M]).replace("'", "")
+        depth[HE1] = [2] * M
+        depth[HE2] = [elen] * M
+        weight[HE0] = self.cascade_weights(depth, qdefs.HE1, qdefs.HE2)
+        self.HEweight = "E 1--" + str(["0" for v in [0] * M]).replace("'", "") + "-" + str(["0" for v in [0] * M]).replace("'", "")
 
 
-    def init_sweights(self, scorelevel, S, mdp):
-        # print(f"Init sweight, scorelevel: {scorelevel}")
+    def init_howeights(self, scorelevel, S, mdp):
+        # print(f"Init howeight, scorelevel: {scorelevel}")
         B = self.B # len of BSN
         B3 = self.B3
         B4 = self.B4
@@ -688,14 +694,14 @@ class crosstable:
         weight = self.weight
         depth = self.depth
 
-        depth[S1] = S + 1
-        depth[S2] = sum(list(range(B-1, S, -2)[:S])) + 1 # B-1 + B-3 + ... + B-(2*S-1) + 1, first S odd numbers starting from B-1 
-        depth[S3] = [2] * B3
-        depth[S4] = [2] * B4
-        depth[S5] = list(range(B5, 0, -1))
-        weight[S0] = self.cascade_weights(depth, S1, S5)
+        depth[HO1] = S + 1
+        depth[HO2] = sum(list(range(B-1, S, -2)[:S])) + 1 # B-1 + B-3 + ... + B-(2*S-1) + 1, first S odd numbers starting from B-1 
+        depth[HO3] = [2] * B3
+        depth[HO4] = [2] * B4
+        depth[HO5] = list(range(B5, 0, -1))
+        weight[HO0] = self.cascade_weights(depth, qdefs.HO1, qdefs.HO5)
  
-        self.Sweight = (
+        self.HOweight = (
             "S 1--"
             + "0"
             + "-"
@@ -711,68 +717,66 @@ class crosstable:
 
 
 
-    def init_bweights(self, scorelevel, s2nodes):
+    def init_bweights(self, scorelevel, HO2nodes):
         #print(f"Init bweight, scorelevel: {scorelevel}")
         B = self.B
         C = self.C
-        H = self.H = s2nodes
+        H = self.H = HO2nodes
         cc = str(C)[1:]
         weight = self.weight
         depth = self.depth
-        depth[S5] = [B + 1] * H
-        weight[S0] = self.cascade_weights(depth, S1, S5)
+        depth[HO5] = [B + 1] * H
+        weight[HO0] = self.cascade_weights(depth, qdefs.HO1, qdefs.HO5)
         self.Bweight = "B 1--" + str(["0" for v in [0] * H]).replace("'", "")
 
-    def update_weight(self, mode, c):
-        # print ("BW:", B)
-
-        c["mode"] = mode
-
+    def update_weight(self, mode, category, c):
         # match (mode):
-        if mode == "C":
-                weight = c["cweight"]
-        elif mode == "E":
-                weight = c["cweight"] * self.weight[E0] + c["eweight"]
-        elif mode == "S":
-                weight = c["cweight"] * self.weight[S0] + c["sweight"]
-        elif mode == "B":
-                weight = c["cweight"] * self.weight[B0] + c["bweight"]
+        if mode == "QC":
+                weight = c["qcweight"]
+        elif mode == "HE":
+                weight = c["qcweight"] * self.weight[HE0] + c["heweight"]
+        elif mode == "HO":
+                weight = c["qcweight"] * self.weight[HO0] + c["howeight"]
+        elif mode == "BI":
+                weight = c["qcweight"] * self.weight[B0] + c["biweight"]
+        else:
+            breakpoint()
+        c["mode"] = mode
+        c["levels"] = category
         c["weight"] = weight
         return weight
 
     def compute_weight(self, wpairs, bquality):
 
-        quality = [None] * QL
-        quality[N8] = 0
+        quality = {q.name : None for q in qdefs if q.value < QL}
+        quality[QN8] = 0
 
         # down =  [d[0] for d in downfloaters]
         for c in wpairs:
-            # print(c['ca'], c['cb'], c['quality'][N8])
+            # print(c['ca'], c['cb'], c['quality'][QN8])
             
             self.get_edge_quality(c)
             q = c["quality"]
             for elem in range(QL):
-                if elem < E1 or (c.get("mode", "") == "E" and elem < S1) or (c.get("mode", "") == "S" and elem >= S1):
-                    if q[elem] is None:
+                nelem = qdefs(elem).name
+                if elem < qdefs.HE1.value or (c.get("mode", "") == "HE" and elem < qdefs.HO1.value) or (c.get("mode", "") == "HO" and elem >= qdefs.HO1.value):
+                    if q[nelem] is None:
                         pass
-                    elif quality[elem] is None:
-                        quality[elem] = q[elem]
-                    elif isinstance(quality[elem], int):
-                        quality[elem] += q[elem]
+                    elif quality[nelem] is None:
+                        quality[nelem] = q[nelem]
+                    elif isinstance(quality[nelem], int):
+                        quality[nelem] += q[nelem]
                     else:
-                        for i in range(len(quality[elem])):
-                            try:
-                                quality[elem][i] += q[elem][i]
-                            except:
-                                breakpoint()
+                        for i in range(len(quality[nelem])):
+                            quality[nelem][i] += q[nelem][i]
 
         return quality
 
     def format_wpart(self, f, wx, start, stop):
         weight = self.weight
         wres = []
-        for welem in range(start, stop+1):
-            warr = weight[welem]
+        for welem in range(start.value, stop.value+1):
+            warr = weight[qdefs(welem).name]
             if isinstance(warr, int):
                 warr = [warr]
             for wfac in warr:
@@ -792,28 +796,29 @@ class crosstable:
 
     def format_weight(self, mode, w):
         weight = self.weight
-        f = self.Cweight
+        f = self.QCweight
         # match (mode):
-        if mode == "E":
-                cw = w // weight[E0]
-                ew = w % weight[E0]
-                return self.format_wpart(self.Cweight, cw, C6, C21) + " " + self.format_wpart(self.Eweight, ew, E1, E2)
-        elif mode == "S":
-                f += " " + self.Sweight
-                cw = w // weight[S0]
-                sw = w % weight[S0]
-                return self.format_wpart(self.Cweight, cw, C6, C21) + " " + self.format_wpart(self.Sweight, sw, S1, S5)
-        elif mode == "B":
+        if mode == "HE":
+                f += " " + self.HEweight
+                cw = w // weight[HE0]
+                ew = w % weight[HE0]
+                return self.format_wpart(self.QCweight, cw, qdefs.QC6, qdefs.QC21) + " " + self.format_wpart(self.HEweight, ew, qdefs.HE1, qdefs.HE2)
+        elif mode == "HO":
+                f += " " + self.HOweight
+                cw = w // weight[HO0]
+                sw = w % weight[HO0]
+                return self.format_wpart(self.QCweight, cw, qdefs.QC6, qdefs.QC21) + " " + self.format_wpart(self.HOweight, sw, qdefs.HO1, qdefs.HO5)
+        elif mode == "BI":
                 f += " " + self.Bweight
                 cw = w // weight[B0]
                 bw = w % weight[B0]
-                return self.format_wpart(self.Cweight, cw, C6, C21) + " " + self.format_wpart(self.Bweight, bw, S5, S5)
+                return self.format_wpart(self.QCweight, cw, qdefs.QC6, qdefs.QC21) + " " + self.format_wpart(self.Bweight, bw, qdefs.HO5, qdefs.HO5)
         else:
                 cw = w
-                return self.format_wpart(self.Cweight, cw, C6, C21)
+                return self.format_wpart(self.QCweight, cw, qdefs.QC6, qdefs.QC21)
 
 
     def compute_pab_weight(self, edges):
         for edge in edges:
-            edge["iweight"] = edge["sb"] if edge["ca"] == 0 else 0
+            edge["weight"] = edge["sb"] if edge["ca"] == 0 else 0
 

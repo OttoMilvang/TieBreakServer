@@ -24,11 +24,22 @@ class commonmain:
     def __init__(self):
         self.parser = argparse.ArgumentParser()
         self.params = None
-        self.filetype = "chessjson"
+        self.filetype = "resultjson"
         self.resulttype = "chessjsonResult"
         self.origin = "checker, version 1.00"
         self.tournamentno = 1
         self.exit = False
+        self.resultjson = {
+            "filetype": self.filetype,
+            "version": "1.0",
+            "published": str(datetime.datetime.now())[0:19],
+            "origin": self.origin,
+            "options": self.params,
+            "status": {"code": 0, "info": [], "error": []},
+        }
+        
+        
+
 
     def printhelp(self):
         print("checker [options]")
@@ -37,17 +48,11 @@ class commonmain:
     #   print error and exit
 
     def error(self, code, txt):
-        chessjson = {
-            "filetype": "Error",
-            "version": "1.0",
-            "origin": self.origin,
-            "published": str(datetime.datetime.now())[0:19],
-            "status": {"code": 0, "error": []},
-        }
-        chessjson["status"]["code"] = code
-        chessjson["status"]["error"].append(txt)
-        #if code >= 400 and code < 500:
-        #    raise
+        resultjson = self.resultjson
+        resultjson["status"]["code"] = code
+        resultjson["status"]["error"].append(txt)
+        # if code >= 400 and code < 500:
+        #     raise
         if code >= 400:
             if self.params["verbose"]:
                 raise
@@ -76,8 +81,8 @@ class commonmain:
         "-f": "filetype, JSON/TRF/TS, default use file-extention and then TRF",
         "-b": "encoding ascii, utf-8, cp1252 ...",
         "-e": "tournament number in file, start at 1",
-        "-n": "Number of rounds, overrides file value",
-        "-M": "The maximum number of meets",
+        "-n": "current round, overrides file value",
+        "-N": "Number of rounds, overrides file value",
         "-r": "Sort on rank order",
         "-d": "Delimiter in output text, T=tab, B=blank, S=semicolon, C=comma, txt=txt",
         "-x": "Add experimental stuff",
@@ -90,15 +95,15 @@ class commonmain:
         parser.add_argument("-c", "--check", required=False, action="count", default=0, help=self.helptxt["-v"])
         parser.add_argument("-i", "--input-file", required=False, default="-", help=self.helptxt["-i"])
         parser.add_argument("-o", "--output-file", required=False, default="-", help=self.helptxt["-o"]),
-        parser.add_argument("-f", "--file-format", required=False, default="TRF", help=self.helptxt["-f"])
+        parser.add_argument("-f", "--input-format", required=False, default="TRF", help=self.helptxt["-f"])
         parser.add_argument("-F", "--output-format", required=False, default="JSON", help=self.helptxt["-f"])
         parser.add_argument("-b", "--encoding", required=False, default="", help=self.helptxt["-b"])
         parser.add_argument("-e", "--tournament-number", required=False, default=str(self.tournamentno), help=self.helptxt["-e"])
-        parser.add_argument("-n", "--number-of-rounds", type=int, default=-1, help=self.helptxt["-n"])
+        parser.add_argument("-n", "--current-round", type=int, default=-1, help=self.helptxt["-n"])
+        parser.add_argument("-N", "--number-of-rounds", type=int, default=0, help=self.helptxt["-N"])
         parser.add_argument("-r", "--rank", required=False, action="store_true", help=self.helptxt["-r"])
         # parser.add_argument("-g", "--game-score", required=False, nargs="*", help=self.helptxt['-g'])
         # parser.add_argument("-m", "--match-score", required=False, nargs="*", help=self.helptxt['-m'])
-        parser.add_argument("-M", "--maxmeets", required=False, default="0", help=self.helptxt["-M"])
         parser.add_argument("-d", "--delimiter", required=False, help=self.helptxt["-d"])
         parser.add_argument("-x", "--experimental", required=False, nargs="*", default=[], help=self.helptxt["-x"])
         parser.add_argument("-v", "--verbose", required=False, action="count", default=0, help=self.helptxt["-v"])
@@ -109,6 +114,8 @@ class commonmain:
         else:
             self.params = params = vars(parser.parse_known_args())
         # print(params)
+        self.resultjson["options"] = self.params
+
 
         # Parse game-score and match-score
         for scoretype in ["game", "match"]:
@@ -143,7 +150,7 @@ class commonmain:
             "input_file": command["filename"],
             "output_file": "-",
             "output_format": "JSON",
-            "file_format": helpers.getFileFormat(command["filename"]),
+            "input_format": helpers.getFileFormat(command["filename"]),
             "tournament_number": str(command["tournamentno"]),
             "number_of_rounds": (int(command["norounds"]) if command["norounds"] != "" else -1),
             "game_score": None,
@@ -161,7 +168,7 @@ class commonmain:
     def read_input_file(self):
         # Read an input file
         try:
-            fileformat = self.params["file_format"]
+            fileformat = self.params["input_format"]
             if fileformat == "JSON":
                     chessfile = chessjson()
                     charset = "utf-8"
@@ -174,7 +181,7 @@ class commonmain:
                     charset = "ascii"
             else:
                     chessfile = chessjson()
-                    chessfile.put_status(403, "Error in file format: " + self.params["file_format"])
+                    chessfile.put_status(403, "Error in file format: " + self.params["input_format"])
 
             self.chessfile = chessfile
             if len(self.params["encoding"]) > 0:
@@ -199,7 +206,7 @@ class commonmain:
                     chessfile.put_status(405, "Can't open file: " + self.params["input_file"])
 
 
-            if charset == "latin1" and lines[0] == "\xef" and lines[1] == "\xbb" and lines[2] == "\xbf":
+            if lines[0] == "\xef" and lines[1] == "\xbb" and lines[2] == "\xbf":
                 lines = lines[3:]
             chessfile.parse_file(lines, self.params["verbose"])
             if chessfile.chessjson["status"]["code"] > 400:
@@ -215,15 +222,12 @@ class commonmain:
         try:
             params = self.params
             chessfile = self.chessfile
-            status = chessfile.chessjson["status"]
+            status = self.resultjson["status"]
             code = status["code"] if "code" in status else 501
-            if code == 0 and hasattr(chessfile, "result"):
+            if code <= 2 and hasattr(chessfile, "result"):
                 result = chessfile.result
-                check = result["check"] if "check" in result else False
-                code = 0 if check else 1
             else:
                 result = None
-                check = params["check"]
 
             if params["output_file"] == "-":
                 f = sys.stdout
@@ -234,15 +238,8 @@ class commonmain:
                 fileopen = True
             # if params["check"] and self.core is not None:
             if result is not None:
-                chessjson = {
-                    "filetype": self.filetype,
-                    "version": "1.0",
-                    "origin": self.origin,
-                    "published": str(datetime.datetime.now())[0:19],
-                    "status": status,
-                    self.resulttype: result,
-                }
-
+                resultjson = self.resultjson
+                resultjson[self.resulttype] = result
                 if "delimiter" in params and params["delimiter"] is not None and params["delimiter"].upper() != "JSON":
                     printcheckstatus = 1 if params["delimiter"][0] == "@" else 0
                     delimiter = params["delimiter"][printcheckstatus:]
@@ -251,7 +248,7 @@ class commonmain:
                         delimiter = tr[delimiter.upper()]
                     if printcheckstatus:
                         f.write(str(code) + (delimiter + str(check) if len(delimiter) > 0 else "") + "\n")
-                    if (code == 0 or code == 1) and len(delimiter) > 0:
+                    if (code == 0 or code == 1 or code == 2) and len(delimiter) > 0:
                         self.write_text_file(f, result, delimiter)
                 else:
                     fileformat = params["output_format"]
@@ -260,7 +257,7 @@ class commonmain:
                             data = trf.output_file(result, 1, self.params["verbose"])
                             f.write(data)
                     elif fileformat == "JSON":
-                            helpers.json_output(f, chessjson)
+                            helpers.json_output(f, resultjson)
             else:
                 fileformat = params["output_format"]
                 if fileformat == "TRF":
@@ -297,19 +294,17 @@ class commonmain:
                 f.write("Content-Type: application/json; charset=utf-8\r\n\r\n")
             
             # if params["check"] and self.core is not None:
-        chessjson = {
-            "filetype": "Error",
-            "version": "1.0",
-            "origin": self.origin,
-            "published": str(datetime.datetime.now())[0:19],
-            "status": chessfile.chessjson["status"],
-        }
+        resultjson = self.resultjson
+        if "info" in chessfile.chessjson["status"]:
+            resultjson["status"]["info"] =  resultjson["status"]["info"] + chessfile.chessjson["status"]["info"]
+        if "error" in chessfile.chessjson["status"]:
+            resultjson["status"]["error"] =  resultjson["status"]["error"] + chessfile.chessjson["status"]["error"]
         delimiter = params.get("delimiter", "JSON") 
         if delimiter == "JSON" or delimiter is None:
-            helpers.json_output(f, chessjson)
+            helpers.json_output(f, resultjson)
         else:
-            f.write("### Error " + str(chessjson["status"]["code"]) + "\n\r")
-            for line in chessjson["status"]["error"]:
+            f.write("### Error " + str(resultjson["status"]["code"]) + "\n\r")
+            for line in resultjson["status"]["error"]:
                 f.write(line + "\r\n")
                 
 
@@ -359,7 +354,7 @@ class commonmain:
         self.do_command(self.test_tournamentno, 501, "Invalid parameter --tournament-number")
         self.do_command(self.add_score, 503, "Invalid parameter - scoresystem")
         self.do_command(self.do_checker, 481, 'Program error: "' + "unknown error" + '"')
-        #self.do_command(self.apply_result, 482, 'Program error: "' + "unknown error" + '"')
+        self.do_command(self.apply_result, 482, 'Program error: "' + "unknown error" + '"')
         self.do_command(self.write_output_file, 503, "Error when writing file: " + params["output_file"])
         if "DUMP" in params["experimental"]:
             self.chessfile.dumpresults()

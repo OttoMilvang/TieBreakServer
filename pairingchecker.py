@@ -21,8 +21,8 @@ from tiebreak import tiebreak
 from pairing import pairing
 from qdefs import qdefs
 
-AHEAD = "  Tournament pairings   "
-PHEAD = "  Checker pairings      "
+AHEAD = "  Tournament analysis   "
+PHEAD = "  Checker pairing       "
 
 # ==============================
 
@@ -41,7 +41,7 @@ class pairingchecker(commonmain):
         -n <no>              # Round to pair, default next round, or all rounds in check mode
         -m <method>          # dutch | berger
         -c                   # check mode, look if tournament pairing is correct
-        -a                   # Analyze and show tournament pairing
+        -a                   # Analysis and show tournament pairing
         -p                   # Dhow the correct pairing of next round (or another round with -n)
         -c [-a] [-p]         # Show correct pairing and explain tournament pairing / checker pairing
         -d @ | T | J         # Print result in result format, text format or JSON formet (default)
@@ -49,7 +49,7 @@ class pairingchecker(commonmain):
 
     --- Return object ---
         {
-         "filetype": "chessjson",
+         "filetype": "Pairing",
          "version": "1.0",
          "origin": "pairingchecker ver. 1.00",
          "published": "2025-04-14 16:42:21",
@@ -63,7 +63,7 @@ class pairingchecker(commonmain):
              "check": True,                          # in check mode, true if equal
              "pairs": [(1,45),(46,2), ...]           # program pairing
              "current": [(1,45),(46,2), ...]         # current pairing from input file
-             "analyze": [                            # Tournament analyze array af scorebrackets, may be empty
+             "analysis": [                            # Tournament analysis array af scorebrackets, may be empty
               {
                 "scorelevel": 3                      # internal scorelevel
                 "competitors: [6,7,9,12],            # Array of competitor id's
@@ -78,19 +78,18 @@ class pairingchecker(commonmain):
                     "canmeet": true,                 # If false, then invalid pairing.
                     "psd": 0,                        # difference in scorelevel
                     "played": 0,                     # Number of times these players has met
-                    "mode": "S",                     # E: paaired in hetrogenious mode, S: homogenious
+                    "mode": "T",                     # E: paaired in hetrogenious mode, S: homogenious
                     "quality": [..],                 # Array of c6-c21, q1-q7, see qdefs.py
-                    "e-rule": "E.1",                 # Rules used to determine colors
+                    "colorrule": "E.1",                 # Rules used to determine colors
                     "board": 4                       # board number
                      }, { ... }, ...
                     ],
                 "downfloaters":  [5, 10, 11],       # Array of downfloated competitors
                 "remaining": [13, 14, 15, 16]       # Array of remaining players
                 "quality": [..],                    # Array of c6-c21, q1-q7, see qdefs.py
-                "valid": true                       # Is bracket valid
               }, {...}, ...
              ]
-             "checker": [...]                       # Pairing array af scorebrackets, may be empty, same format as analyze
+             "pairing": [...]                       # Pairing array af scorebrackets, may be empty, same format as analysis
              "competitors": [                       # Array of competitors
               {
                 "cid": 6,                           # competitor id
@@ -129,17 +128,19 @@ class pairingchecker(commonmain):
     def __init__(self):
         super().__init__()
         ver = version.version()
-        self.origin = "pairingchecker ver. " + ver["version"]
+        self.resultjson["origin"] =  self.origin = "pairingchecker ver. " + ver["version"]
+        self.resultjson["filetype"] =  self.filetype = "Pairing"
         self.resulttype = "pairingResult"
 
     def read_command_line(self):
-        self.parser.add_argument("-a", "--analyze", required=False, action="count", default=0, help="Analyze pairing")
+        self.parser.add_argument("-a", "--analysis", required=False, action="count", default=0, help="Analysis pairing")
         self.parser.add_argument("-p", "--pairing", required=False, action="count", default=0, help="Do pairing")
         self.parser.add_argument("-m", "--method", required=False, default="dutch", help="dutch | berger")
         self.parser.add_argument("-t", "--top-color", required=False, default=" ", help="Color on top board")
+        self.parser.add_argument("-M", "--maxmeets", required=False, default="0", help="The maximum number of meets")
         self.parser.add_argument("-u", "--unpaired", required=False, nargs="*", default=[])
         self.read_common_command_line(self.origin, True)
-
+ 
     def write_text_pairing(self, lines, pairs):
         lines.append(str(len(pairs)))
         for w, b in pairs:
@@ -163,67 +164,68 @@ class pairingchecker(commonmain):
                 lines.append(p + a)
         return eq
 
-    def xxwrite_text_diff(self, lines, analyze, pairing):
-        eq = True
-        apairs = []
-        ppairs = []
-        for pairs, result in [(apairs, analyze), (ppairs, pairing)]:
-            for bracket in result:
-                if bracket is not None and "pairs" in bracket:
-                    for pair in bracket["pairs"]:
-                        pairs.append(pair)
-        apairs = sorted(apairs, key=lambda c: (c["board"]))
-        ppairs = sorted(ppairs, key=lambda c: (c["board"]))
-        head = PHEAD + AHEAD
-        for i in range(max(len(apairs), len(ppairs))):
-            apair = (str(apairs[i]["w"]) + "  - " + str(apairs[i]["b"])) if i < len(apairs) else "-"
-            ppair = (str(ppairs[i]["w"]) + "  - " + str(ppairs[i]["b"])) if i < len(ppairs) else "-"
-            if apair != ppair:
-                if head:
-                    lines.append(head)
-                    head = None
-                    eq = False
-                apos = apair.find("-")
-                a = "         "[apos:] + apair + "                         "[: 15 + apos - len(apair)]
-                ppos = ppair.find("-")
-                p = "         "[ppos:] + ppair + "                         "[: 15 + ppos - len(ppair)]
-                lines.append(p + a)
-        return eq
 
-    def write_text_details(self, lines, analyze, pairing, competitors):
+
+    def format_quality_list(self, analysis, pairing, bno):
+        lines = []
+        head = "Rule " + (PHEAD if len(pairing) > 0 else "") + (AHEAD if len(analysis) > 0 else "")
+        lines.append(head)
+        change = qdefs.IW.value
+        for i in range(qdefs.IW.value):  # (crosstable.IW):
+            label= qdefs(i).name
+            if label == "QMM":
+                continue
+            p = str(pairing[bno]["quality"][label] if bno < len(pairing) else "")
+            a = str(analysis[bno]["quality"][label] if bno < len(analysis) else "")
+            if p != a and i < change:
+                change = i
+            label = f"{label:<5}"
+            plen = len(PHEAD) if len(p) > 0 else 0
+            alen = len(AHEAD) if len(a) > 0 else 0
+            maxlen = len(AHEAD) - 1
+            while len(p) or len(a):
+                (ppart, p) = spilt_my_line(p, maxlen, ",")
+                (apart, a) = spilt_my_line(a, maxlen, ",")
+                line = label + format("  " + ppart, "<" + str(maxlen + 1)) + format("  " + apart, "<" + str(maxlen + 1))
+                label = "     "
+                lines.append(line)
+        lines.append("")
+        return (change, lines)
+
+    def write_text_details(self, lines, analysis, pairing, competitors):
         eq = True
         cr = self.pairingengine.crosstable
-        if analyze and pairing:
-            alen = sum([len((bracket["pairs"] if bracket is not None and "pairs" in bracket else [])) for bracket in analyze])
+        if analysis and pairing:
+            alen = sum([len((bracket["pairs"] if bracket is not None and "pairs" in bracket else [])) for bracket in analysis])
             plen = sum([len((bracket["pairs"] if bracket is not None and "pairs" in bracket else [])) for bracket in pairing])
             eq = eq and (alen == plen)
-
-        for bno in range(max(len(pairing), len(analyze))):
+        
+        for bno in range(max(len(pairing), len(analysis))):
             allcompetitors = acmps = pcmps = apairs = ppairs = adown = pdown = []
             bsn = {}
-            if analyze:
-                work = analyze
-                if bno < len(analyze):
-                    scorelevel = analyze[bno]["scorelevel"]
+            if analysis:
+                work = analysis
+                if bno < len(analysis):
+                    scorelevel = analysis[bno]["scorelevel"]
                     bsn = "bsn-" + str(scorelevel)
-                    # print(bsn, analyze[bno]['competitors'])
+                    # print(bsn, analysis[bno]['competitors'])
                     allcompetitors = acmps = sorted(
-                        [competitors[c] for c in analyze[bno]["competitors"]], key=lambda s: (-s["scorelevel"], s["cid"])
+                        [competitors[c] for c in analysis[bno]["competitors"]], key=lambda s: (-s["scorelevel"], s["cid"])
                     )
-                    bsn = analyze[bno]["bsne"]
+                    bsn = analysis[bno]["bsne"]
                     apairs = (
-                        sorted(analyze[bno]["pairs"], key=lambda c: (c["board"]))
-                        if bno < len(analyze) and bno < len(analyze)
+                        sorted(analysis[bno]["pairs"], key=lambda c: (c["board"]))
+                        if bno < len(analysis) and bno < len(analysis)
                         else []
                     )
                     acomp = pcomp = {c["cid"]: c for c in allcompetitors}
                     aopp = {
                         **{c["w"]: str(c["b"]) + "w" for c in apairs},
                         **{c["b"]: str(c["w"]) + "b" for c in apairs},
-                        **{c: "down" for c in analyze[bno]["downfloaters"]},
+                        **{c: "down" for c in analysis[bno]["downfloaters"]},
                     }
                     adown = sorted(
-                        [c for c in analyze[bno]["downfloaters"]], key=lambda s: (-pcomp[s]["scorelevel"], pcomp[s]["cid"])
+                        [c for c in analysis[bno]["downfloaters"]], key=lambda s: (-pcomp[s]["scorelevel"], pcomp[s]["cid"])
                     )
                 else:
                     allcompetitors = acmps = bsn = apairs = adown = []
@@ -263,14 +265,6 @@ class pairingchecker(commonmain):
                 l0 = allcompetitors[0]["hst"]
                 line += "".join([f"{key:>5}" for key in l0.keys() if isinstance(key, int)])
                 lines.append(line)
-                # print([c['cid'] for c in competitors])
-                # print(pairing[bno]['competitors'])
-                # print(analyze[bno]['competitors'])
-                # print(popp)
-                # print(aopp)
-                # print([(c['w'], c['b']) for c in ppairs])
-                # print([(c['w'], c['b']) for c in apairs])
-                # print([c['cid'] for c in allcompetitors])
                 colorprefs = defaultdict(int)
                 for cmp in allcompetitors:
                     try:
@@ -321,15 +315,16 @@ class pairingchecker(commonmain):
                 #      colorprefs.get("w", 0),
                 #      colorprefs.get("b0", 0),
                 #      colorprefs.get("b", 0),
-                #      analyze[bno]['quality'][qdefs.C6.value],
-                #      analyze[bno]['quality'][qdefs.C12.value],
-                #      analyze[bno]['quality'][qdefs.C13.value]
+                #      analysis[bno]['quality'][qdefs.C6.value],
+                #      analysis[bno]['quality'][qdefs.C12.value],
+                #      analysis[bno]['quality'][qdefs.C13.value]
                 #      )
                 lines.append(line)
                 lines.append("")
 
+                (change, qlines) = self.format_quality_list(analysis, pairing, bno)
                 sno = "tpn" if "TPN" in self.params["experimental"] else "cid"
-                line = "Pairs    :    Pairing      BSN        Analyze      BSN    "
+                line = "Pairs    :    Pairing      BSN        Analysis      BSN    "
                 lines.append(line)
                 for pno in range(max(len(ppairs), len(apairs))):
                     pp = format_pair(ppairs[pno], pcomp, bsn, sno) if pno < len(ppairs) else ""
@@ -338,6 +333,10 @@ class pairingchecker(commonmain):
                     eq = eq and (pp == ap)
                     arrow = arrow if not eq else ""
                     line = "          " + f"{pp:>24}" + f"{ap:>24}" + arrow
+                    if pno < len(ppairs) and pno < len(apairs) and ppairs[pno]["w"] == apairs[pno]["b"] and ppairs[pno]["b"] == apairs[pno]["w"]:
+                        line += f" {ppairs[pno]['colorrule']}"
+                    elif arrow and change < qdefs.IW.value:
+                        line += " " + qdefs(change).name
                     lines.append(line)
                 line = "Down     :"
                 for pno in range(max(len(pdown), len(adown))):
@@ -348,53 +347,40 @@ class pairingchecker(commonmain):
                     lines.append(line)
                     line = "          "
                 lines.append("")
+                lines += qlines
 
-                head = "Rule " + (PHEAD if len(pairing) > 0 else "") + (AHEAD if len(analyze) > 0 else "")
-                lines.append(head)
-                for i in range(24):  # (crosstable.IW):
-
-                    label = qdefs(i).name
-                    p = str(pairing[bno]["quality"][i] if bno < len(pairing) else "")
-                    a = str(analyze[bno]["quality"][i] if bno < len(analyze) else "")
-                    label = f"{label:<5}"
-                    plen = len(PHEAD) if len(p) > 0 else 0
-                    alen = len(AHEAD) if len(a) > 0 else 0
-                    maxlen = len(AHEAD) - 1
-
-                    while len(p) or len(a):
-                        (ppart, p) = spilt_my_line(p, maxlen, ",")
-                        (apart, a) = spilt_my_line(a, maxlen, ",")
-                        line = label + format("  " + ppart, "<" + str(maxlen + 1)) + format("  " + apart, "<" + str(maxlen + 1))
-                        label = "     "
-                        lines.append(line)
-                lines.append("")
         return eq
+
 
     def write_text_file(self, f, result, delimiter):
         lines = []
         eq = True
         for rndpairing in result:
-            analyze = rndpairing["analyze"]
-            pairing = rndpairing["checker"]
-            competitors = rndpairing["competitors"]
+            analysis = rndpairing.get("analysis", {})
+            pairing = rndpairing.get("pairing", {})
+            competitors = rndpairing.get("competitors", [])
 
             if not self.docheck:
-                self.write_text_pairing(lines, rndpairing["pairs"])
+                if  self.dopairing:
+                    self.write_text_pairing(lines, rndpairing["pairs"])
+                if  self.doanalysis and not self.dopairing:
+                    self.write_text_pairing(lines, rndpairing["current"])
                 lines.append("")
             else:
                 lines.append("================= Round #" + str(rndpairing["round"]) + " =================")
-                if self.doanalyze or self.dopairing:
-                    eq = eq and self.write_text_details(lines, analyze, pairing, competitors)
+                if self.doanalysis or self.dopairing:
+                    eq = eq and self.write_text_details(lines, analysis, pairing, competitors)
                 else:
                     eq = self.write_text_diff(lines, rndpairing["current"], rndpairing["pairs"]) and eq
                 lines.append("")
+        if self.params["check"]:
+            lines.append(f"Check: {eq}")
         f.writelines(line + "\n" for line in lines)
-        print("Check:", eq)
         # if not eq: breakpoint()
         return eq
 
     def compute_pairs(self, pairing):
-        # pairing = analyze if pairing is None or len(pairing) == 0 else pairing
+        # pairing = analysis if pairing is None or len(pairing) == 0 else pairing
         pairs = []
         for bracket in pairing:
             if bracket is not None and "pairs" in bracket:
@@ -405,17 +391,17 @@ class pairingchecker(commonmain):
     def compute_pairing(self, chessfile, pairingengine, params):
         # print('PARAMS', params)
         self.pairingengine = pairingengine
-        analyze = pairing = []
+        analysis = pairing = []
         acompetitors = pcompetitors = {}
-        if self.doanalyze or (self.docheck and not self.doanalyze and not self.dopairing):
-            analyze = pairingengine.compute_pairing(True, self.doanalyze)
+        if self.doanalysis or (self.docheck and not self.doanalysis and not self.dopairing):
+            analysis = pairingengine.compute_pairing(True, self.doanalysis)
             acompetitors = sorted(
                 #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.competitors],
                 pairingengine.crosstable.competitors,
                 key=lambda c: (c["cid"]),
             )
 
-        if self.dopairing or (self.docheck and not self.doanalyze and not self.dopairing):
+        if self.dopairing or (self.docheck and not self.doanalysis and not self.dopairing):
             pairing = pairingengine.compute_pairing(False, self.dopairing)
             pcompetitors = sorted(
                 #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.crosstable],
@@ -424,19 +410,16 @@ class pairingchecker(commonmain):
             )
         result = {
             "round": pairingengine.rnd,
-            "check": self.docheck,
             "pairs": self.compute_pairs(pairing),
-            "current": self.compute_pairs(analyze),
-            "analyze": [],
-            "checker": [],
-            "competitors": [],
-            "level2score": pairingengine.crosstable.level2score,
+            "current": self.compute_pairs(analysis),
         }
         if self.docheck:
-            result["analyze"] = analyze
-            result["checker"] = pairing
+            result["check"] = result["pairs"] == result["current"]
+            result["pairing"] = pairing
+            result["analysis"] = analysis
             result["competitors"] = pcompetitors if len(pcompetitors) >= len(acompetitors) else acompetitors
-
+            result["level2score"] = pairingengine.crosstable.level2score,
+ 
         # chessfile.chessjson["status"]["code"] = 1
         return result
 
@@ -451,7 +434,7 @@ class pairingchecker(commonmain):
             for key in ["pairs", "current"]:
                 for pair in cround[key]:
                     pair = (trans[pair[0]], trans[pair[1]])
-            for key in ["analyze", "checker"]:
+            for key in ["analysis", "pairing"]:
                 for level in cround[key]:
                     for pair in level["pairs"]:
                         pair["w"] = trans[pair["w"]]
@@ -472,15 +455,17 @@ class pairingchecker(commonmain):
                 maxmeets = int(self.params["maxmeets"])
                 if maxmeets > 0:
                     tournament["maxMeets"] = maxmeets
+                if params["number_of_rounds"] > 0:
+                    tournament["numRounds"] = params["number_of_rounds"]
                 numrounds = tournament["numRounds"]
-                firstround = lastround = params["number_of_rounds"]
+                firstround = lastround = params["current_round"]
                 self.dopairing = params["pairing"]
                 self.docheck = params["check"]
-                self.doanalyze = params["analyze"]
+                self.doanalysis = params["analysis"]
                 if firstround == -1:
                     if self.dopairing:
                         firstround = lastround = currentround + 1
-                    if self.doanalyze:
+                    if self.doanalysis:
                         firstround = lastround = currentround
                     if self.docheck:
                         firstround = 1
@@ -501,11 +486,15 @@ class pairingchecker(commonmain):
                         inv[c["rank"]] = c["cid"]
                     self.fakerank(tournament, fwd, [])
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
+                    unpaired = [parse_int(u) for u in params["unpaired"]]
+                    if len(unpaired) > 0:
+                        for c in tournament["competitors"]:
+                            if c["cid"] in unpaired:
+                                c["present"] = False  
                     cpairing = pairing(
                         tournament,
                         rnd,
                         topcolor,
-                        params["unpaired"],
                         "fakerank" not in self.params["experimental"] and self.params['rank'],
                         params["experimental"],
                         params["verbose"],
@@ -515,9 +504,21 @@ class pairingchecker(commonmain):
                 if "fakerank" in params["experimental"]:
                     self.fakerank(tournament, inv, chessfile.result)
                     # print("================= Round #" + str(rnd )+ " =================")
-        self.core = result
-        # print('self.core')
-        # json_output('-', self.core)
+
+
+    def apply_result(self):
+        params = self.params
+        chessfile = self.chessfile
+        if chessfile.get_status() == 0:
+            if params["check"]:
+                ok = all([rndpairing["check"] for rndpairing in chessfile.result])
+                self.resultjson["status"]["code"] = 0 if ok else 1
+            else: 
+                ok = len(chessfile.result) != 1 or len(chessfile.result[0]["pairs"]) > 0
+                self.resultjson["status"]["code"] = 0 if ok else 2  
+
+
+
 
 
 # tournament.export_trf(params)
@@ -525,7 +526,7 @@ class pairingchecker(commonmain):
 
 # run program
 if __name__ == "__main__":
-    sys.set_int_max_str_digits(20000)
+    # sys.set_int_max_str_digits(12000)
     start_time = time.time()
     pch = pairingchecker()
     code = pch.common_main()
