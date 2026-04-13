@@ -168,12 +168,9 @@ class crosstable:
                 "pts": tbval[PTS]["val"] if tbval else Decimal("0.0"),
                 "acc": tbval[ACC]["val"] if tbval else Decimal("-1.0"),
                 "rfp": tbval[RFP]["val"] != "" if tbval else False,
-                "pop": int(tbval[RFP]["val"][0:-1]) if tbval and len(tbval[RFP]["val"]) > 1 else -1,
-                "pco": tbval[RFP]["val"][-1:] if tbval and len(tbval[RFP]["val"]) > 1 else "",
                 "hst": tbval[RFP] if tbval else {},
-                "num": tbval[NUM]["val"] if tbval else 0,
+                "num": tbval[NUM] if tbval else {},
                 "rip": tbval[RIP]["val"] if tbval else 0,
-                "met": tbval[NUM] if tbval else {},
                 "cod": tbval[COD]["val"] if tbval else 0,
                 "cop": tbval[COP]["val"] if tbval else "  ",
                 "csq": " " + tbval[CSQ]["val"] if tbval else " ",
@@ -208,27 +205,11 @@ class crosstable:
         # Invariant c['ca'] < c['cb']
         for i in range(size + 1):
             b = competitors[i]
-            bhasmet = [opp for (key, opp) in b["met"].items() if key != "val"]
+            bhasmet = [opp for (key, opp) in b["num"].items() if key != "val"]
             for j in range(i+1):
                 a = competitors[j]
                 opponents[j][i] = opponents[i][j] = self.create_edge(a, b, bhasmet)
 
-        # Set c["w] and c["b"]
-        if self.checkonly:
-            for i in range(size):
-                a = competitors[i]
-                for j in range(size):
-                    b = competitors[j]
-                    c = opponents[i][j]
-                    if a["pop"] == j:
-                        c["canmeet"] = c["qc"] = True
-                        if a["pco"] == "w" or b["pco"] == "w":
-                            c[a["pco"]] = i
-                            c[b["pco"]] = j
-                        # print(i, j, c['canmeet'], c['w'] if 'w' in c else '?', c['b'] if 'b' in c else '?' )
-                    else:
-                        c["canmeet"] = c["qc"] = False
-                        
         for elem in prohibited:
             if  elem["firstRound"] <= self.rnd <= elem["lastRound"]:
                 for c1, c2 in list(combinations(elem["competitors"], 2)):
@@ -257,7 +238,7 @@ class crosstable:
             "canmeet": False,
             "isblob": b["cid"] == self.BLOB,
             "played": played,
-            "unplayed": self.rnd - 1 - b["num"], # Unplayd games by b, for c9-calculations
+            "unplayed": self.rnd - 1 - b["num"].get("val", 0), # Unplayd games by b, for c9-calculations
             "qlevel": -1, # quality was calulated for scorelevel ...
             "quality": None,
             "weight": 0,
@@ -268,13 +249,17 @@ class crosstable:
             "qc": False,
         }
         # QC3 not-topscorers with absolute color preference cannot meet
-        canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
-        for col in ["w", "b"]:
-            col2 = col + "2"
-            if a["cop"] == col2 and b["cop"] == col2 and (not a["top"]) and (not b["top"]):
-                canmeet = False
-            if a["cod"] * b["cod"] >= 4 and (not a["top"]) and (not b["top"]):
-                canmeet = False
+        if self.checkonly:
+            hb = b.get("hst", {}).get("val", "")
+            canmeet = hb != "" and int(hb[0:-1]) == a["cid"]
+        else:    
+            canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
+            for col in ["w", "b"]:
+                col2 = col + "2"
+                if a["cop"] == col2 and b["cop"] == col2 and (not a["top"]) and (not b["top"]):
+                    canmeet = False
+                if a["cod"] * b["cod"] >= 4 and (not a["top"]) and (not b["top"]):
+                    canmeet = False
         # score diff
         c["canmeet"] = c["qc"] = canmeet
         return c
@@ -342,7 +327,7 @@ class crosstable:
             c14 = c15 = c16 = c17 = 0
             if a["scorelevel"] >= scorelevel and b["scorelevel"] == scorelevel:
                 if self.pablevel and b["scorelevel"] == 0:
-                    q[QC9] = self.rnd - 1 - a["num"]
+                    q[QC9] = self.rnd - 1 - a["num"].get("val", 0)
                     cweight += weight[QC9] * q[QC9]
 
                 if c["canmeet"] and c["played"] > 0 and self.maxmeets > 1:
@@ -420,7 +405,7 @@ class crosstable:
                     cweight += weight[QC7][maxpsd - level]
 
                 if self.pablevel and b["scorelevel"] == 0:
-                    q[QC9] = self.rnd - 1 - a["num"]
+                    q[QC9] = self.rnd - 1 - a["num"].get("val", 0)
                     cweight += weight[QC9] * q[QC9]
 
                 # c14 minimize the number of players who receive downfloat in the previous round

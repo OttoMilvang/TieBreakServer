@@ -50,7 +50,10 @@ class commonmain:
     def error(self, code, txt):
         resultjson = self.resultjson
         resultjson["status"]["code"] = code
-        resultjson["status"]["error"].append(txt)
+        if isinstance(txt, list):
+            resultjson["status"]["error"] = resultjson["status"]["error"] + txt 
+        else:   
+            resultjson["status"]["error"].append(txt)
         # if code >= 400 and code < 500:
         #     raise
         if code >= 400:
@@ -295,17 +298,19 @@ class commonmain:
             
             # if params["check"] and self.core is not None:
         resultjson = self.resultjson
-        if "info" in chessfile.chessjson["status"]:
-            resultjson["status"]["info"] =  resultjson["status"]["info"] + chessfile.chessjson["status"]["info"]
-        if "error" in chessfile.chessjson["status"]:
-            resultjson["status"]["error"] =  resultjson["status"]["error"] + chessfile.chessjson["status"]["error"]
+        #if "info" in chessfile.chessjson["status"]:
+        #    resultjson["status"]["info"] =  resultjson["status"]["info"] + chessfile.chessjson["status"]["info"]
+        #if "error" in chessfile.chessjson["status"]:
+        #    resultjson["status"]["error"] =  resultjson["status"]["error"] + chessfile.chessjson["status"]["error"]
         delimiter = params.get("delimiter", "JSON") 
         if delimiter == "JSON" or delimiter is None:
             helpers.json_output(f, resultjson)
         else:
             f.write("### Error " + str(resultjson["status"]["code"]) + "\n\r")
-            for line in resultjson["status"]["error"]:
-                f.write(line + "\r\n")
+            for elem in ["info", "error"]:
+                if elem in resultjson["status"]:
+                   for line in resultjson["status"][elem]:
+                        f.write(line + "\r\n")
                 
 
     def test_tournamentno(self):

@@ -355,25 +355,22 @@ class pairingchecker(commonmain):
     def write_text_file(self, f, result, delimiter):
         lines = []
         eq = True
-        for rndpairing in result:
-            analysis = rndpairing.get("analysis", {})
-            pairing = rndpairing.get("pairing", {})
-            competitors = rndpairing.get("competitors", [])
+        if not self.docheck:
+            self.write_text_pairing(lines, result["pairs"])
+            lines.append("")
+        else:
+            for rndpairing in result["roundpairing"]:
+                analysis = rndpairing.get("analysis", {})
+                pairing = rndpairing.get("pairing", {})
+                competitors = rndpairing.get("competitors", [])
 
-            if not self.docheck:
-                if  self.dopairing:
-                    self.write_text_pairing(lines, rndpairing["pairs"])
-                if  self.doanalysis and not self.dopairing:
-                    self.write_text_pairing(lines, rndpairing["current"])
-                lines.append("")
-            else:
                 lines.append("================= Round #" + str(rndpairing["round"]) + " =================")
                 if self.doanalysis or self.dopairing:
                     eq = eq and self.write_text_details(lines, analysis, pairing, competitors)
                 else:
                     eq = self.write_text_diff(lines, rndpairing["current"], rndpairing["pairs"]) and eq
                 lines.append("")
-        if self.params["check"]:
+        if self.params["check"] and ((self.dopairing > 0) == (self.doanalysis > 0)):
             lines.append(f"Check: {eq}")
         f.writelines(line + "\n" for line in lines)
         # if not eq: breakpoint()
@@ -447,7 +444,18 @@ class pairingchecker(commonmain):
     def do_checker(self):
         params = self.params
         chessfile = self.chessfile
-        chessfile.result = []
+        if params["check"]:
+            chessfile.result = {
+                "rules": "", 
+                "roundpairing": [],
+            }
+        else:            
+            chessfile.result = {
+                "rules": "", 
+                "round": 0,
+                "pairs": None,
+                "roundpairing": []
+            }
         if chessfile.get_status() == 0:
             if self.tournamentno > 0:
                 tournament = chessfile.get_tournament(self.tournamentno)
@@ -499,10 +507,11 @@ class pairingchecker(commonmain):
                         params["experimental"],
                         params["verbose"],
                     )
+                    chessfile.result["rules"] = cpairing.rules
                     result = self.compute_pairing(chessfile, cpairing, params)
-                    chessfile.result.append(result)
+                    chessfile.result["roundpairing"].append(result)
                 if "fakerank" in params["experimental"]:
-                    self.fakerank(tournament, inv, chessfile.result)
+                    self.fakerank(tournament, inv, chessfile.result["roundpairing"])
                     # print("================= Round #" + str(rnd )+ " =================")
 
 
@@ -511,12 +520,18 @@ class pairingchecker(commonmain):
         chessfile = self.chessfile
         if chessfile.get_status() == 0:
             if params["check"]:
-                ok = all([rndpairing["check"] for rndpairing in chessfile.result])
+                ok = all([rndpairing["check"] for rndpairing in chessfile.result["roundpairing"]])
+                ok = ok or (self.dopairing > 0 ^ self. doanalysis > 0)
+                chessfile.result["check"] = ok
                 self.resultjson["status"]["code"] = 0 if ok else 1
             else: 
-                ok = len(chessfile.result) != 1 or len(chessfile.result[0]["pairs"]) > 0
+                pairs = "pairs" if self.dopairing else "current"
+                ok = len(chessfile.result) != 1 or len(chessfile.result["roundpairing"][0][pairs]) > 0
                 self.resultjson["status"]["code"] = 0 if ok else 2  
-
+                chessfile.result["pairs"] =  chessfile.result["roundpairing"][0][pairs]
+                chessfile.result["round"] =  chessfile.result["roundpairing"][0]["round"]
+                chessfile.result.pop("roundpairing")
+                
 
 
 

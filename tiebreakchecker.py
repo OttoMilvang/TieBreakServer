@@ -80,7 +80,7 @@ class tiebreakchecker(commonmain):
             header = ["Rank", "StartNo"]
             field = ["rank", "cid"]
         else:
-            sortorder = result["competitors"]
+            sortorder = result.get("competitors", [])
             header = ["StartNo", "Rank"]
             field = ["cid", "rank"]
         line = header[0] + delimiter + header[1]
@@ -95,20 +95,31 @@ class tiebreakchecker(commonmain):
                 else:
                     line += delimiter + str(val)
             f.write(line + "\n")
+        if self.params["check"]:
+            f.write(f"Check: {result.get('check', True)}\n")
+
 
     def do_checker(self):
         params = self.params
-        if params["check"]:
-            self.filetype = "tiebreak"
         chessfile = self.chessfile
         if chessfile.get_status() == 0:
             tournament = chessfile.get_tournament(self.tournamentno)
             if self.tournamentno > 0:
-                tb = tiebreak(tournament, params["number_of_rounds"], params)
+                tb = tiebreak(tournament, params["current_round"], params)
                 chessfile.result = tb.compute_tiebreaks(tournament, params)
             else:
-                tb = tiebreak(chessfile, self.tournamentno, params["number_of_rounds"], params)
-        self.core = tb
+                chessfile.result = {}
+                tb = None
+
+
+    def apply_result(self):
+        params = self.params
+        chessfile = self.chessfile
+        if chessfile.get_status() == 0:
+            if params["check"]:
+                ok = chessfile.result.get("check", True)
+                self.resultjson["status"]["code"] = 0 if ok else 1
+
 
 
 # run program

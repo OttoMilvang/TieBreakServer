@@ -139,6 +139,11 @@ Structre
 
 class pairing:
 
+    DUTCH_RULES = {
+        0 : "2022-01-01",
+        1 : "2026-02-01",   # Approved by FIDE Council on 01/02/2026
+        } 
+
     # constructor function
     def __init__(self, tournament, rnd, topcolor, rank, experimental, verbose):
         # helpers.json_output(sys.stdout, cmps[12]['tiebreakDetails'])
@@ -149,6 +154,7 @@ class pairing:
         self.rank = "rnk" if rank else "cid"
         self.experimental = experimental
         self.verbose = verbose
+        self.rules = self.DUTCH_RULES[1]
         self.optimize = "weighted" not in experimental
 
     """
@@ -1359,11 +1365,16 @@ class pairing:
     """
 
     def update_color(self, c):
-        colres = self.color_allocation(self.competitors[c["ca"]],  self.competitors[c["cb"]])
+        ca = self.competitors[c["ca"]]
+        cb = self.competitors[c["cb"]]
+        colres = self.color_allocation(ca, cb)
         if self.checkonly:
-            if "b" not in c:
-                c["b"] = 0
-            (c["colorrule"], c["e-ok"]) = (colres["colorrule"], c["w"] == colres["w"] and (c["b"] == colres["b"]))
+            if ca["cid"] == 0:
+                p =  {"w": cb["cid"], "b": 0}
+            else: # ca["hst"]["val"][-1] == 0:
+               p =  {ca["hst"]["val"][-1]: ca["cid"], cb["hst"]["val"][-1]: cb["cid"]}
+            c.update(p)
+            c["colorrule"] = colres["colorrule"]
         else:
             (c["w"], c["b"], c["colorrule"]) = (colres["w"], colres["b"], colres["colorrule"])
 

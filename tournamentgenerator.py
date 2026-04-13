@@ -80,6 +80,7 @@ class tournamentgenerator(commonmain):
         self.parser.add_argument("-R", "--rating", required=False, nargs="*", default=[], help=self.helptxt["-R"])
         self.parser.add_argument("-S", "--statistics", required=False, nargs="*", default=["0.01", "0.05", "0.02"], help=self.helptxt["-S"])
         self.parser.add_argument("-m", "--method", required=False, default="dutch", help=self.helptxt["-m"])
+        self.parser.add_argument("-M", "--maxmeets", required=False, default="0", help="The maximum number of meets")
         self.parser.add_argument("-t", "--top-color", required=False,
             default=' ',
             help="Color on top board" )
@@ -113,7 +114,7 @@ class tournamentgenerator(commonmain):
         params = self.params
         ch = chessjson()
         today =  datetime.datetime.today().strftime('%Y-%m-%d')
-        rounds = int(self.params["number_of_rounds"])
+        rounds = max(self.params["number_of_rounds"], self.params["current_round"])
         players = int(self.params["players"])
         members = int(self.params["members"])
         tournament = ch.add_tournament(1, False, rounds)
@@ -223,7 +224,7 @@ class tournamentgenerator(commonmain):
         if tournament["accelerated"]["name"] and rnd == 1:
             present = [competitor["cid"] for competitor in tournament["competitors"] if competitor["present"]]
             q = ((len(present)+3) // 4) * 2 # From handbook
-            rounds = self.params["number_of_rounds"]
+            rounds = max(self.params["number_of_rounds"], self.params["current_round"])
             accrounds = [0, (rounds+3)//4, (rounds+1)//2 ]
             gscrounds = ["Z", "W", "D" ]
             for acc in [1,2]: 
@@ -239,7 +240,6 @@ class tournamentgenerator(commonmain):
         
         cpairing  = pairing(tournament, rnd, 
                             tournament["topColor"], 
-                            self.params['unpaired'], 
                             "fakerank" not in self.params["experimental"] and self.params['rank'],
                             self.params['experimental'], 
                             self.params['verbose'])
