@@ -1018,7 +1018,7 @@ class pairing:
 
     def simple_permute(self, scorelevel, nodes, edges, S1, S2, colordiff, checkdf):
         testlevel = -1
-        MAXSUB = 100000
+        MAXSUB = 40320 # 8! permutations
         numsub = 0
         if S2 is None or len(S2) == 0:
             return []
