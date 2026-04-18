@@ -18,8 +18,11 @@ class tiebreakchecker(commonmain):
     def __init__(self):
         super().__init__()
         ver = version.version()
-        self.origin = "tiebreakchecker ver. " + ver["version"]
+        self.resultjson["origin"] =  self.origin = "tiebreakchecker ver. " + ver["version"]
+        self.resultjson["filetype"] =  self.filetype = "Tiebreak"
         self.resulttype = "tiebreakResult"
+
+
 
     # read_command_line
     #   options:
@@ -110,7 +113,7 @@ class tiebreakchecker(commonmain):
             else:
                 chessfile.result = {}
                 tb = None
-
+ 
 
     def apply_result(self):
         params = self.params
@@ -119,6 +122,7 @@ class tiebreakchecker(commonmain):
             if params["check"]:
                 ok = chessfile.result.get("check", True)
                 self.resultjson["status"]["code"] = 0 if ok else 1
+        self.core = self.resultjson
 
 
 

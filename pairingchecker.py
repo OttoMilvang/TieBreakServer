@@ -460,16 +460,16 @@ class pairingchecker(commonmain):
             if self.tournamentno > 0:
                 tournament = chessfile.get_tournament(self.tournamentno)
                 currentround = tournament["currentRound"]
-                maxmeets = int(self.params["maxmeets"])
+                maxmeets = int(self.params.get("maxmeets", 1))
                 if maxmeets > 0:
                     tournament["maxMeets"] = maxmeets
-                if params["number_of_rounds"] > 0:
+                if params.get("number_of_rounds", 0) > 0:
                     tournament["numRounds"] = params["number_of_rounds"]
                 numrounds = tournament["numRounds"]
-                firstround = lastround = params["current_round"]
-                self.dopairing = params["pairing"]
-                self.docheck = params["check"]
-                self.doanalysis = params["analysis"]
+                firstround = lastround = params.get("current_round", -1)
+                self.dopairing = params.get("pairing", True)
+                self.docheck = params.get("check", False)
+                self.doanalysis = params.get("analysis", False)
                 if firstround == -1:
                     if self.dopairing:
                         firstround = lastround = currentround + 1
@@ -481,12 +481,12 @@ class pairingchecker(commonmain):
                 if lastround > numrounds:
                     self.error(504, "Number of rounds = " + str(numrounds) + ", can't pair round " + str(lastround))
                 params["is_rr"] = False
-                method = params["method"].lower()
+                method = params.get("method", "dutch").lower()
                 if method != "dutch":
                     chessfile.put_status(410, "Method '" + method + "' not implemented")
                     raise
-                topcolor = chessjson.get_topcolor(chessfile, self.tournamentno, params["top_color"])
-                if "fakerank" in params["experimental"]:
+                topcolor = chessjson.get_topcolor(chessfile, self.tournamentno, params.get("top_color", "white"))
+                if "experimental" in params and "fakerank" in params["experimental"]:
                     fwd = [0]*(len(tournament["competitors"])+1)
                     inv = [0]*(len(tournament["competitors"])+1)
                     for i, c in enumerate(tournament["competitors"]):
@@ -494,7 +494,7 @@ class pairingchecker(commonmain):
                         inv[c["rank"]] = c["cid"]
                     self.fakerank(tournament, fwd, [])
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
-                    unpaired = [parse_int(u) for u in params["unpaired"]]
+                    unpaired = [parse_int(u) for u in params.get("unpaired", [])]
                     if len(unpaired) > 0:
                         for c in tournament["competitors"]:
                             if c["cid"] in unpaired:
@@ -503,9 +503,9 @@ class pairingchecker(commonmain):
                         tournament,
                         rnd,
                         topcolor,
-                        "fakerank" not in self.params["experimental"] and self.params['rank'],
-                        params["experimental"],
-                        params["verbose"],
+                        "experimental" in params and "fakerank" not in self.params["experimental"] and self.params.get('rank', False),
+                        params.get("experimental", []),
+                        params.get("verbose", 1),
                     )
                     chessfile.result["rules"] = cpairing.rules
                     result = self.compute_pairing(chessfile, cpairing, params)

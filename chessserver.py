@@ -1,13 +1,21 @@
-#! C:/Program Files/Python313/python.exe
+#! /usr/bin/python3
 # -*- coding: utf-8 -*-
 """
 Created on Mon Oct 25 08:16:13 2024
 @author: Otto Milvang, sjakk@milvang.no
 """
+import json
+import json
 import sys
+from convert import convert2jch
+import helpers
+from pairingchecker import pairingchecker
+from tiebreakchecker import tiebreakchecker
 import version
 from commonmain import commonmain
 from tiebreak import tiebreak
+from pairing import pairing
+
 
 """
 ==============================
@@ -17,18 +25,26 @@ Request:
     "version": "1.0",
     "origin": "<Free text>",
     "published": "<date on format 2018-08-14 05:07:44>",
-    "command": {
+    "options": {
         "service" : "convert" | tiebreak,
-        "filename" : "<original file name>",
-        "filetype": "TRF" | "TS" | < other known format >,
-        "content": ["<lines with base 64 encoded file>"],
-        "tournamentno": <0 or tournamentno to convert>,
+        "input_filename" : "<original file name>",
+        "input_filetype": "TRF" | "TS" | < other known format >,
+        "data": ["<lines with base 64 encoded file>"],
+        "tournament_number": <0 or tournamentno to convert>,
         "current_round": <int>,
         "number_of_rounds": <int>,
         // parameters for tiebreaks
-            "tiebreaks" : [string list],
-            "tournamenttype" : "" | "d" | "p" | "s"
-        }
+            "tie_break" : [string list],
+            "pre-determined" : true | false,
+            "swiss" : true | false, 
+            "unrated" : <rating for unrated players>,
+        // parameters for pairing   
+            "pairing" : true | false,
+            "method" : "dutch",
+            "top_color" : "white" | "black",
+            "maxmeets" : <int>,
+            "unpaired" : [<cid>, …],
+            "analysis" : true | false,  }
 
     }
 }
@@ -64,39 +80,72 @@ Response:
 
 class chessserver(commonmain):
 
+    methods = {
+         "convert":  convert2jch,  
+         "tiebreak": tiebreakchecker, 
+         "pairing":  pairingchecker 
+         }
+
+
     def __init__(self):
         super().__init__()
         self.origin = "chessserver ver. " + version.version()["version"]
         self.tournamentno = 0
 
     def read_command_line(self):
-        self.read_common_server(True)
+        # form = cgi.FieldStorage()
+        # helpers.json_output('c:\\temp\\t.txt', form)
+        charset = "utf-8"
+        sys.stdin.reconfigure(encoding=charset)
+        data = sys.stdin.read()
+        jsondata = json.loads(data)
+        command = jsondata["command"]
+        # helpers.json_output('c:\\temp\\t2.txt', command)
+        self.params = {
+            "service": "",
+            "input_file": "@",
+            "output_file": "-",
+            "output_format": "JSON",
+            "encoding": "ascii",
+            "tournament_number": 1,
+            "current_round": -1,
+            "delimiter": None,
+            "check": False,
+            "experimental": [],
+            "verbose": 0,
+        }
+
+        self.params.update(command)
+        if "input_format" not in self.params:
+            self.params["input_format"] = helpers.getFileFormat(command["input_file"])
+        self.baseclass = self.methods.get(self.params["service"], convert2jch)()
+        self.baseclass.params = self.params
+        return self.params
+
+    def read_input_file(self):
+        self.baseclass.read_input_file()
+        
+    def test_tournamentno(self):
+        self.baseclass.test_tournamentno()
+
+    def test_add_score(self):
+        self.baseclass.test_add_score()
 
     def write_text_file(self, f, result, delimiter):
         pass
 
     def do_checker(self):
-        params = self.params
-        self.core = None
-        service = params["service"]
-        chessfile = self.chessfile
-        tournament = chessfile.get_tournament(self.tournamentno)
-        
-        if service == "convert":
-                self.core = None
-        elif service == "tiebreak":
-                # result = None
-                if params["check"]:
-                    self.filetype = "tiebreak"
-                if chessfile.get_status() == 0:
-                    if self.tournamentno > 0:
-                        tb = tiebreak(tournament, params["current_round"], params)
-                        tb.compute_tiebreaks(tournament, params)
-                    else:
-                        tb = tiebreak(tournament, params["current_round"], params)
-                self.core = tb
-        else:
-                self.core = None
+        self.baseclass.do_checker()
+        return
+
+    def apply_result(self):
+         self.baseclass.apply_result()
+         self.chessfile = self.baseclass.chessfile
+         self.resultjson = self.baseclass.resultjson
+         pass
+
+    def write_output_file(self):
+        self.baseclass.write_output_file()
 
 
 # run program

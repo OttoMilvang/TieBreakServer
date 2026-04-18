@@ -39,6 +39,8 @@ class convert2jch(commonmain):
     def do_checker(self):
         self.core = None
 
+    def apply_result(self):
+         pass
 
 # run program
 

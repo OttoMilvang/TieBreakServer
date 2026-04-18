@@ -136,37 +136,6 @@ class commonmain:
                 sys.exit(0)
         return params
 
-    def read_common_server(self, strict):
-        # form = cgi.FieldStorage()
-        # helpers.json_output('c:\\temp\\t.txt', form)
-        charset = "utf-8"
-        sys.stdin.reconfigure(encoding=charset)
-        data = sys.stdin.read()
-        jsondata = json.loads(data)
-        command = jsondata["command"]
-        # helpers.json_output('c:\\temp\\t2.txt', command)
-        self.params = {
-            "service": command["service"],
-            "check": command["service"] == "tiebreak",
-            "data": base64.b64decode(command["content"]),
-            "encoding": command["encoding"] if "encoding" in command else "",
-            "input_file": command["filename"],
-            "output_file": "-",
-            "output_format": "JSON",
-            "input_format": helpers.getFileFormat(command["filename"]),
-            "tournament_number": str(command["tournamentno"]),
-            "number_of_rounds": (int(command["norounds"]) if command["norounds"] != "" else -1),
-            "game_score": None,
-            "match_score": None,
-            "delimiter": None,
-            "experimental": [],
-            "verbose": 1,
-        }
-        if self.params["service"] == "tiebreak":
-            self.params["tie_break"] = command["tiebreaks"]
-            self.params["pre_determined"] = command["tournamenttype"] == "p"
-            self.params["swiss"] = command["tournamenttype"] == "s"
-        return self.params
 
     def read_input_file(self):
         # Read an input file
@@ -194,8 +163,11 @@ class commonmain:
                 self.error(402, "Missing parameter --input-file")
             if "output_file" not in self.params:
                 self.error(403, "Missing parameter --output-file")
-            if "data" in self.params:
-                lines = self.params["data"].decode(charset)
+            if "base64" in self.params:
+                base64code = base64.b64decode(self.params["base64"])
+                lines = base64code.decode(charset)
+            elif "jch" in self.params:
+                lines = self.params["jch"]
             elif self.params["input_file"] == "-":
                 sys.stdin.reconfigure(encoding=charset)
                 f = sys.stdin
@@ -234,7 +206,7 @@ class commonmain:
 
             if params["output_file"] == "-":
                 f = sys.stdout
-                if "data" in params:
+                if "base64" in params or "jch" in params:
                     f.write("Content-Type: application/json; charset=utf-8\r\n\r\n")
             else:
                 f = open(params["output_file"], "w")
@@ -286,14 +258,14 @@ class commonmain:
             status = chessfile.chessjson["status"]
             if params["output_file"] == "-":
                 f = sys.stdout
-                if "data" in params:
+                if "base64" in params or "jch" in params:
                     f.write("Content-Type: application/json; charset=utf-8\r\n\r\n")
             else:
                 f = open(params["output_file"], "w")
                 fileopen = True
         except:
             f = sys.stdout
-            if "data" in params:
+            if "base64" in params or "jch" in params:
                 f.write("Content-Type: application/json; charset=utf-8\r\n\r\n")
             
             # if params["check"] and self.core is not None:
