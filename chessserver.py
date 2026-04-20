@@ -34,7 +34,7 @@ Request:
         "current_round": <int>,
         "number_of_rounds": <int>,
         // parameters for tiebreaks
-            "tie_break" : [string list],
+            "tiebreak" : [string list],
             "pre-determined" : true | false,
             "swiss" : true | false, 
             "unrated" : <rating for unrated players>,

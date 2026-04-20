@@ -40,7 +40,7 @@ class tiebreakchecker(commonmain):
     #   -d = delimiter
     #   -r = sort on rank order
     #   -u = set rating for unrated players
-    #   -t = tie-break
+    #   -t = tiebreak
     #   -v = verbose and debug
     #   -x = experimental
 
@@ -56,7 +56,7 @@ class tiebreakchecker(commonmain):
         self.parser.add_argument("-u", "--unrated", required=False, default=0, help="rating for unrated players")
         self.parser.add_argument(
             "-t",
-            "--tie-break",
+            "--tiebreak",
             required=False,
             nargs="*",
             default=[],
@@ -87,7 +87,7 @@ class tiebreakchecker(commonmain):
             header = ["StartNo", "Rank"]
             field = ["cid", "rank"]
         line = header[0] + delimiter + header[1]
-        for arg in self.params["tie_break"]:
+        for arg in self.params["tiebreak"]:
             line += delimiter + arg
         f.write(line + "\n")
         for competitor in sortorder:

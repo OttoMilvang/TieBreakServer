@@ -52,7 +52,7 @@ Structure
 |                           }
 |                   tbval: {  - intermediate results from tb calculations }
 |     ---- output for each player / team
-|                   score: [ array of tie-breaks values, same order and length as 'tiebreaks'
+|                   score: [ array of tiebreaks values, same order and length as 'tiebreaks'
 |                   rank: final rank of player / team
 |                 },
 |              2: { ... },
@@ -249,10 +249,10 @@ class tiebreak:
         # run tiebreak
         tm = tournament
         self.find_tmversion(tm)
-        tblist = params["tie_break"]
+        tblist = params["tiebreak"]
         if len(tblist) == 0 and "rankOrder" in tm:
             tblist = tm["rankOrder"]
-            params["tie_break"] = tblist
+            params["tiebreak"] = tblist
         for pos in range(0, len(tblist)):
             mytb = self.parse_tiebreak(pos + 1, tblist[pos])
             self.compute_single_tiebreak(mytb)
@@ -1603,7 +1603,7 @@ class tiebreak:
         return tbname
 
     # get_scoreinfo(self, tb, primary)
-    # tb - tie break
+    # tb - tiebreak
     # primary or secondary score
 
     def get_scoreinfo(self, tb, primary):
