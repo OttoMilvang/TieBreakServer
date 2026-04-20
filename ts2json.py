@@ -662,7 +662,6 @@ class ts2json(chessjson.chessjson):
         matches = g2m.merge_matches()
         for key, tmatch in matches.items():
             if tmatch["id"] > current:
-                print(tmatch)
                 matchlist.append(tmatch)
         self.current_id = g2m.get_current_id()
         return
