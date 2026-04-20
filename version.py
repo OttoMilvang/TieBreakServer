@@ -11,7 +11,7 @@ def version():
         "version_major": 1,
         "version_minor": 7,
         "version_patch": 50,
-        "version_date": "2026-03-24",
+        "version_date": "2026-04-20",
        }
 
 if __name__ == "__main__":
