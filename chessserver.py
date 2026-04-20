@@ -120,6 +120,7 @@ class chessserver(commonmain):
             self.params["input_format"] = helpers.getFileFormat(command["input_file"])
         self.baseclass = self.methods.get(self.params["service"], convert2jch)()
         self.baseclass.params = self.params
+        self.baseclass.resultjson["options"] = self.params
         return self.params
 
     def read_input_file(self):

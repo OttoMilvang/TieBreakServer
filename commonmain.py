@@ -229,7 +229,7 @@ class commonmain:
                     fileformat = params["output_format"]
                     if fileformat == "TRF":
                             trf = trf2json()
-                            data = trf.output_file(result, 1, self.params["verbose"])
+                            data = trf.output_file(result, self.tournamentno, self.params["verbose"])
                             f.write(data)
                     elif fileformat == "JSON":
                             helpers.json_output(f, resultjson)
@@ -237,7 +237,7 @@ class commonmain:
                 fileformat = params["output_format"]
                 if fileformat == "TRF":
                         trf = trf2json()
-                        data = trf.output_file(chessfile.chessjson["event"], 1, self.params["verbose"])
+                        data = trf.output_file(chessfile.chessjson["event"], self.tournamentno, self.params["verbose"])
                         f.write(data)
                 elif fileformat == "JSON":
                         helpers.json_output(f, chessfile.chessjson)

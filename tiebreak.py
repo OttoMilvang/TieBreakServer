@@ -281,7 +281,7 @@ class tiebreak:
             "tiebreaks": self.tiebreaks, 
             "competitors": competitors
         }
-        if params["check"] and not correct:
+        if params["check"]:
              result["check"] = correct
         return result 
         
