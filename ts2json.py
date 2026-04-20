@@ -658,7 +658,6 @@ class ts2json(chessjson.chessjson):
             return
         current = self.current_id
         matchlist =  tournament["matchList"]
-        print("B", self.current_id)
         g2m = games2matches.games2matches(self.scores, tournament, {"current_id": self.current_id})
         matches = g2m.merge_matches()
         for key, tmatch in matches.items():
@@ -666,7 +665,6 @@ class ts2json(chessjson.chessjson):
                 print(tmatch)
                 matchlist.append(tmatch)
         self.current_id = g2m.get_current_id()
-        print("A", self.current_id)
         return
 
         [cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
