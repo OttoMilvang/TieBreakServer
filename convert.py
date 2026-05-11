@@ -33,7 +33,7 @@ class convert2jch(commonmain):
     def read_command_line(self):
         self.read_common_command_line(self.origin, True)
 
-    def write_text_file(self, f, result, delimiter):
+    def write_text_file(self, f, result, delimiter, decimalpoint):
         pass
 
     def do_checker(self):

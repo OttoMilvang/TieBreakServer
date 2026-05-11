@@ -141,6 +141,8 @@ class crosstable:
 
     def compute_tiebreak(self, tournament, rnd):
         tb = tiebreak(tournament, rnd - 1, None)
+        if tournament["teamTournament"] and "primary" in tournament["scoreSystem"]:
+            tb.set_primaryscore(tournament["scoreSystem"]["primary"])
         tblist = ["PTS", "ACC", "RFP", "NUM", "RIP", "COD", "COP", "CSQ", "FLT", "TOP"]
         for pos in range(0, len(tblist)):
             mytb = tb.parse_tiebreak(pos + 1, tblist[pos])

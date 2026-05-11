@@ -3,6 +3,7 @@
 Created on Tue Oct 31 13:57:55 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
+import collections.abc
 import dataclasses
 import decimal
 import json
@@ -39,6 +40,13 @@ def safe(dict_list, acc_list, default=None):
             return val
     return default
 
+def deep_update(d, u):
+    for k, v in u.items():
+        if isinstance(v, collections.abc.Mapping):
+            d[k] = deep_update(d.get(k, {}), v)
+        else:
+            d[k] = v
+    return d
 
 #  Parse
 

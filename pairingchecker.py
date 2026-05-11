@@ -135,10 +135,11 @@ class pairingchecker(commonmain):
     def read_command_line(self):
         self.parser.add_argument("-a", "--analysis", required=False, action="count", default=0, help="Analysis pairing")
         self.parser.add_argument("-p", "--pairing", required=False, action="count", default=0, help="Do pairing")
-        self.parser.add_argument("-m", "--method", required=False, default="dutch", help="dutch | berger")
+        self.parser.add_argument("-m", "--method", required=False, nargs="*", default=["dutch"], help="dutch | berger")
         self.parser.add_argument("-t", "--top-color", required=False, default=" ", help="Color on top board")
-        self.parser.add_argument("-M", "--maxmeets", required=False, default="0", help="The maximum number of meets")
+        self.parser.add_argument("-K", "--maxmeets", required=False, default="0", help="The maximum number of meets")
         self.parser.add_argument("-u", "--unpaired", required=False, nargs="*", default=[])
+        self.parser.add_argument("-T", "--exchange", required=False, nargs="*", default=[], help="Test mode: exchange pairs")
         self.read_common_command_line(self.origin, True)
  
     def write_text_pairing(self, lines, pairs):
@@ -352,7 +353,7 @@ class pairingchecker(commonmain):
         return eq
 
 
-    def write_text_file(self, f, result, delimiter):
+    def write_text_file(self, f, result, delimiter, decimal_point):
         lines = []
         eq = True
         if not self.docheck:
@@ -439,7 +440,33 @@ class pairingchecker(commonmain):
                         pair["ca"] = trans[pair["ca"]]
                         pair["cb"] = trans[pair["cb"]] if pair["cb"] > 0 else 0 
 
-
+    # For test purposes, exchange pairs in the input file, to check if checker can find a better pairing. 
+    # Format of exchange is list of strings "a-b" where a and b are competitor id's. Example: -T 1-2 3-4
+    def add_exchanges(self, tournament, currentround, exchanges):
+        pairs = []
+        players = set()
+        errtxt = "Illegal exchange format: " + ", ".join(exchanges) 
+        try:
+            for exchange in exchanges:
+                a, b = exchange.split("-")
+                a = int(a)
+                b = int(b)
+                pairs.append((a, b))
+                players.add(a)
+                players.add(b)
+            affected = [pair for pair in tournament["gameList"] if pair["round"] == currentround and (pair["white"] in players or pair["black"] in players)]
+            oplayers = set()
+            for pair in affected:
+                oplayers.add(pair["white"])
+                oplayers.add(pair["black"]) 
+            if players != oplayers:
+                errtxt = "Illegal exchange format: " + str(players) + " != " + str(oplayers)
+                raise
+            for i, pair in enumerate(affected):
+                pair["white"] = pairs[i][0]
+                pair["black"] = pairs[i][1]
+        except:
+            self.error(410, errtxt)
 
     def do_checker(self):
         params = self.params
@@ -467,6 +494,8 @@ class pairingchecker(commonmain):
                     tournament["numRounds"] = params["number_of_rounds"]
                 numrounds = tournament["numRounds"]
                 firstround = lastround = params.get("current_round", -1)
+                if len(self.params["exchange"]):
+                    self.add_exchanges(tournament, firstround, self.params["exchange"])
                 self.dopairing = params.get("pairing", True)
                 self.docheck = params.get("check", False)
                 self.doanalysis = params.get("analysis", False)
@@ -481,7 +510,8 @@ class pairingchecker(commonmain):
                 if lastround > numrounds:
                     self.error(504, "Number of rounds = " + str(numrounds) + ", can't pair round " + str(lastround))
                 params["is_rr"] = False
-                method = params.get("method", "dutch").lower()
+                self.methodlist = [item for sublist in [ s.split("-") for s in params.get("method", ["dutch"])] for item in sublist]
+                method = self.methodlist[0].lower() if len(self.methodlist) > 0 else "dutch"
                 if method != "dutch":
                     chessfile.put_status(410, "Method '" + method + "' not implemented")
                     raise
@@ -493,6 +523,9 @@ class pairingchecker(commonmain):
                         fwd[c["cid"]] = c["rank"]
                         inv[c["rank"]] = c["cid"]
                     self.fakerank(tournament, fwd, [])
+                primary = [arg for arg in self.methodlist if arg.lower() in ["mp", "gp", "match", "game"]]
+                if len(primary) > 0:
+                    tournament["scoreSystem"]["primary"] = primary[0]
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
                     unpaired = [parse_int(u) for u in params.get("unpaired", [])]
                     if len(unpaired) > 0:

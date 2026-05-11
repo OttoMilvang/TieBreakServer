@@ -1,3 +1,17 @@
+2026-05-10
+Add option -G --game-score
+Add option -M --match-score
+Add option -D --decimal-point
+Add option -T --exchange for testing alternative pairing
+Fix option -F TXT
+Add primary score to scoresystem
+Modify -m option ta accept mp or gp -m dutch-mp or -m dutch-gp
+Added set_seed to drawresult.py
+Change option key on max_meet to K
+Add set_primaryscore to tiebreak.py
+Added parsing of Code 192
+
+
 2026-04-15
 Improve chessserver
 Check options

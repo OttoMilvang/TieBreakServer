@@ -80,7 +80,7 @@ class tournamentgenerator(commonmain):
         self.parser.add_argument("-R", "--rating", required=False, nargs="*", default=[], help=self.helptxt["-R"])
         self.parser.add_argument("-S", "--statistics", required=False, nargs="*", default=["0.01", "0.05", "0.02"], help=self.helptxt["-S"])
         self.parser.add_argument("-m", "--method", required=False, default="dutch", help=self.helptxt["-m"])
-        self.parser.add_argument("-M", "--maxmeets", required=False, default="0", help="The maximum number of meets")
+        self.parser.add_argument("-K", "--maxmeets", required=False, default="0", help="The maximum number of meets")
         self.parser.add_argument("-t", "--top-color", required=False,
             default=' ',
             help="Color on top board" )
@@ -95,13 +95,19 @@ class tournamentgenerator(commonmain):
 
     def process_tournaments(self):
         params = self.params
-        generate = ([0] + [int(g) for g in params["generate"]])[-2:]
-        seed = generate[0] * 10000 + 4711
-        self.statistics = drawresult(seed)
+        generate = [int(g) for g in params["generate"]]
+        if len(generate) == 2:
+            generate[1] += generate[0]
+        if len(generate) == 3:
+            generate[1] = generate[0] + generate[1] * generate[2]
+        self.statistics = drawresult(None)
         self.statistics.set_params(0.01, 0.05, 0.02)
         self.statistics.set_sigma(50.0)
         self.statistics.set_team(1)
+        # print(generate)
         for fileno in range(*generate):
+            seed = fileno * 10000 + 4711
+            self.statistics.set_seed(seed)
             event = self.gen_tournament(fileno)
             trf = trf2json()  
             txt = trf.output_file(event, 1, self.params["verbose"])
@@ -118,6 +124,10 @@ class tournamentgenerator(commonmain):
         players = int(self.params["players"])
         members = int(self.params["members"])
         tournament = ch.add_tournament(1, False, rounds)
+        if "game_score" in params and params["game_score"] is not None:
+            tournament["scoreSystem"]["game"].update(params["game_score"])
+        if "match_score" in params and params["match_score"] is not None:
+            tournament["scoreSystem"]["match"].update(params["match_score"])   
         rating = params["rating"]
         if players < 65:
             rtop = 2200
@@ -255,7 +265,7 @@ class tournamentgenerator(commonmain):
                     bResult ={"W": "L", "D":"D", "B": "W", "+": "Z", "-": "W"}[res]
                     b["gamePoints"] += tournament["scoreSystem"]["game"][bResult]
                 else:
-                    wResult = "W"
+                    wResult = tournament["scoreSystem"]["game"]["P"]
                     bResult = None
                     played = True
                 w["gamePoints"] += tournament["scoreSystem"]["game"][wResult]
@@ -270,7 +280,7 @@ class tournamentgenerator(commonmain):
                     "bResult": bResult,
                     }
                 ch.append_result(tournament["gameList"], game)
-
+ 
     def fakerank(self, tm, trans, pairing):
         for competitor in tm["competitors"]:
             competitor["cid"] = trans[competitor["cid"]]

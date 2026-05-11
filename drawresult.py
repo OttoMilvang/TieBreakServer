@@ -10,13 +10,16 @@ class drawresult:
     
     # constructor function
     def __init__(self, seed):
-        random.seed(seed if seed else 4711) 
+        self.set_seed(seed)
         self.sigma = 0
         self.zpb = 0.0
         self.hpb = 0.0
         self.forfeited = 0.0
         self.team = 1
 
+    def set_seed(self, seed):
+        random.seed(seed if seed else 4711)
+    
     def prob(self, rw, rb): 
         # rw = Rating white player 
         # rb = Rating black player 

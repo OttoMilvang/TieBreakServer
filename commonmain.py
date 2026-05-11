@@ -88,6 +88,9 @@ class commonmain:
         "-N": "Number of rounds, overrides file value",
         "-r": "Sort on rank order",
         "-d": "Delimiter in output text, T=tab, B=blank, S=semicolon, C=comma, txt=txt",
+        "-D": "Decimal poinit in output text, P=period, C=comma, txt=txt",
+        "-G" : "Point system for matches, default W:2.0,D:1.0,L:0.0,Z:0,P:1.0,U:1.0",
+        "-M" : "Point system for games, default W:1.0,D:0.5,L:0.0,Z:0,P:1.0,U:0.5",
         "-x": "Add experimental stuff",
         "-v": "Verbose and debug",
         "-V": "Version",
@@ -105,9 +108,10 @@ class commonmain:
         parser.add_argument("-n", "--current-round", type=int, default=-1, help=self.helptxt["-n"])
         parser.add_argument("-N", "--number-of-rounds", type=int, default=0, help=self.helptxt["-N"])
         parser.add_argument("-r", "--rank", required=False, action="store_true", help=self.helptxt["-r"])
-        # parser.add_argument("-g", "--game-score", required=False, nargs="*", help=self.helptxt['-g'])
-        # parser.add_argument("-m", "--match-score", required=False, nargs="*", help=self.helptxt['-m'])
+        parser.add_argument("-G", "--game-score", required=False, nargs="*", help=self.helptxt['-G'])
+        parser.add_argument("-M", "--match-score", required=False, nargs="*", help=self.helptxt['-M'])
         parser.add_argument("-d", "--delimiter", required=False, help=self.helptxt["-d"])
+        parser.add_argument("-D", "--decimal-point", required=False, help=self.helptxt["-D"])
         parser.add_argument("-x", "--experimental", required=False, nargs="*", default=[], help=self.helptxt["-x"])
         parser.add_argument("-v", "--verbose", required=False, action="count", default=0, help=self.helptxt["-v"])
         parser.add_argument("-V", "--version", required=False, action="count", default=0, help=self.helptxt["-V"])
@@ -128,7 +132,7 @@ class commonmain:
                     for param in arg.split(","):
                         param = param.replace("=", ":")
                         args = param.split(":")
-                        scoresystem[args[0]] = helpers.parse_float(args[1])
+                        scoresystem[args[0]] = helpers.parse_float(args[1]) if args[1].replace('.','',1).isdigit() else args[1]
                 params[scoretype + "_score"] = scoresystem
         if params.get("version", 0) > 0 or params.get("verbose", 0) > 0:
             print(version)
@@ -215,18 +219,22 @@ class commonmain:
             if result is not None:
                 resultjson = self.resultjson
                 resultjson[self.resulttype] = result
-                if "delimiter" in params and params["delimiter"] is not None and params["delimiter"].upper() != "JSON":
-                    printcheckstatus = 1 if params["delimiter"][0] == "@" else 0
-                    delimiter = params["delimiter"][printcheckstatus:]
-                    tr = {"B": " ", "T": "\t", "C": ",", "S": ";"}
+                fileformat = params["output_format"]
+                if fileformat == "TXT" or "delimiter" in params and params["delimiter"] is not None:
+                    delimiter = params["delimiter"] if params["delimiter"] is not None and len(params["delimiter"]) else "T"
+                    printcheckstatus = 1 if delimiter[0] == "@" else 0
+                    delimiter = delimiter       [printcheckstatus:]
+                    tr = {"B": " ", "T": "\t", "C": ",", "S": ";", "P": "."}
                     if delimiter.upper() in tr:
                         delimiter = tr[delimiter.upper()]
+                    decimal_point = params.get("decimal_point", None)
+                    if decimal_point and decimal_point.upper() in ["C", "P"]:
+                        decimal_point = tr[decimal_point.upper()]
                     if printcheckstatus:
                         f.write(str(code) + (delimiter + str(check) if len(delimiter) > 0 else "") + "\n")
                     if (code == 0 or code == 1 or code == 2) and len(delimiter) > 0:
-                        self.write_text_file(f, result, delimiter)
+                        self.write_text_file(f, result, delimiter, decimal_point)
                 else:
-                    fileformat = params["output_format"]
                     if fileformat == "TRF":
                             trf = trf2json()
                             data = trf.output_file(result, self.tournamentno, self.params["verbose"])
@@ -275,7 +283,7 @@ class commonmain:
         #if "error" in chessfile.chessjson["status"]:
         #    resultjson["status"]["error"] =  resultjson["status"]["error"] + chessfile.chessjson["status"]["error"]
         delimiter = params.get("delimiter", "JSON") 
-        if delimiter == "JSON" or delimiter is None:
+        if delimiter is None and params["output_format"] != "TXT":
             helpers.json_output(f, resultjson)
         else:
             f.write("### Error " + str(resultjson["status"]["code"]) + "\n\r")

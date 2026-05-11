@@ -555,8 +555,7 @@ class ts2json(chessjson.chessjson):
         return periodno
 
     def parse_ts_group_order(self, rank, tournament, ordertype):
-        if ordertype == "TieBreaksBy":
-            tournament["rankOrder"] = []
+        grouporder = []
         for key, value in rank.items():
             if key == "NumOrdersInPgroup":
                 pass
@@ -584,8 +583,11 @@ class ts2json(chessjson.chessjson):
                 name += "/K" + tb["Factor"]
             if "Fore" in tb and tb["Fore"] == "Y":
                 name += "/F"
-            if ordertype == "TieBreaksBy":
-                tournament["rankOrder"].append(name)
+            grouporder.append(name)
+        if ordertype == "TieBreaksBy":
+            tournament["rankOrder"] = grouporder
+        if ordertype == "PairingGroupBy" and tournament["teamTournament"] and len(grouporder) > 0:
+            tournament["scoreSystem"]["primary"] = "match" if grouporder[0] == "Points" else "game"
         return
 
     def parse_ts_group_prize(self, attrib, tournamentno):

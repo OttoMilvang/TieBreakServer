@@ -77,7 +77,7 @@ class tiebreakchecker(commonmain):
                 self.params[scoretype + "_score"] = scoresystem
 
 
-    def write_text_file(self, f, result, delimiter):
+    def write_text_file(self, f, result, delimiter, decimal_point):
         if self.params["rank"]:
             sortorder = sorted(result["competitors"], key=lambda cmp: (cmp["rank"], cmp["cid"]))
             header = ["Rank", "StartNo"]
@@ -93,8 +93,8 @@ class tiebreakchecker(commonmain):
         for competitor in sortorder:
             line = str(competitor[field[0]]) + delimiter + str(competitor[field[1]])
             for val in competitor["tiebreakScore"]:
-                if "." in str(val):
-                    line += delimiter + str(val)
+                if decimal_point and "." in str(val):
+                    line += delimiter + str(val).replace(".", decimal_point)
                 else:
                     line += delimiter + str(val)
             f.write(line + "\n")

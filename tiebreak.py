@@ -208,6 +208,17 @@ class tiebreak:
     # get_score
     # return a float value from result struct and color
 
+    def set_primaryscore(self, scorename):
+        if self.primaryscore is not None:
+            return
+        scorename = scorename.lower()
+        if scorename == "mp" or scorename == "match":
+            self.primaryscore = "mpoints"
+        elif scorename == "gp" or scorename == "game":
+            self.primaryscore = "gpoints"
+        else:
+            self.primaryscore = "points"
+
     def get_score(self, slist, result, color):
         if color[0] + "Result" in result:
             res = result[color[0] + "Result"]
