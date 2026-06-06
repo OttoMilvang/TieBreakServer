@@ -21,6 +21,8 @@ import sys
 import os
 import datetime
 import codecs
+from pairingberger import pairing_berger
+from pairingdutch import pairing_dutch
 import version
 from helpers import *
 from chessjson import chessjson
@@ -59,6 +61,11 @@ class tournamentgenerator(commonmain):
         super().__init__()
         ver = version.version()
         self.origin = "tournamentgenerator ver. " + ver["version"]
+        self.method = {
+            "dutch": pairing_dutch,
+            "berger": pairing_berger,
+                #"fideteam": pairing_fideteam
+        }
 
  
 
@@ -79,7 +86,7 @@ class tournamentgenerator(commonmain):
                             help="Team members")
         self.parser.add_argument("-R", "--rating", required=False, nargs="*", default=[], help=self.helptxt["-R"])
         self.parser.add_argument("-S", "--statistics", required=False, nargs="*", default=["0.01", "0.05", "0.02"], help=self.helptxt["-S"])
-        self.parser.add_argument("-m", "--method", required=False, default="dutch", help=self.helptxt["-m"])
+        self.parser.add_argument("-m", "--method", required=False, nargs="*", default=["dutch"], help="dutch | berger")
         self.parser.add_argument("-K", "--maxmeets", required=False, default="0", help="The maximum number of meets")
         self.parser.add_argument("-t", "--top-color", required=False,
             default=' ',
@@ -146,6 +153,8 @@ class tournamentgenerator(commonmain):
             rstep = 0
             sigma = 200.0
 
+        methodlist = params["methodlist"] = [item for sublist in [ s.lower().split("-") for s in params.get("method", ["dutch"])] for item in sublist]
+        is_rr = "berger" in methodlist 
         rtop = rtop if len(rating) < 1 else parse_int(rating[0])
         rstep = rstep if len(rating) < 2 else parse_int(rating[1])
         sigma = sigma if len(rating) < 3 else float(parse_float(rating[2]))
@@ -153,6 +162,9 @@ class tournamentgenerator(commonmain):
         stat = params["statistics"]
         zpb = 0.01 if len(stat) < 1 else float(stat[0])
         hpb = 0.05 if len(stat) < 2 else float(stat[1])
+        if is_rr:
+            zpb = 0.0
+            hpb = 0.0   
         forfeited = 0.02 if len(stat) < 3 else float(stat[2])
         self.statistics.set_params(zpb, hpb, forfeited) 
         self.statistics.set_sigma(sigma) 
@@ -171,7 +183,7 @@ class tournamentgenerator(commonmain):
         }
         tournament["topColor"] = "w" if fileno%2 == 0 else "b"
         tournament["accelerated"]= {"name" : params["acceleration"], "values": [] }
-
+        tournament["pairingSystem"] = methodlist
 
         for player in range(1, players + 1):
             rating = int(rtop - rstep*player)
@@ -189,11 +201,13 @@ class tournamentgenerator(commonmain):
                 }
             )
         # ch.update_tournament_random(tournament, False)        
-        tournament["competitors"] = sorted(tournament["competitors"],  key=lambda comp: (-comp["rating"], comp["random"]))
-        cid = 0
-        for competitor in tournament["competitors"]:
-            cid += 1
-            competitor["cid"] = cid
+        if is_rr:
+            tournament["competitors"] = self.statistics.do_shuffle(tournament["competitors"])
+        else:
+            tournament["competitors"] = sorted(tournament["competitors"],  key=lambda comp: (-comp["rating"], comp["random"]))
+
+        for i, competitor in enumerate(tournament["competitors"]):
+            competitor["cid"] = i + 1
         for rnd in range(1, rounds + 1):
             if rnd == 4:
                 self.statistics.set_hpb(0.0)
@@ -205,7 +219,13 @@ class tournamentgenerator(commonmain):
         tr = {"Z": "Z", "H": "D", "+": "W", "-": "Z" }
         rounds = int(self.params["number_of_rounds"])
         maxmeets = int(self.params["maxmeets"])
-        self.params['is_rr'] = False
+        params = self.params
+        methodlist = params["methodlist"] = [item for sublist in [ s.split("-") for s in params.get("method", [""])] for item in sublist]
+        method = methodlist[0].lower() if len(methodlist) > 0 else "dutch"
+        if method not in self.method:
+            print(410, "Method '" + method + "' not implemented")
+            raise
+        self.params['is_rr'] = method
         self.docheck = False
         self.doanalysis = False
         self.dopairing = True  
@@ -248,11 +268,7 @@ class tournamentgenerator(commonmain):
                 }
                 tournament["accelerated"]["values"].append(value)
         
-        cpairing  = pairing(tournament, rnd, 
-                            tournament["topColor"], 
-                            "fakerank" not in self.params["experimental"] and self.params['rank'],
-                            self.params['experimental'], 
-                            self.params['verbose'])
+        cpairing  = self.method[method](tournament, rnd, self.params)
         result = self.compute_pairing(cpairing, self.params) 
         for level in result['checker']:
             for pair in level['pairs']:

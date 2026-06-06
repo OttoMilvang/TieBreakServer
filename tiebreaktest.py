@@ -50,43 +50,43 @@ TESTFILES = {
         "type": "S",
         "team": False,
         "input_file": "NMU-NMforbarnogungdom2024.trx",
-        "file_format": "TS",
+        "input_format": "TS",
         "tournament_number": "6",
     },
     # "teamheld": { "type": "S", "team": True, "input_file" : "team-Example.trf", },
     "elite": {"type": "R", "team": False, "input_file": "elite19-20.trf"},
     "nccteam22": {"type": "S", "team": False, "input_file": "nmlag2022.trf"},
-    #              "file_format" : "TS", 'tournament_number': '1', },
+    #              "input_format" : "TS", 'tournament_number': '1', },
 }
 
 
 TIEBREAKS = {
-    "in-nu": {"team": False, "tie_break": ["WIN", "WON", "BPG", "BWG", "REP"]},
-    "tm-nu": {"team": True, "tie_break": ["WIN:MP", "WON:MP"]},
-    "in-de": {"team": False, "tie_break": ["DE", "DE/P"]},
-    "co-ps": {"team": False, "tie_break": ["PS", "PS/C1", "PS/C2 "]},
-    "co-ks": {"team": False, "tie_break": ["KS", "KS/L40", "KS/L-2"]},
+    "in-nu": {"team": False, "tiebreak": ["WIN", "WON", "BPG", "BWG", "REP"]},
+    "tm-nu": {"team": True, "tiebreak": ["WIN:MP", "WON:MP"]},
+    "in-de": {"team": False, "tiebreak": ["DE", "DE/P"]},
+    "co-ps": {"team": False, "tiebreak": ["PS", "PS/C1", "PS/C2 "]},
+    "co-ks": {"team": False, "tiebreak": ["KS", "KS/L40", "KS/L-2"]},
     "co-bh": {
         "team": False,
-        "tie_break": ["ABH", "BH", "BH/C1", "BH/C2", "BH/M1", "BH/M2", "BH/P", "ABH/P", "BH/C1/P", "BH/C2/P", "BH/M1/P", "BH/M2/P"],
+        "tiebreak": ["ABH", "BH", "BH/C1", "BH/C2", "BH/M1", "BH/M2", "BH/P", "ABH/P", "BH/C1/P", "BH/C2/P", "BH/M1/P", "BH/M2/P"],
     },
     "co-fb": {
         "team": False,
-        "tie_break": ["AFB", "FB", "FB/C1", "FB/C2", "FB/M1", "FB/M2", "FB/P", "AFB/P", "FB/C1/P", "FB/C2/P", "FB/M1/P", "FB/M2/P"],
+        "tiebreak": ["AFB", "FB", "FB/C1", "FB/C2", "FB/M1", "FB/M2", "FB/P", "AFB/P", "FB/C1/P", "FB/C2/P", "FB/M1/P", "FB/M2/P"],
     },
-    "in-sb": {"team": False, "tie_break": ["SB", "SB/C1", "SB/C2", "SB/P", "SB/C1/P", "SB/C2/P"]},
-    "co-ab": {"team": False, "tie_break": ["AOB", "AOB/F"]},
-    "in-rg": {"team": False, "tie_break": ["ARO", "ARO/C1", "ARO/C2", "ARO/M1", "ARO/M2", "TPR", "PTP", "APRO", "APPO"]},
-    "tm-bc": {"team": True, "tie_break": ["TBR", "BBE", "BC"]},
-    "tm-de": {"team": True, "tie_break": ["EDE", "EDE/P"]},
-    "gg-sb": {"team": True, "tie_break": ["ESB:GG", "ESB:GG/C1", "ESB:GG/C1/P", "ESB:GG/C2", "ESB:GG/C2/P", "ESB:GG/P"]},
-    "gm-sb": {"team": True, "tie_break": ["ESB:GM", "ESB:GM/C1", "ESB:GM/C1/P", "ESB:GM/C2", "ESB:GM/C2/P", "ESB:GM/P"]},
-    "mg-sb": {"team": True, "tie_break": ["ESB:MG", "ESB:MG/C1", "ESB:MG/C1/P", "ESB:MG/C2", "ESB:MG/C2/P", "ESB:MG/P"]},
-    "mm-sb": {"team": True, "tie_break": ["ESB:MM", "ESB:MM/C1", "ESB:MM/C1/P", "ESB:MM/C2", "ESB:MM/C2/P", "ESB:MM/P"]},
-    "mg-gm": {"team": True, "tie_break": ["MPvGP"]},
+    "in-sb": {"team": False, "tiebreak": ["SB", "SB/C1", "SB/C2", "SB/P", "SB/C1/P", "SB/C2/P"]},
+    "co-ab": {"team": False, "tiebreak": ["AOB", "AOB/F"]},
+    "in-rg": {"team": False, "tiebreak": ["ARO", "ARO/C1", "ARO/C2", "ARO/M1", "ARO/M2", "TPR", "PTP", "APRO", "APPO"]},
+    "tm-bc": {"team": True, "tiebreak": ["TBR", "BBE", "BC"]},
+    "tm-de": {"team": True, "tiebreak": ["EDE", "EDE/P"]},
+    "gg-sb": {"team": True, "tiebreak": ["ESB:GG", "ESB:GG/C1", "ESB:GG/C1/P", "ESB:GG/C2", "ESB:GG/C2/P", "ESB:GG/P"]},
+    "gm-sb": {"team": True, "tiebreak": ["ESB:GM", "ESB:GM/C1", "ESB:GM/C1/P", "ESB:GM/C2", "ESB:GM/C2/P", "ESB:GM/P"]},
+    "mg-sb": {"team": True, "tiebreak": ["ESB:MG", "ESB:MG/C1", "ESB:MG/C1/P", "ESB:MG/C2", "ESB:MG/C2/P", "ESB:MG/P"]},
+    "mm-sb": {"team": True, "tiebreak": ["ESB:MM", "ESB:MM/C1", "ESB:MM/C1/P", "ESB:MM/C2", "ESB:MM/C2/P", "ESB:MM/P"]},
+    "mg-gm": {"team": True, "tiebreak": ["MPvGP"]},
     "tm-ss": {
         "team": True,
-        "tie_break": ["SSSC", "SSSC/F", "SSSC/F/K5", "SSSC/F/P", "SSSC/F/P/K5", "SSSC/K5", "SSSC/P", "SSSC/P/K5"],
+        "tiebreak": ["SSSC", "SSSC/F", "SSSC/F/K5", "SSSC/F/P", "SSSC/F/P/K5", "SSSC/K5", "SSSC/P", "SSSC/P/K5"],
     },
 }
 
@@ -95,7 +95,7 @@ class TestTiebreakMethods(unittest.TestCase):
 
     def get_parms(self, tb, tiebreaks, test, testfile, pts):
         params = {
-            "file_format": "TRF",
+            "input_format": "TRF",
             "encoding": "latin1",
             "input_file": "",
             "output_file": "-",
@@ -104,7 +104,7 @@ class TestTiebreakMethods(unittest.TestCase):
             "rank": True,
             "unrated": 0,
             "testname": tb,
-            "tie_break": tiebreaks,
+            "tiebreak": tiebreaks,
             "check": 1,
             "tournament_number": "1",
             "number_of_rounds": -1,
@@ -165,16 +165,16 @@ class TestTiebreakMethods(unittest.TestCase):
         params = self.get_parms(tb, tiebreaks, test, testfile, pts)
         (tresult, jresult) = self.compute_tiebreak(params)
         (treference, jreference) = self.read_tiebreak(params, tresult, jresult)
-        self.assertEqual(tresult, treference, "Failed on test " + tiebreaks["tie_break"][1] + " tiebreak")
-        self.assertEqual(jresult, jreference, "Failed on test " + tiebreaks["tie_break"][1] + " details")
+        self.assertEqual(tresult, treference, "Failed on test " + tiebreaks["tiebreak"][1] + " tiebreak")
+        self.assertEqual(jresult, jreference, "Failed on test " + tiebreaks["tiebreak"][1] + " details")
 
     def run_all(self, tb, team, pts, typ):
         for test, testfile in TESTFILES.items():
             if testfile["type"] in typ and team == testfile["team"]:
-                for tbt in TIEBREAKS[tb]["tie_break"]:
+                for tbt in TIEBREAKS[tb]["tiebreak"]:
                     self.run_tiebreaktest(
                         tb + "-" + tbt.replace("/", "-").replace(":", ".").lower(),
-                        {"tie_break": [pts, tbt, "SNO"]},
+                        {"tiebreak": [pts, tbt, "SNO"]},
                         test,
                         testfile,
                         pts,

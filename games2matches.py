@@ -58,6 +58,7 @@ class games2matches():
     def build_cpointers(self):
         tournament = self.tournament
         cteam = self.cteam
+        cteam[0] = 0
         cplayer = self.cplayer
         
         self.cgames = {game["id"]: game for game in tournament["gameList"]  }
@@ -116,7 +117,7 @@ class games2matches():
                 index = str(rnd) + "-" + str(wt) + "-" + str(bt)
             else:
                 index = str(rnd) + "-" + str(bt) + "-" + str(wt)
-            if bt > 0:
+            if wt > 0 and bt > 0:
                 if not (index in matches):
                     self.matchid += 1
                     matches[index] = {"id": self.matchid, 
@@ -291,7 +292,7 @@ class games2matches():
             # print("A", key, a)
             tmatch["games"] = [game["id"] for game in sorted([cgames[game] for game in tmatch["games"]], 
                     key=lambda game: (
-                        game["black"] == 0 and game["wResult"] == "Z", 
+                        game["black"] == 0 and game["wResult"] == "Z" or game["white"] == 0 and game["bResult"] == "Z" , 
                         (cplayer[game.get("white", 0)] if cteam[game.get("white",0)] == p1 else cplayer[game.get("black", 0)]).get("order", 0))
                     )]
             b = str(tmatch["games"])
@@ -349,7 +350,7 @@ class games2matches():
             if tmatch.get("black", -1) != 0 and int(p2) != 0:
                 games1 = tmatches[rnd + "-" + p1]["games"][:teamsize]
                 games2 = tmatches[rnd + "-" + p2]["games"][:teamsize]
-                
+
                 if "black" in tmatch:  # decide color
                     white = tmatch["white"]
                     black = tmatch["black"]

@@ -14,12 +14,15 @@ import time
 
 from collections import defaultdict
 import version
+import pairingdutch
 from helpers import *
 from chessjson import chessjson
 from commonmain import commonmain
 from tiebreak import tiebreak
 from pairing import pairing
-from qdefs import qdefs
+from pairingdutch import pairing_dutch
+from pairingberger import pairing_berger
+#from pairingfideteam import pairing_fideteam
 
 AHEAD = "  Tournament analysis   "
 PHEAD = "  Checker pairing       "
@@ -131,17 +134,24 @@ class pairingchecker(commonmain):
         self.resultjson["origin"] =  self.origin = "pairingchecker ver. " + ver["version"]
         self.resultjson["filetype"] =  self.filetype = "Pairing"
         self.resulttype = "pairingResult"
+        self.method = {
+            "dutch": pairing_dutch,
+            "berger": pairing_berger,
+            #"fideteam": pairing_fideteam
+        }
 
     def read_command_line(self):
         self.parser.add_argument("-a", "--analysis", required=False, action="count", default=0, help="Analysis pairing")
         self.parser.add_argument("-p", "--pairing", required=False, action="count", default=0, help="Do pairing")
-        self.parser.add_argument("-m", "--method", required=False, nargs="*", default=["dutch"], help="dutch | berger")
+        self.parser.add_argument("-m", "--method", required=False, nargs="*", default=[], help="dutch | berger")
         self.parser.add_argument("-t", "--top-color", required=False, default=" ", help="Color on top board")
         self.parser.add_argument("-K", "--maxmeets", required=False, default="0", help="The maximum number of meets")
         self.parser.add_argument("-u", "--unpaired", required=False, nargs="*", default=[])
         self.parser.add_argument("-T", "--exchange", required=False, nargs="*", default=[], help="Test mode: exchange pairs")
         self.read_common_command_line(self.origin, True)
- 
+
+    
+
     def write_text_pairing(self, lines, pairs):
         lines.append(str(len(pairs)))
         for w, b in pairs:
@@ -171,9 +181,10 @@ class pairingchecker(commonmain):
         lines = []
         head = "Rule " + (PHEAD if len(pairing) > 0 else "") + (AHEAD if len(analysis) > 0 else "")
         lines.append(head)
-        change = qdefs.IW.value
-        for i in range(qdefs.IW.value):  # (crosstable.IW):
-            label= qdefs(i).name
+        self.qdefsenum = qdefsenum = self.pairingengine.qdefs_enum()
+        rangelen = change = self.pairingengine.crosstable.maxquality()
+        for i in range(rangelen):  
+            label= qdefsenum(i).name
             if label == "QMM":
                 continue
             p = str(pairing[bno]["quality"][label] if bno < len(pairing) else "")
@@ -213,7 +224,7 @@ class pairingchecker(commonmain):
                     allcompetitors = acmps = sorted(
                         [competitors[c] for c in analysis[bno]["competitors"]], key=lambda s: (-s["scorelevel"], s["cid"])
                     )
-                    bsn = analysis[bno]["bsne"]
+                    bsn = analysis[bno].get("bsne", [])
                     apairs = (
                         sorted(analysis[bno]["pairs"], key=lambda c: (c["board"]))
                         if bno < len(analysis) and bno < len(analysis)
@@ -237,7 +248,7 @@ class pairingchecker(commonmain):
                 allcompetitors = pcmps = sorted(
                     [competitors[c] for c in pairing[bno]["competitors"]], key=lambda s: (-s["scorelevel"], s["cid"])
                 )
-                bsn = pairing[bno]["bsne"]
+                bsn = pairing[bno].get("bsne", [])
                 pcomp = {c["cid"]: c for c in allcompetitors}
                 ppairs = (
                     sorted(pairing[bno]["pairs"], key=lambda c: (c["board"])) if bno < len(pairing) and bno < len(pairing) else []
@@ -259,7 +270,7 @@ class pairingchecker(commonmain):
                 scorelevel = work[bno]["scorelevel"]
                 scorebracket = str(cr.level2score[scorelevel]) if work[bno] is not None and len(cr.level2score) > scorelevel else "--"
                 lines.append(
-                    "== Bracket: " + scorebracket + ", scorelevel: " + str(scorelevel) + (", PAB" if work[bno]["pab"] else "")
+                    "== Bracket: " + scorebracket + ", scorelevel: " + str(scorelevel) + (", PAB" if work[bno].get("pab", "") else "")
                 )
                 #         3   4    5    5          5                         2  3  3
                 line = "SNO BSN  PTS" + ("    P" if len(pcmps) else "") + ("    A" if acmps else "") + " T CP CD F1 F2"
@@ -336,8 +347,8 @@ class pairingchecker(commonmain):
                     line = "          " + f"{pp:>24}" + f"{ap:>24}" + arrow
                     if pno < len(ppairs) and pno < len(apairs) and ppairs[pno]["w"] == apairs[pno]["b"] and ppairs[pno]["b"] == apairs[pno]["w"]:
                         line += f" {ppairs[pno]['colorrule']}"
-                    elif arrow and change < qdefs.IW.value:
-                        line += " " + qdefs(change).name
+                    elif arrow and change < self.qdefsenum.IW.value:
+                        line += " " + self.qdefsenum(change).name
                     lines.append(line)
                 line = "Down     :"
                 for pno in range(max(len(pdown), len(adown))):
@@ -384,7 +395,8 @@ class pairingchecker(commonmain):
             if bracket is not None and "pairs" in bracket:
                 for pair in bracket["pairs"]:
                     pairs.append(pair)
-        return [(pair["w"], pair["b"]) for pair in sorted(pairs, key=lambda c: (c["board"]))]
+        pairs = [(pair["w"], pair["b"]) for pair in sorted(pairs, key=lambda c: (c["board"]))]
+        return pairs
 
     def compute_pairing(self, chessfile, pairingengine, params):
         # print('PARAMS', params)
@@ -487,11 +499,6 @@ class pairingchecker(commonmain):
             if self.tournamentno > 0:
                 tournament = chessfile.get_tournament(self.tournamentno)
                 currentround = tournament["currentRound"]
-                maxmeets = int(self.params.get("maxmeets", 1))
-                if maxmeets > 0:
-                    tournament["maxMeets"] = maxmeets
-                if params.get("number_of_rounds", 0) > 0:
-                    tournament["numRounds"] = params["number_of_rounds"]
                 numrounds = tournament["numRounds"]
                 firstround = lastround = params.get("current_round", -1)
                 if len(self.params["exchange"]):
@@ -509,13 +516,11 @@ class pairingchecker(commonmain):
                         lastround = currentround
                 if lastround > numrounds:
                     self.error(504, "Number of rounds = " + str(numrounds) + ", can't pair round " + str(lastround))
-                params["is_rr"] = False
-                self.methodlist = [item for sublist in [ s.split("-") for s in params.get("method", ["dutch"])] for item in sublist]
-                method = self.methodlist[0].lower() if len(self.methodlist) > 0 else "dutch"
-                if method != "dutch":
-                    chessfile.put_status(410, "Method '" + method + "' not implemented")
-                    raise
-                topcolor = chessjson.get_topcolor(chessfile, self.tournamentno, params.get("top_color", "white"))
+                pairingSystems = list(set(tournament["pairingSystem"]) & set(self.method))
+                if len(pairingSystems) != 1:
+                    self.error(510, "Method '" + "-".join(tournament["pairingSystem"]) + "' not implemented")
+                    #self.error(504, "Number of rounds = " + str(numrounds) + ", can't pair round " + str(lastround))
+                pairingSystem = pairingSystems[0]
                 if "experimental" in params and "fakerank" in params["experimental"]:
                     fwd = [0]*(len(tournament["competitors"])+1)
                     inv = [0]*(len(tournament["competitors"])+1)
@@ -523,23 +528,14 @@ class pairingchecker(commonmain):
                         fwd[c["cid"]] = c["rank"]
                         inv[c["rank"]] = c["cid"]
                     self.fakerank(tournament, fwd, [])
-                primary = [arg for arg in self.methodlist if arg.lower() in ["mp", "gp", "match", "game"]]
-                if len(primary) > 0:
-                    tournament["scoreSystem"]["primary"] = primary[0]
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
                     unpaired = [parse_int(u) for u in params.get("unpaired", [])]
                     if len(unpaired) > 0:
                         for c in tournament["competitors"]:
                             if c["cid"] in unpaired:
-                                c["present"] = False  
-                    cpairing = pairing(
-                        tournament,
-                        rnd,
-                        topcolor,
-                        "experimental" in params and "fakerank" not in self.params["experimental"] and self.params.get('rank', False),
-                        params.get("experimental", []),
-                        params.get("verbose", 1),
-                    )
+                                c["present"] = False
+                    pairingEngine = self.method[pairingSystem]
+                    cpairing = pairingEngine(tournament, rnd, params)
                     chessfile.result["rules"] = cpairing.rules
                     result = self.compute_pairing(chessfile, cpairing, params)
                     chessfile.result["roundpairing"].append(result)

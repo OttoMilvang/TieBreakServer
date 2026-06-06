@@ -98,6 +98,10 @@ class drawresult:
     def add_sigma(self, rating):
         return rating + int(round(random.gauss(0.0, self.sigma)))
 
+    def do_shuffle(self, lst):
+        random.shuffle(lst)
+        return lst
+    
     def get_random(self):
         return random.random()
    

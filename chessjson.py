@@ -56,7 +56,7 @@ class chessjson:
                 "FG": "W*",
                 "HG": "D*",
                 "ZG": "Z*",
-                "PB": "P*",
+                "PG": "P*",
             },
         }
 

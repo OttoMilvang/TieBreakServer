@@ -1,3 +1,15 @@
+2026-06-07
+Fix error in float for team dutch tournaments with game points.
+Added method "berger" "berger-double" and "berger-double-fide" 
+Keyword "fide" will swap the two last round in cycle 1 in double berger
+"berger-double-reverse" that reverses the second round in a roundrobin tournament is experimental
+"berger-double-gacrux" is another experimental roundrobin tournamentfhat starts seconf cycle with round N, and then 1..N-1
+Code will also read TRF 192 record FIDE_DUTCH, BERGER_ROUNDROBIN, BERGER_DOUBLEROUNDROBIN, FIDE_ROUNDROBIN, FIDE_DOUBLEROUNDROBIN
+Restructure code to make it easier to add more pairing engines.
+Tournament generator supports Round robin. Note that -N and -p are mandatory. 
+If more than two cycles (triple berger and more) -K is mandatory.
+tournamentgenerator.py -g1 -N12 -K 4 -p4 -m berger-double
+
 2026-05-10
 Add option -G --game-score
 Add option -M --match-score

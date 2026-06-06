@@ -132,7 +132,9 @@ class tiebreak:
             "SSSC":  {"name": "SSSC",  "func": self.compute_score_strength_combination,  "rev": True , "flag": "PKF","desc": "Score strength combination"},
             "STD":   {"name": "STD",   "func": self.compute_std,                         "rev": True , "flag": ""   ,"desc": "Stanard score system"},
             "ACC":   {"name": "ACC",   "func": self.compute_acc,                         "rev": True , "flag": ""   ,"desc": "Points + accellerated points"},
-            "FLT":   {"name": "FLT",   "func": self.compute_flt,                         "rev": True , "flag": ""   ,"desc": "Float (8=df 4=uf in prev round, 2=df 1=uf in 2 rounds before)"},
+            "FLT":   {"name": "FLT",   "func": self.compute_flt_dutch,                   "rev": True , "flag": ""   ,"desc": "Float (8=df 4=uf in prev round, 2=df 1=uf in 2 rounds before)"},
+            "FLTD":  {"name": "FLT",   "func": self.compute_flt_dutch,                   "rev": True , "flag": ""   ,"desc": "Float (8=df 4=uf in prev round, 2=df 1=uf in 2 rounds before)"},
+            "FLTFT": {"name": "FLT",   "func": self.compute_flt_team,                    "rev": True , "flag": ""   ,"desc": "Float (2=df 1=uf in 2 rounds before)"},
             "RFP":   {"name": "RFP",   "func": self.compute_rfp,                         "rev": True , "flag": ""   ,"desc": "Registered for round"},
             "TOP":   {"name": "TOP",   "func": self.compute_top,                         "rev": True , "flag": ""   ,"desc": "Is player a top-scorer in last round"},
             }
@@ -547,6 +549,7 @@ class tiebreak:
                     tbscore[prefix + "points"][rnd] = points
                     tbscore[prefix + "points"]["val"] += points
                     # number of games
+                    complist = [rst]
                     if self.isteam and scorename == "game":
                         if rst["played"] and rst["opponent"] > 0:
                             gamelist = rst["games"] 
@@ -591,31 +594,6 @@ class tiebreak:
                             if game["opponent"] > 0:
                                 self.addtbval(tbscore[prefix + "num"], "val", 1)
                                 tbscore[prefix + "pfp"] += points
-                                if not self.isteam or scorename == "match":
-                                    ocol = ncol = game["color"]
-                                    pf = 1 if ocol == "w" else -1
-                                    self.addtbval(tbscore[prefix + "cod"], rnd, pf)
-                                    self.addtbval(tbscore[prefix + "cod"], "val", pf)
-                                    pf = tbscore[prefix + "cod"]["val"]
-                                    ncol = (other[ocol] + "bbbbwwww")[pf]
-                                    ncol += str(abs(pf)) if ocol != pcol else "2"
-    
-                                    # if ocod > -2 and ocod < 2:
-                                    #    ncol = 'w' if ocol == 'b' else 'b'
-                                    #    ncol = ncol.upper() if ncol.upper() == tbscore[prefix + 'cop']['val'].upper()
-                                    #    else ncol
-    
-                                    csq += ocol
-                                    pcol = ocol
-                                    self.addtbval(tbscore[prefix + "csq"], rnd, ocol)
-                                    self.addtbval(tbscore[prefix + "csq"], "val", ocol)
-    
-                                    self.addtbval(tbscore[prefix + "cop"], rnd, ncol)
-                                    tbscore[prefix + "cop"]["val"] = ncol
-                                    #cpa = "N"
-                                    #if pf < -1   osv
-                                    #tbscore[prefix + "cop"]["val"] = ncol
-
                             # last played game (or PAB)
                             if rnd > tbscore[prefix + "lp"]:
                                 tbscore[prefix + "lp"] = rnd
@@ -662,6 +640,28 @@ class tiebreak:
                             tbscore[prefix + "lo"] = rnd
                         if rnd > tbscore[prefix + "lp"] and (game["opponent"] > 0):
                             tbscore[prefix + "lp"] = rnd
+                    for comp in complist:
+                        if comp["played"] and comp["opponent"] > 0:
+                            ocol = ncol = comp["color"]
+                            pf = 1 if ocol == "w" else -1
+                            self.addtbval(tbscore[prefix + "cod"], rnd, pf)
+                            self.addtbval(tbscore[prefix + "cod"], "val", pf)
+                            pf = tbscore[prefix + "cod"]["val"]
+                            ncol = (other[ocol] + "bbbbwwww")[pf]
+                            ncol += str(abs(pf)) if ocol != pcol else "2"
+    
+                            csq += ocol
+                            pcol = ocol
+                            self.addtbval(tbscore[prefix + "csq"], rnd, ocol)
+                            self.addtbval(tbscore[prefix + "csq"], "val", ocol)
+    
+                            self.addtbval(tbscore[prefix + "cop"], rnd, ncol)
+                            tbscore[prefix + "cop"]["val"] = ncol
+                            #cpa = "N"
+                            #if pf < -1   osv
+                            #tbscore[prefix + "cop"]["val"] = ncol
+
+
 
     """
     compute_recursive_if_tied is used for DE, EDE, EDEBT, EDEBB, EDET, EDEB, TBR and BBE
@@ -1337,7 +1337,7 @@ class tiebreak:
             tbscore[prefix + "acc"]["val"] = val
         return "acc"
 
-    def compute_flt(self, tb, cmps, rounds):
+    def compute_flt(self, tb, cmps, rounds, rules):
         self.compute_acc(tb, cmps, rounds)
         (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         for startno, cmp in cmps.items():
@@ -1347,14 +1347,14 @@ class tiebreak:
             sfloat = ""  # Float so far as string
             for rnd in range(1, rounds + 1):
                 nfloat *= 4
-                p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else self.zero(scorename)
+                pts = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else self.zero(scorename)
                 opp = cmp["rsts"][rnd]["opponent"] if rnd in cmp["rsts"] and "opponent" in cmp["rsts"][rnd] else 0
                 # ownacc = own points + accellerated
                 # oppacc = opponent points + accellerated
                 if opp > 0 and cmp["rsts"][rnd]["played"]:
                     ownacc = cmp["tbval"][prefix + "acc"][rnd - 1]
                     oppacc = cmps[opp]["tbval"][prefix + "acc"][rnd - 1]
-                elif p > scoretype["L"] or cmp["rsts"][rnd]["played"]:  # Have points without playing, more than points for loss
+                elif rules == "dutch" and (pts > scoretype["L"] or cmp["rsts"][rnd]["played"]):  # Have points without playing, more than points for loss
                     ownacc = 1
                     oppacc = 0
                 else:
@@ -1374,8 +1374,16 @@ class tiebreak:
                 self.addtbval(tbscore[prefix + "flt"], rnd, cfloat)
                 nfloat += ifloat
                 sfloat += cfloat
-            tbscore[prefix + "flt"]["val"] = (sfloat if tb["modifiers"].get("swiss", False) else nfloat) % 16
+            fac = {"dutch": 16, "fideteam": 4}[rules]
+            tbscore[prefix + "flt"]["val"] = (sfloat if tb["modifiers"].get("swiss", False) else nfloat) % fac
         return "flt"
+
+    def compute_flt_dutch(self, tb, cmps, rounds):
+        return self.compute_flt(tb, cmps, rounds, "dutch")
+
+    def compute_flt_team(self, tb, cmps, rounds):
+        return self.compute_flt(tb, cmps, rounds, "fideteam")
+
 
     def compute_rfp(self, tb, cmps, rounds):
         (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
@@ -1498,6 +1506,7 @@ class tiebreak:
                # "swiss": False,                # Treat as Swiss tournament
                # "foremode": False,             # Fore mode
                # "vun": False,                  # Proposal of Roberto (not published)
+               # "exchange": False,             # Exchange priamry and secondary score for tiebreak calculation (not published)
                 "rev": False,                   # Reverse default order
                 "ver": self.rulesversion,       # Set rule version, 1=2024, 2=2026
             },
@@ -1550,6 +1559,8 @@ class tiebreak:
                         tb["modifiers"]["rev"] = True
                 elif mf[index] == "S":
                         tb["modifiers"]["swiss"] = True
+                elif mf[index] == "X":
+                        tb["modifiers"]["exchange"] = True
                 elif mf[index] == "V":
                         ver = int(mf[1:]) if len(mf[1:]) else max(self.TIEBREAK_RULES.keys()) 
                         if ver > 2000:
@@ -1618,6 +1629,8 @@ class tiebreak:
     # primary or secondary score
 
     def get_scoreinfo(self, tb, primary):
+        if tb["modifiers"].get("exchange", False):
+            primary = not primary
         pos = 0 if primary else 1
         key = tb["pointtype"][pos]
         if not primary and (key != "g" and key != "m"):

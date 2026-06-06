@@ -126,11 +126,8 @@ class chessserver(commonmain):
     def read_input_file(self):
         self.baseclass.read_input_file()
         
-    def test_tournamentno(self):
-        self.baseclass.test_tournamentno()
-
-    def test_add_score(self):
-        self.baseclass.test_add_score()
+    def prepare_tournament(self):
+        self.baseclass.prepare_tournament()
 
     def write_text_file(self, f, result, delimiter):
         pass

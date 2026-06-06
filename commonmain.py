@@ -293,23 +293,42 @@ class commonmain:
                         f.write(line + "\r\n")
                 
 
-    def test_tournamentno(self):
+    def prepare_tournament(self):
         params = self.params
         if "tournament_number" not in self.params:
                 raise
         self.tournamentno = helpers.parse_int(self.params["tournament_number"])
         if self.tournamentno < 0 or self.tournamentno > len(self.chessfile.chessjson["event"]["tournaments"]):
                 raise
- 
-    def add_score(self):
-        params = self.params
-        # Add command line parameters
         for score in ["game", "match"]:
             if score + "_score" in params and params[score + "_score"] is not None:
                 for arg in params[score + "_score"]:
                     self.chessfile.parse_score_system(score, arg)
 
+        if self.tournamentno > 0:
+            tournament = self.chessfile.get_tournament(self.tournamentno)
+            methodlist = params["methodlist"] = [item for sublist in [ s.lower().split("-") for s in params.get("method", [""])] for item in sublist]
+            if len(methodlist) > 0:
+                tournament["pairingSystem"] = methodlist
+            if "pairingSystem" not in tournament:
+                tournament["pairingSystem"] = ["dutch"]
+            methodlist = tournament["pairingSystem"]
 
+            primary = [arg for arg in methodlist if arg in ["mp", "gp", "match", "game"]]
+            if len(primary) > 0:
+                tournament["scoreSystem"]["primary"] = primary[0]
+
+            tournament["maxMeets"] = max(1, int(self.params.get("maxmeets", "1")), tournament.get("maxMeets", 1))
+            if "double" in methodlist:
+                tournament["maxMeets"] = max(2, tournament["maxMeets"])
+
+            if params.get("number_of_rounds", 0) > 0:
+                tournament["numRounds"] = params["number_of_rounds"]
+            if "berger" in methodlist:
+                numrounds = ((len(tournament["competitors"]) + 1) // 2 ) * 2 - 1
+                if "double" in methodlist:
+                    numrounds = numrounds * 2
+                tournament["numRounds"] = max(tournament["numRounds"], numrounds) 
 
     def do_command(self, func, errcode, errtxt):
         if self.exit:
@@ -336,8 +355,7 @@ class commonmain:
         self.do_command(self.read_command_line, 500, "Bad command line")
         params = self.params
         self.do_command(self.read_input_file, 502, "Error when reading file: " + params["input_file"])
-        self.do_command(self.test_tournamentno, 501, "Invalid parameter --tournament-number")
-        self.do_command(self.add_score, 503, "Invalid parameter - scoresystem")
+        self.do_command(self.prepare_tournament, 501, "Invalid parameter --tournament-number")
         self.do_command(self.do_checker, 481, 'Program error: "' + "unknown error" + '"')
         self.do_command(self.apply_result, 482, 'Program error: "' + "unknown error" + '"')
         self.do_command(self.write_output_file, 503, "Error when writing file: " + params["output_file"])
