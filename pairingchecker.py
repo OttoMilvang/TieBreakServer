@@ -185,7 +185,7 @@ class pairingchecker(commonmain):
         rangelen = change = self.pairingengine.crosstable.maxquality()
         for i in range(rangelen):  
             label= qdefsenum(i).name
-            if label == "QMM":
+            if label == "QMM" and "QMM" not in self.params["experimental"]:
                 continue
             p = str(pairing[bno]["quality"][label] if bno < len(pairing) else "")
             a = str(analysis[bno]["quality"][label] if bno < len(analysis) else "")

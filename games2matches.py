@@ -393,8 +393,10 @@ class games2matches():
                             wgame.update({"black": bgame["white"], "bResult": bgame["wResult"]}) 
                             tmatch["games"].append(wgame["id"])
                             self.tournament["gameList"].remove(bgame)
+                #breakpoint()
                 for board, game in enumerate(tmatch["games"]): 
-                    cgames[game]["board"] = board + 1 
+                    if game in cgames:
+                        cgames[game]["board"] = board + 1 
             elif "white" not in tmatch:
                 w0 = cgames[tmatch["games"][0]]["white"]
                 tmatch.update({"white": cteam[w0], "black": 0, "played": False})
@@ -413,7 +415,7 @@ class games2matches():
         for key, tmatch in matches.items():
             (rnd, p1, p2) = key.split("-")
             arg = int(p1)
-            games = [cgames[game] for game in tmatch["games"]]
+            games = [cgames[game] for game in tmatch["games"] if game in cgames]
             points = {"white": Decimal("0.0"), "black": Decimal("0.0")}
             if len(games) > 0:
                 white = tmatch["white"]
@@ -424,6 +426,8 @@ class games2matches():
                 # print('GEO:', games)
                 for game in range(teamsize):
                     ind += 1
+                    if game >= len(games):
+                        continue
                     cgame = games[game]
                     # wcol = self.tindex[seq[game % len(seq)]]  # Team with wcol is white (wrong) 
                     wcol = "white" if cteam[cgame["white"]] == white else "black"

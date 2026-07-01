@@ -16,7 +16,7 @@ import fidetables
 
 
 def ComputeExpectedScore(ratingPlayer, ratingOpponent):
-    if ratingPlayer == 0 or ratingOpponent == 0:
+    if ratingPlayer is None or ratingOpponent is None:
         return None
     diff = ratingOpponent - ratingPlayer
     if diff > 800:
@@ -40,13 +40,15 @@ def ComputeExpectedScore(ratingPlayer, ratingOpponent):
 
 def ComputeSumExpectedScore(ratingPlayer, ratingOpponents):
     sum = 0
+    if ratingPlayer is None:
+        return 0.0
     for opponent in ratingOpponents:
-        sum += ComputeExpectedScore(ratingPlayer, opponent)
+            sum += ComputeExpectedScore(ratingPlayer, opponent)
     return sum
 
 
 #
-# Coppute Delta R, the differnce between score and ecpecter score
+# Copmute Delta R, the differnce between score and ecpecter score
 #
 
 
@@ -62,7 +64,7 @@ def ComputeDeltaR(pd, score):
 def ComputeAverageRatingOpponents(ratingsopp):
     num = len(ratingsopp)
     if num == 0:
-        return 0
+        return None
     return int(round(sum(ratingsopp) / num + 0.000001))
 
 
@@ -74,7 +76,7 @@ def ComputeAverageRatingOpponents(ratingsopp):
 def ComputeTournamentPerformanceRating(score, ratingsopp, norm=""):
     num = len(ratingsopp)
     if num == 0:
-        return 0
+        return None
     tnorm = norm.upper()
     if len(tnorm) > 0:
         rfloor = {"GM": 2200, "IM": 2050, "WGM": 2000, "WIM": 1850}
@@ -93,7 +95,7 @@ def ComputeTournamentPerformanceRating(score, ratingsopp, norm=""):
 def ComputePerfectTournamentPerformance(score, ratingsopp):
     # exception for score == 0
     if len(ratingsopp) == 0:
-        return 0
+        return None
     if score == Decimal("0.0"):
         return min(ratingsopp) - 800
     # avoid infinite loop on illegal input

@@ -648,6 +648,7 @@ class trf2json(chessjson.chessjson):
         ftitle = line[10:13].strip()
         ftitle = self.titles.get(ftitle, ftitle)
 
+        rating = parse_int(line[48:52])
         profile = {
             "id": 0,
             "lastName": names[0].strip(),
@@ -657,7 +658,7 @@ class trf2json(chessjson.chessjson):
             "federation": line[53:56].strip(),
             "fideId": parse_int(line[57:68]),
             "fideName": fideName,
-            "rating": [parse_int(line[48:52])],
+            "rating": [rating],
             "fideTitle": ftitle,
         }
         self.append_profile(profile)
@@ -676,7 +677,7 @@ class trf2json(chessjson.chessjson):
             "present": startno > 0,
             "gamePoints": gamePoints,
             "rank": parse_int(line[85:89]),
-            "rating": parse_int(line[48:52]),
+            "rating": rating if rating > 0 else None,
         }
         score = {"sum": gamePoints, "W": 0, "D": 0, "L": 0, "P": 0, "A": 0, "U": 0, "Z": 0}
         self.gamescores.append(score)
@@ -1651,7 +1652,7 @@ class trf2json(chessjson.chessjson):
     def output_trf_player(self, tournament, trfkey):
         resw = [{"W": "+", "D": "D", "L": "-", "Z": "-", "A": "?"}, {"W": "1", "D": "=", "L": "0", "Z": "0", "A": "?"}]
         resb = [{"W": "-", "D": "D", "L": "+", "Z": "+", "A": "?"}, {"W": "0", "D": "=", "L": "1", "Z": "1", "A": "?"}]
-        unpl = [{"W": "F", "D": "H", "L": "Z", "Z": "Z", "A": "?"}, {"W": "U", "D": "U", "L": "U", "Z": "U", "A": "?"}]
+        unpl = [{"W": "F", "D": "H", "L": "Z", "Z": "Z", "A": "?", "P": "U"}, {"W": "U", "D": "U", "L": "U", "Z": "U", "A": "?", "P": "U"}]
 
         t001 = ""
         for cmp in sorted(tournament["competitors"], key=lambda c: c["cid"]):

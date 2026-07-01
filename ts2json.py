@@ -653,8 +653,9 @@ class ts2json(chessjson.chessjson):
                 break
         pids = self.all_pids()
         for key, player in self.pcompetitors.items():
-            player["rating"] = int(pids[player["profileId"]]["rating"][ratingindex])
-
+            rating = int(pids[player["profileId"]]["rating"][ratingindex])
+            player["rating"] = rating if rating > 0 else None
+        
     def update_tournament_teamcompetitors(self, tournament):
         if not tournament["teamTournament"]:
             return
