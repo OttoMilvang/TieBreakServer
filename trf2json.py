@@ -1015,7 +1015,7 @@ class trf2json(chessjson.chessjson):
         oooteam = parse_int(line[8:11])
         otherteam = parse_int(line[12:15])
         for i in range(20, len(line) + 1, 5):
-            if len(line[i - 4:].strip()):
+            if len(line[i - 4:]):
                 order.append(parse_int(line[i - 4 : i]))
         ooo = {"round": rnd, "oooteam": oooteam, "otherteam": otherteam, "order": order}
         self.ooolist.append(ooo)
@@ -1494,7 +1494,7 @@ class trf2json(chessjson.chessjson):
             "ooolist": self.ooolist,
             "current_id": self.current_id
             }
-        g2m = games2matches.games2matches(self.scores, tournament, options)
+        g2m = games2matches.games2matches(self, tournament, options)
         matches = g2m.merge_matches()
         self.current_id = g2m.get_current_id()
         tournament["matchList"] = [match for key, match in matches.items()]

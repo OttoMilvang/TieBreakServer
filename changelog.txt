@@ -1,14 +1,66 @@
-2026-06-07
-Fix error in float for team dutch tournaments with game points.
-Added method "berger" "berger-double" and "berger-double-fide" 
-Keyword "fide" will swap the two last round in cycle 1 in double berger
-"berger-double-reverse" that reverses the second round in a roundrobin tournament is experimental
-"berger-double-gacrux" is another experimental roundrobin tournamentfhat starts seconf cycle with round N, and then 1..N-1
-Code will also read TRF 192 record FIDE_DUTCH, BERGER_ROUNDROBIN, BERGER_DOUBLEROUNDROBIN, FIDE_ROUNDROBIN, FIDE_DOUBLEROUNDROBIN
-Restructure code to make it easier to add more pairing engines.
-Tournament generator supports Round robin. Note that -N and -p are mandatory. 
-If more than two cycles (triple berger and more) -K is mandatory.
-tournamentgenerator.py -g1 -N12 -K 4 -p4 -m berger-double
+
+2026-07-03 1.9.55
+Added support for double out-of-order entries as
+300   1  26  13  105  106  107    0
+300   1  13  26   51   52   53    0     
+Added error messages to out-of-order parsing
+
+
+2026-07-01 1.9.54
+Bug fixes
+
+A bug in dutch_gp (Team) where teams were paired again. This was a mix of team id and player id. Fixed
+
+A bug in Koya system. If Koya was used in Swiss tournaments, and had players with no played opponents, max-games was wrong giving errors in KS.
+This is now limited to RR (where its correct that Koya adjust for withdrawn players with only ZPB)
+
+A bug in Fore Buchholz, and TBs that depend on this.
+If a player in the two last round has ZPB - forfeited loss,
+the ZPB will in FB lose the 1/2p contribution to BH since the last game has changed status from absent (VUR) to played. 
+
+A bug where two teams is missing last player. I don’t know is this is completely fixed. I don’t know how to handle this.
+
+Changes:
+This implementation will be strict for Rating-based Tiebreaks:
+"These tie-breaks must be dropped from the tournament tie-break list
+when unrated players are present, unless detailed rules on the handling
+of unrated players are included in the tournament regulations or
+established and published by the Chief Arbiter before the start of the tournament."
+If not all players have rating and /Uxxx is not specified, the TB is dropped.
+The affected TBs are ARO, TPR, PTP, APRO, APPO and RTNG
+The old RTG will list ratings for rated players and null for unrated players.
+
+Internal representation of unrated player is None, in json null and in text output -0
+ 
+All undefined results have internal representation None, in json null and text output -0  , hope this is compatible with current implementations.
+ 
+Undefined is added to short-order of TBs
+This means that for TRP that can have negative values for rating systems with ratings from 0,
+a player that has met no other (two forfeited losses, followed by ZPB) will have undefined TPR,
+and sorted after players with negative TPR.
+ 
+tiebreakDetails will have a "desc" - description to make the json more human-readable
+ 
+RTNG - implemented as a Tiebreak. This means that if with /U switch.
+RTG will show all ratings,
+ 
+RND will give predefiend RND in all rounds in json tiebreakDetails.
+RTNG - implemented with /U switch.
+RTG will show all ratings,
+RSES - new internal TB used for calculating expected score
+ 
+ 
+New program
+ratingsimulation.py
+This will require
+pip install matplotlib
+pip install numpy
+pip install scipy
+Ratingsimulation is an example on how to run tournament simulation, and collect data
+python ratingsimulation.py -N9 -R 1000 1800 -x 5 0
+Is a test on the inflation of the rating system.
+In this simulating the rating algorithm are changed after 5 iterations, with new rating floor = 0
+I will not go in details, just show it as an example on how all moduls works together
 
 2026-05-10
 Add option -G --game-score
