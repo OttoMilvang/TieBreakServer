@@ -257,19 +257,31 @@ def rating_nro(fide, nrs):
 
 
 def rating_fidon(fide, nrs):
-    return fide if fide > 0 else nrs
+    return fide if fide is not None else nrs
 
 
 def rating_nidof(fide, nrs):
-    return nrs if nrs > 0 else fide
+    return nrs if nrs is not None else fide
 
 
 def rating_hbfn(fide, nrs):
+    if fide is None and nrs is None:
+        return None
+    if fide is None:
+        return nrs
+    if nrs is None:
+        return fide
     return max(fide, nrs)
 
 
 def rating_lbfn(fide, nrs):
-    return min(fide, nrs) if fide > 0 and nrs > 0 else max(fide, nrs)
+    if fide is None and nrs is None:
+        return None
+    if fide is None:
+        return nrs
+    if nrs is None:
+        return fide
+    return min(fide, nrs)
 
 
 def rating_other(fide, nrs):

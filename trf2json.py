@@ -934,6 +934,8 @@ class trf2json(chessjson.chessjson):
     def parse_trf_natrating(self, tournament, line):
         startno = parse_int(line[4:8])
         rating = parse_int(line[48:52])
+        if rating == 0:
+            rating = None
 
         fideName = line[14:47].rstrip()
         names = fideName.split(",")

@@ -1,4 +1,8 @@
 
+2026-07-10 1.9.56
+Bug fix National rating support
+Unrated in National Rating support shall be represented None
+
 2026-07-03 1.9.55
 Added support for double out-of-order entries as
 300   1  26  13  105  106  107    0
