@@ -22,7 +22,7 @@ from tiebreak import tiebreak
 from pairing import pairing
 from pairingdutch import pairing_dutch
 from pairingberger import pairing_berger
-#from pairingfideteam import pairing_fideteam
+from pairingfideteam import pairing_fideteam
 
 AHEAD = "  Tournament analysis   "
 PHEAD = "  Checker pairing       "
@@ -137,7 +137,7 @@ class pairingchecker(commonmain):
         self.method = {
             "dutch": pairing_dutch,
             "berger": pairing_berger,
-            #"fideteam": pairing_fideteam
+            "fideteam": pairing_fideteam
         }
 
     def read_command_line(self):
