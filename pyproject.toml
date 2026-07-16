@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gacrux"
-version = "1.9.53"
+version = "1.9.56"
 authors = [
   { name="Otto Milvang" },
 ]
@@ -27,7 +27,7 @@ py-modules = [
     "crosstable", "crosstabledutch", "drawresult", "fidetables",
     "gacrux_entry", "games2matches", "helpers", "jsonscheme",
     "pairing", "pairingberger", "pairingchecker", "pairingdutch",
-    "qdefs", "rating", "scoresystem", "tiebreak", "tiebreakchecker",
+    "qdefs", "rating", "ratingsimulation", "scoresystem", "tiebreak", "tiebreakchecker",
     "tiebreaktest", "tournamentgenerator", "trf2json", "ts2json",
     "verifyjch", "version", "xxxmain"
 ]
