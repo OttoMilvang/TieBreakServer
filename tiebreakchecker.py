@@ -53,7 +53,7 @@ class tiebreakchecker(commonmain):
             help="Use rules for tournament with pre-determined pairing",
         )
         self.parser.add_argument("-s", "--swiss", required=False, action="store_true", help="Use rules for swiss tournament")
-        self.parser.add_argument("-u", "--unrated", required=False, default=0, help="rating for unrated players")
+        self.parser.add_argument("-u", "--unrated", required=False, default=None, help="rating for unrated players")
         self.parser.add_argument(
             "-t",
             "--tiebreak",
@@ -96,7 +96,7 @@ class tiebreakchecker(commonmain):
                 if decimal_point and "." in str(val):
                     line += delimiter + str(val).replace(".", decimal_point)
                 else:
-                    line += delimiter + str(val)
+                    line += delimiter + str(val).replace("None", "-0")
             f.write(line + "\n")
         if self.params["check"]:
             f.write(f"Check: {result.get('check', True)}\n")

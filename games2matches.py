@@ -13,8 +13,9 @@ import scoresystem
 class games2matches():
 
     
-    def __init__(self, score, tournament, options):
-        self.score = score
+    def __init__(self, parent, tournament, options):
+        self.parent = parent
+        self.scores = parent.scores
         self.tournament = tournament
         self.cteam = {}
         self.cplayer = {0: {}}
@@ -273,7 +274,9 @@ class games2matches():
                         tmatches[tkey] = {
                             "id": tmatch["id"], 
                             "games": [game for game in tmatch["games"] if cteam.get(cgames[game]["white"], 0) == ipx or cteam.get(cgames[game]["black"], 0) == ipx],
-                        }                        
+                        } 
+                        #if len(tmatches[tkey]["games"]) < self.tournament["teamSize"]:
+                        #    print("Build", tkey, len(tmatches[tkey]["games"]), tmatches[tkey])    
             else:
                 tmatch["games"] = []
         
@@ -311,10 +314,14 @@ class games2matches():
             team2 = ooo["otherteam"]
             key = str(rnd) + "-" + str(team1)
             tmatch = tmatches[key]
-            games = [cgames[game] for game in tmatch["games"]]
+            zgame = {'id': 0, 'round': rnd, 'white': 0, 'black': 0, 'played': False, 'rated': False, 'wResult': 'Z', 'bResult': 'Z', 'board': 0}
+            games = [cgames[game] if game > 0 else zgame.copy() for game in tmatch["games"]]
             sortedgames = [None]*teamsize
             unsortedgames = []
             for i in range(teamsize):
+                if i >= len(ooo["order"]):
+                    self.parent.put_status(431, f"Error in Out-of-order record, round {rnd}, {team1}-{team2} has only {len(ooo['order'])} players, but teamSize is {teamsize}")
+                    raise
                 player = ooo["order"][i]
                 if player > 0:
                     [game for game in games if game["white"] == player or game["black"] == player][0]["board"] = i + 1
@@ -377,7 +384,13 @@ class games2matches():
                         tmatch["games"].append(game2)
                         games1.remove(game2)
                     else:
-                        game1 = [game for game in games1 if game == 0 or game not in games2][0]
+                        gamelist = [game for game in games1 if game == 0 or game not in games2]
+                        if len(gamelist) == 0:
+                            self.parent.put_status(431, f"Error in teams, round {rnd}, {p1}-{p2} has only {len( tmatch['games'])} games, but teamSize is {teamsize}")
+                            self.parent.put_status(431, "Add 300 Out-of-order records to solve this")
+                            raise
+                        
+                        game1 = gamelist[0]
                         games1.remove(game1)
                         wcol = self.tindex[seq[game % len(seq)]]  # Team with wcol is white 
                         bcol = "black" if wcol == "white" else "white"
@@ -394,7 +407,8 @@ class games2matches():
                             tmatch["games"].append(wgame["id"])
                             self.tournament["gameList"].remove(bgame)
                 for board, game in enumerate(tmatch["games"]): 
-                    cgames[game]["board"] = board + 1 
+                    if game in cgames:
+                        cgames[game]["board"] = board + 1 
             elif "white" not in tmatch:
                 w0 = cgames[tmatch["games"][0]]["white"]
                 tmatch.update({"white": cteam[w0], "black": 0, "played": False})
@@ -408,12 +422,12 @@ class games2matches():
         cteam = self.cteam
         teamsize = self.tournament["teamSize"]
         seq = self.tournament.get("teamSequence", "WB")
-        score = self.score
+        scores = self.scores
 
         for key, tmatch in matches.items():
             (rnd, p1, p2) = key.split("-")
             arg = int(p1)
-            games = [cgames[game] for game in tmatch["games"]]
+            games = [cgames[game] for game in tmatch["games"] if game in cgames]
             points = {"white": Decimal("0.0"), "black": Decimal("0.0")}
             if len(games) > 0:
                 white = tmatch["white"]
@@ -424,13 +438,15 @@ class games2matches():
                 # print('GEO:', games)
                 for game in range(teamsize):
                     ind += 1
+                    if game >= len(games):
+                        continue
                     cgame = games[game]
                     # wcol = self.tindex[seq[game % len(seq)]]  # Team with wcol is white (wrong) 
                     wcol = "white" if cteam[cgame["white"]] == white else "black"
                     bcol = "black" if wcol == "white" else "white"
                     played = played or cgame["played"]
-                    points[wcol] += score.get_score(self.tournament, "game", cgame["wResult"])
-                    points[bcol] += score.get_score(self.tournament, "game", cgame.get("bResult", "Z"))
+                    points[wcol] += scores.get_score(self.tournament, "game", cgame["wResult"])
+                    points[bcol] += scores.get_score(self.tournament, "game", cgame.get("bResult", "Z"))
                 tmatch["played"] = played
             if tmatch["black"] > 0:
                 loss = "L" if played else "Z"

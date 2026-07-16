@@ -66,6 +66,7 @@ class tournamentgenerator(commonmain):
             "berger": pairing_berger,
                 #"fideteam": pairing_fideteam
         }
+        self.statistics = drawresult(None)
 
  
 
@@ -99,15 +100,17 @@ class tournamentgenerator(commonmain):
             default=[] )
         self.read_common_command_line(self.origin, True)
 
-
-    def process_tournaments(self):
-        params = self.params
+    def parse_generate(self, params):
         generate = [int(g) for g in params["generate"]]
         if len(generate) == 2:
             generate[1] += generate[0]
         if len(generate) == 3:
             generate[1] = generate[0] + generate[1] * generate[2]
-        self.statistics = drawresult(None)
+        return generate
+    
+    def process_tournaments(self):
+        params = self.params
+        generate = self.parse_generate(params)
         self.statistics.set_params(0.01, 0.05, 0.02)
         self.statistics.set_sigma(50.0)
         self.statistics.set_team(1)
@@ -129,7 +132,7 @@ class tournamentgenerator(commonmain):
         today =  datetime.datetime.today().strftime('%Y-%m-%d')
         rounds = max(self.params["number_of_rounds"], self.params["current_round"])
         players = int(self.params["players"])
-        members = int(self.params["members"])
+        team_members = int(self.params["members"])
         tournament = ch.add_tournament(1, False, rounds)
         if "game_score" in params and params["game_score"] is not None:
             tournament["scoreSystem"]["game"].update(params["game_score"])
@@ -168,7 +171,7 @@ class tournamentgenerator(commonmain):
         forfeited = 0.02 if len(stat) < 3 else float(stat[2])
         self.statistics.set_params(zpb, hpb, forfeited) 
         self.statistics.set_sigma(sigma) 
-        self.statistics.set_team(members)
+        self.statistics.set_team(team_members)
         exp = " ".join(self.params["experimental"])
         ch.get_event()["eventInfo"] = {
             "fullName": "tournamentgenerator ver." + version.version()["version"] + " " + exp,
@@ -200,7 +203,13 @@ class tournamentgenerator(commonmain):
                 "random" : self.statistics.get_random(),
                 }
             )
-        # ch.update_tournament_random(tournament, False)        
+ 
+        self.run_tournament(ch, tournament, rounds, is_rr)
+
+        return ch.get_event()
+
+   
+    def run_tournament(self, ch, tournament, rounds, is_rr):
         if is_rr:
             tournament["competitors"] = self.statistics.do_shuffle(tournament["competitors"])
         else:
@@ -213,7 +222,7 @@ class tournamentgenerator(commonmain):
                 self.statistics.set_hpb(0.0)
             self.do_pairing(ch, tournament, rnd)
 
-        return ch.get_event()
+
 
     def do_pairing(self, ch, tournament, rnd):
         tr = {"Z": "Z", "H": "D", "+": "W", "-": "Z" }
@@ -345,9 +354,10 @@ class tournamentgenerator(commonmain):
         return result
 
 
-
-sys.set_int_max_str_digits(15000)
-tge = tournamentgenerator()
-code = tge.read_command_line()
-tge.process_tournaments()
-sys.exit(code)
+# run program
+if __name__ == "__main__":
+    sys.set_int_max_str_digits(15000)
+    tge = tournamentgenerator()
+    code = tge.read_command_line()
+    tge.process_tournaments()
+    sys.exit(code)
