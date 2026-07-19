@@ -257,8 +257,21 @@ class crosstable_dutch(crosstable):
                     # bsq = b["csq"][-2:] + ("w" if b["cid"] == c["w"] else "b")
                     acop = a["cop"]
                     bcop = b["cop"]
-                    opp = {"w": "bb", "b":"ww", " ":"nc"}[acop[0]]
 
+                    # `opp` used to be computed here as well, from a table with no entry for a
+                    # competitor who has NO colour preference:
+                    #
+                    #     opp = {"w": "bb", "b": "ww", " ": "nc"}[acop[0]]
+                    #
+                    # color_preference() returns "nc" for exactly that competitor -- one with no
+                    # played games at all, which a small field with byes or forfeits reaches by
+                    # the third round -- so acop[0] is "n", the table has no "n", and the pairing
+                    # died with KeyError: 'n'.
+                    #
+                    # The value was never used. It is read only inside the branch below, which
+                    # cannot be entered unless acop[0] is "w" or "b", and which recomputes it from
+                    # a two-entry table anyway. So the line computed a value it did not need, and
+                    # crashed the engine doing it, on a legal tournament.
                     if acop[0] == bcop[0] == "w" or acop[0] == bcop[0] == "b":
                         opp = {"w": "bb", "b":"ww"}[acop[0]]
                         anp = int(acop[1])
