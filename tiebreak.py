@@ -397,8 +397,7 @@ class tiebreak:
         if black > 0:
             if "bResult" not in rst:
                 err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(rst.get("white", 0)) + ", black=" +  str(rst.get("black", 0))
-                self.chessevent.put_status(451, err)
-                raise
+                raise GacruxInputError(err)
             bPoints = self.get_score(scoresystem, rst, "black")
             brPoints = self.get_score(self.rating, rst, "black")
             bVur = self.is_vur(rst, "black")
@@ -1114,6 +1113,8 @@ class tiebreak:
                 high = rounds - low
             vun = tb["modifiers"].get("vun", False)
             while low > 0:
+                if len(bhvalue) == 0:  # the cut is larger than the number of games of this competitor
+                    break
                 sortall = sorted(bhvalue, key=lambda game: (game["score"], game["tbvalue"]))
                 sortexp = sorted(bhvalue, key=lambda game: (-game["vur"], game["score"], game["tbvalue"]))
                 if vun or sortall[0]["tbvalue"] > sortexp[0]["tbvalue"]:
