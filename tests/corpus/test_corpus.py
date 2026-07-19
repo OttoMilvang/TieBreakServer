@@ -13,10 +13,10 @@ not this module:
 * ``skip: true`` records are skipped with their own ``skip_reason``. The current
   corpus has no skipped records.
 * records named in ``known_failures.json`` are marked ``xfail`` with the reason
-  recorded there -- these are tournaments the current engine gets wrong because
-  of a known, not-yet-fixed bug.  ``strict=True`` means that when the bug is
-  fixed the record turns into an XPASS and fails the suite, which is the signal
-  to remove it from ``known_failures.json``.
+  recorded there -- these tests still execute, but document tournaments the
+  current engine gets wrong because of a known, not-yet-fixed bug. ``strict=True``
+  means that when the bug is fixed the record turns into an XPASS and fails the
+  suite, which is the signal to remove it from ``known_failures.json``.
 
 By default a fast deterministic sample of the corpus runs, for quick local
 feedback; set ``TIEBREAK_CORPUS_FULL=1`` to run all of it, which CI does on every
@@ -53,9 +53,17 @@ def test_corpus_record(record):
     assert tiebreak_status != 510, \
         "tie-break checker faulted (status 510) on %s" % record["name"]
 
+    # Every team record must reach the newly implemented team method. An invalid
+    # individual record may already use status 510 as its rejection verdict, which is
+    # existing corpus behavior and outside the team feature.
+    pairing_status = _harness.pairing_status(trf)
+    if record["category"] == "team":
+        assert pairing_status != 510, \
+            "team pairing checker faulted or selected no implemented method on %s" % record["name"]
+
     # Validity is an identity verdict over both the prescribed pairing and the
     # standings produced by the fixture's declared tie-breaks.
-    accepts = _harness.pairing_status(trf) == 0 and tiebreak_status == 0
+    accepts = pairing_status == 0 and tiebreak_status == 0
     assert accepts == record["valid"], (
         "engine %s %s, but the corpus marks it valid=%s"
         % ("accepted" if accepts else "rejected", record["name"], record["valid"]))

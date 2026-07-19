@@ -179,6 +179,9 @@ class tiebreak:
         self.maxboard = 0
         self.lastplayedround = 0
         self.primaryscore = None  # use default
+        declared_primary = tournament["scoreSystem"].get("primary") if self.isteam else None
+        if declared_primary is not None:
+            self.set_primaryscore(declared_primary)
         self.accelerated = tournament["accelerated"] if "accelerated" in tournament else None
         self.rating = {"W": Decimal("1.0"), "D": Decimal("0.5"), "L": "Z", "Z": Decimal("0.0"), "A": "Z", "U": "Z"}
 

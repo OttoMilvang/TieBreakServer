@@ -23,6 +23,7 @@ from pairing import pairing
 from pairingdutch import pairing_dutch
 from pairingberger import pairing_berger
 from pairingfideteam import pairing_fideteam
+from errors import GacruxNoLegalPairing
 
 AHEAD = "  Tournament analysis   "
 PHEAD = "  Checker pairing       "
@@ -42,7 +43,7 @@ class pairingchecker(commonmain):
         -t w | b             # initial color on top ranked player in round 1
         -u [list of illagal pairings]
         -n <no>              # Round to pair, default next round, or all rounds in check mode
-        -m <method>          # dutch | berger
+        -m <method>          # dutch | berger | fideteam[-typeb]
         -c                   # check mode, look if tournament pairing is correct
         -a                   # Analysis and show tournament pairing
         -p                   # Dhow the correct pairing of next round (or another round with -n)
@@ -143,7 +144,10 @@ class pairingchecker(commonmain):
     def read_command_line(self):
         self.parser.add_argument("-a", "--analysis", required=False, action="count", default=0, help="Analysis pairing")
         self.parser.add_argument("-p", "--pairing", required=False, action="count", default=0, help="Do pairing")
-        self.parser.add_argument("-m", "--method", required=False, nargs="*", default=[], help="dutch | berger")
+        self.parser.add_argument(
+            "-m", "--method", required=False, nargs="*", default=[],
+            help="dutch | berger | fideteam[-typeb]",
+        )
         self.parser.add_argument("-t", "--top-color", required=False, default=" ", help="Color on top board")
         self.parser.add_argument("-K", "--maxmeets", required=False, default="0", help="The maximum number of meets")
         self.parser.add_argument("-u", "--unpaired", required=False, nargs="*", default=[])
@@ -402,9 +406,21 @@ class pairingchecker(commonmain):
         # print('PARAMS', params)
         self.pairingengine = pairingengine
         analysis = pairing = []
+        degenerate = False
         acompetitors = pcompetitors = {}
         if self.doanalysis or (self.docheck and not self.doanalysis and not self.dopairing):
-            analysis = pairingengine.compute_pairing(True, self.doanalysis)
+            try:
+                analysis = pairingengine.compute_pairing(True, self.doanalysis)
+            except GacruxNoLegalPairing:
+                if not isinstance(pairingengine, pairing_fideteam):
+                    raise
+                degenerate = True
+                current = [
+                    {"w": match["white"], "b": match.get("black", 0), "board": match["board"]}
+                    for match in pairingengine.tournament["matchList"]
+                    if match["round"] == pairingengine.rnd
+                ]
+                analysis = [{"pairs": current}]
             acompetitors = sorted(
                 #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.competitors],
                 pairingengine.crosstable.competitors,
@@ -412,7 +428,13 @@ class pairingchecker(commonmain):
             )
 
         if self.dopairing or (self.docheck and not self.doanalysis and not self.dopairing):
-            pairing = pairingengine.compute_pairing(False, self.dopairing)
+            try:
+                pairing = pairingengine.compute_pairing(False, self.dopairing)
+            except GacruxNoLegalPairing:
+                if not isinstance(pairingengine, pairing_fideteam):
+                    raise
+                degenerate = True
+                pairing = [{"pairs": pairingengine.compute_degenerate_pairing()}]
             pcompetitors = sorted(
                 #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.crosstable],
                 pairingengine.crosstable.competitors,
@@ -423,6 +445,9 @@ class pairingchecker(commonmain):
             "pairs": self.compute_pairs(pairing),
             "current": self.compute_pairs(analysis),
         }
+        if degenerate:
+            result["pairs"].sort()
+            result["current"].sort()
         if self.docheck:
             result["check"] = result["pairs"] == result["current"]
             result["pairing"] = pairing

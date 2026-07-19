@@ -15,6 +15,7 @@ held as its points.
 import decimal
 
 import trf2json
+from scoresystem import scoresystem
 from tiebreak import tiebreak
 
 
@@ -83,3 +84,10 @@ def test_pab_worth_a_win_is_still_held_as_a_win():
     assert chessfile.get_status() == 0
     assert scoresystem["P"] == "W"
     assert points_of(chessfile)[5] == decimal.Decimal("6.0")
+
+
+def test_match_acceleration_uses_the_match_score_system():
+    system = scoresystem()
+
+    assert system.get_result({}, "match", decimal.Decimal("2.0")) == "W"
+    assert system.get_result({}, "match", decimal.Decimal("1.0")) == "D"

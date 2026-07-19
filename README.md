@@ -28,7 +28,9 @@
 
 - **-a** or **--analyze** - Analyze pairing
 - **-p** or **--pairing** - Do pairing
-- **-m \<method\>** or **--method \<method\>** - dutch (| berger not implemented)
+- **-m \<method\>** or **--method \<method\>** - `dutch`, `berger`, or
+  `fideteam` (`fideteam-typeb` for type B colour preferences). FIDE team Swiss
+  tournaments are selected automatically from TRF record 192.
 - **-t \<w | b\>** or **--top-color \<w | b\>** - Color on top board")
 - **-u \<list\>** or **--unpaired \<list\>** - list of competiters that shall not be paired for next round
 - **-x \<list\>** or **--experimental \<list\>** - list of kewords, "weighted" - use weighted
