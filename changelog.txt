@@ -1,6 +1,8 @@
 
 Unreleased
 
+- Fixed absolute colour preferences when the colour difference is +/-1 and the
+  player received the same colour in their last two played games.
 - Added typed engine errors and fixed crashes involving unpairable fields,
   incomplete results, uncommon scoring systems, invalid pairing numbers,
   long colour sequences, and tie-break cuts.

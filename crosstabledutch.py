@@ -128,9 +128,20 @@ class crosstable_dutch(crosstable):
     def color_preference(self, cod, csq):
         # Implementation for determining color preference
         #print(cod, csq)
-        if cod <= -2 or cod <= 0 and csq[-2:] == "bb":
+        # C.04.3 art. 1.7.1: "The preference is for White when the colour difference is less
+        # than -1 OR when the last two games were played with Black." The second clause is
+        # unconditional on the colour difference. Gating it at cod <= 0 (resp. cod >= 0) drops
+        # the |cod| == 1 cases, which then fall through to art. 1.7.2 and come back as a STRONG
+        # preference for the OPPOSITE colour -- e.g. a player with the colour history wwwbb
+        # (cod = +1, last two Black) has an absolute preference for White by 1.7.1, but was
+        # returned "b1". Widening to cod <= 1 / cod >= -1 covers them.
+        #
+        # cod >= +2 with the last two games Black (and its mirror) is left resolving by the
+        # colour difference, as before: there art. 1.7.1 asserts BOTH preferences, and the
+        # article does not say which wins.
+        if cod <= -2 or cod <= 1 and csq[-2:] == "bb":
              return "w2"
-        elif cod >= 2 or cod >= 0 and csq[-2:] == "ww":
+        elif cod >= 2 or cod >= -1 and csq[-2:] == "ww":
              return "b2"
         elif cod == -1:
              return "w1"
