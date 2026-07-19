@@ -8,6 +8,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 import chessjson as chessjson
 import rating as rating
+from errors import GacruxInputError
 
 """
 Structure
@@ -1126,6 +1127,8 @@ class tiebreak:
                 low -= 1
 
             while high > 0:
+                if len(bhvalue) == 0:  # the cut is larger than the number of games of this competitor
+                    break
                 sortall = sorted(bhvalue, key=lambda game: (-game["score"], -game["tbvalue"]))
                 # sortexp = sorted(bhvalue, key=lambda game: (-game['vur'], -game['score'], -game['tbvalue'])) // No
                 # exception on high
