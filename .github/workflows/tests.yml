@@ -1,0 +1,96 @@
+name: tests
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  # Cancel a superseded pull-request run when new commits arrive, but leave a
+  # manually dispatched run alone so it is never cut short.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least privilege: the jobs only read the repository and hand JUnit artifacts
+# between each other within the run; nothing here needs write access.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Shards are shown to people as 1-8; `index` remains zero-based because it
+    # is passed to the corpus's round-robin partitioner.
+    name: Python ${{ matrix.python-version }} · shard ${{ matrix.shard.number }}/8
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # The lowest and highest interpreter the engine supports.
+        python-version: ["3.11", "3.14"]
+        # The whole corpus runs in CI. Checking a tournament is real pairing work,
+        # so it is split across shards -- each a separate runner doing an eighth of
+        # the corpus -- and xdist then spreads that shard over the runner's cores.
+        shard:
+          - {number: 1, index: 0}
+          - {number: 2, index: 1}
+          - {number: 3, index: 2}
+          - {number: 4, index: 3}
+          - {number: 5, index: 4}
+          - {number: 6, index: 5}
+          - {number: 7, index: 6}
+          - {number: 8, index: 7}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          # Cache the pip wheel/download cache, keyed on the requirement files.
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run tests
+        env:
+          TIEBREAK_CORPUS_FULL: "1"
+          TIEBREAK_CORPUS_SHARDS: "8"
+          TIEBREAK_CORPUS_SHARD: ${{ matrix.shard.index }}
+        run: >
+          pytest tests/ -n auto
+          --junitxml=junit/results-${{ matrix.python-version }}-${{ matrix.shard.number }}.xml
+      - name: Upload test results
+        # Upload even when the tests fail (so their JUnit feeds the summary),
+        # but not when the run was cancelled.
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-${{ matrix.python-version }}-${{ matrix.shard.number }}
+          path: junit/results-*.xml
+          retention-days: 7
+
+  summary:
+    name: Test summary
+    needs: test
+    # Run once every shard has finished, whether they passed or failed, so the
+    # report covers failing runs too; skip only when the run was cancelled.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the summary script
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - name: Download test results
+        uses: actions/download-artifact@v8
+        with:
+          path: junit
+          pattern: junit-*
+          merge-multiple: true
+      - name: Write the run summary
+        run: python3 .github/scripts/junit_summary.py junit >> "$GITHUB_STEP_SUMMARY"
