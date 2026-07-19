@@ -11,8 +11,9 @@ concurrency:
   # manually dispatched run alone so it is never cut short.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Least privilege: the jobs only read the repository and hand JUnit artifacts
-# between each other within the run; nothing here needs write access.
+# Tests and report generation only read the repository.  The separate comment
+# job below gets narrowly-scoped write access, and only for branches in this
+# repository; fork pull requests are reported by test-summary-comment.yml.
 permissions:
   contents: read
 
@@ -93,4 +94,72 @@ jobs:
           pattern: junit-*
           merge-multiple: true
       - name: Write the run summary
-        run: python3 .github/scripts/junit_summary.py junit >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          python3 .github/scripts/junit_summary.py junit > test-summary.md
+          cat test-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the run summary
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-summary
+          path: test-summary.md
+          retention-days: 7
+
+  comment:
+    name: Post test summary
+    needs: summary
+    # A pull_request token is writable only for branches in this repository.
+    # Fork pull requests are handled by the trusted workflow_run workflow.
+    if: >-
+      ${{
+        !cancelled() &&
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download the run summary
+        uses: actions/download-artifact@v8
+        with:
+          name: test-summary
+          path: test-summary
+      - name: Create or update the pull-request comment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- tiebreakserver-test-summary -->';
+            const report = fs.readFileSync(
+              'test-summary/test-summary.md', 'utf8'
+            );
+            const body = `${marker}\n${report}`;
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              }
+            );
+            const previous = comments.find(comment =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

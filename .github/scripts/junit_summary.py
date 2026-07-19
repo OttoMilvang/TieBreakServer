@@ -20,10 +20,9 @@ pytest encodes each outcome in JUnit XML as a ``<testcase>`` element:
 * xfail   -- a ``<skipped type="pytest.xfail">`` child  (a tolerated known bug)
 * skip    -- a ``<skipped type="pytest.skip">`` child
 
-so xfailed records (the corpus's 158 not-yet-fixed known failures) and plainly
-skipped ones (the whole team category, pending FIDE team-system validation) are
-told apart by the ``<skipped>`` element's ``type``, rather than lumped together
-the way the ``<testsuite>`` ``skipped`` attribute would.
+so expected failures and plainly skipped records are told apart by the
+``<skipped>`` element's ``type``, rather than lumped together the way the
+``<testsuite>`` ``skipped`` attribute would.
 
 The report is grouped two ways -- by *test group* (the individual-pairing corpus
 vs. the team corpus vs. the hand-written unit/regression tests) and by *Python

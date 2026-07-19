@@ -101,7 +101,9 @@ TIEBREAK_CORPUS_FULL=1 pytest tests/corpus/ -n auto
 
 CI runs the complete corpus in round-robin shards. `TIEBREAK_CORPUS_SHARDS`
 sets the number of shards and `TIEBREAK_CORPUS_SHARD` selects the zero-based
-shard index.
+shard index. Once every runner finishes, CI posts or updates one pull-request
+comment with the combined results; the same report remains available on the
+workflow run's summary page.
 
 Fixtures listed in `known_failures.json` run under strict `xfail` markers. A
 fixed disagreement therefore becomes an XPASS and fails the suite until its
