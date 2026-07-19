@@ -465,7 +465,7 @@ class pairing_dutch(pairing):
         pab = self.pablevel
         cmp = self.competitors
         hamilton = self.hamilton
-        if self.optimize and pab == -1 and len(edges) > 0 and len(hamilton) > 0 and hamilton[-1]["rem_hamilton"] >= 0:
+        if self.optimize and pab == -1 and len(edges) > 0 and len(hamilton) > 0 and hamilton[-1].get("rem_hamilton", -1) >= 0:
             # Note that edges are sorted on "ca" and then on "cb"
             # in the order scorelevel on a, scorelevel on b, cid
             pab = cmp[edges[-1]["cb"]]["scorelevel"] if cmp[0]["rfp"] else 0
