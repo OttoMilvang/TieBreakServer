@@ -310,7 +310,10 @@ class pairing_dutch(pairing):
         cat1 = False
         hamilton = self.hamilton
         if len(edges) == 0:
-            raise  
+            raise GacruxNoLegalPairing(
+                "score bracket " + str(scorelevel) + " has no admissible pairing"
+                + " (see C.04.3 art. 1.9.3)"
+            )
         if edges[0]["sa"] < scorelevel or edges[0]["sb"] < scorelevel:
             return -1  # There are no pairing for this scorebracket
         if edges[0]["sa"] == 1 and edges[0]["sb"] == 1:
