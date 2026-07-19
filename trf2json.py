@@ -1030,16 +1030,16 @@ class trf2json(chessjson.chessjson):
             "att": line[4],
             "matchPoints": parse_float(line[7:11]),
             "gamePoints": parse_float(line[13:17]),
-            "round": parse_int(line[13:17]),
+            "round": parse_int(line[19:22]),
             "teams": teams,
         }
         for i in range(27, linelen + 1, 5):
             team = parse_int(line[i - 4 : i])
-            teams.append[team]
+            teams.append(team)
         if att["round"] == 0 and (len(teams) == 0 or teams[0] == 0):
             self.scores.add_unplayed(att["att"], att["matchPoints"], att["gamePoints"])
         else:
-            self.attlist.append(att)
+            self.aatlist.append(att)
 
     def parse_trf_acceleratedv4(self, tournament, line):
         linelen = len(line)
