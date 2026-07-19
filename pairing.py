@@ -213,8 +213,7 @@ class pairing:
                 self.roundpairing.append(bracket)
             scorelevel -= 1
         if len(nodes) > 0:
-            breakpoint()
-            raise            
+            raise
         if pabbracket:
             self.roundpairing.append(pabbracket)
         self.update_board(self.roundpairing)
@@ -420,8 +419,6 @@ class pairing:
                 lf_hist[ll_id[edge["cb"] if edge["sa"] < edge["sb"] else edge["ca"]]] += 1
 
         # laste += 1
-        if bp:
-            breakpoint()
         return hamilton
 
     def is_complete(self, nodes, edges, weight=False, hist=None, pab=False):
