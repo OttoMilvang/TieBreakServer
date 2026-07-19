@@ -10,6 +10,23 @@ import chessjson as chessjson
 import rating as rating
 from errors import GacruxInputError
 
+
+def _select_low_cut_game(games, ignore_vur_exception=False):
+    """Select the next value removed by a low cut under C.07 articles 14 and 16.5."""
+    least_significant = min(games, key=lambda game: (game["score"], game["tbvalue"]))
+    if ignore_vur_exception:
+        return least_significant
+
+    lowest_vur = min(
+        (game for game in games if game["vur"]),
+        key=lambda game: game["tbvalue"],
+        default=None,
+    )
+    if lowest_vur is not None and lowest_vur["tbvalue"] >= least_significant["tbvalue"]:
+        return lowest_vur
+    return least_significant
+
+
 """
 Structure
 
@@ -1116,14 +1133,9 @@ class tiebreak:
             while low > 0:
                 if len(bhvalue) == 0:  # the cut is larger than the number of games of this competitor
                     break
-                sortall = sorted(bhvalue, key=lambda game: (game["score"], game["tbvalue"]))
-                sortexp = sorted(bhvalue, key=lambda game: (-game["vur"], game["score"], game["tbvalue"]))
-                if vun or sortall[0]["tbvalue"] > sortexp[0]["tbvalue"]:
-                    bhvalue = sortall[1:]
-                    tbscore[oprefix + name]["cut"].append(sortall[0]["rnd"])
-                else:
-                    bhvalue = sortexp[1:]
-                    tbscore[oprefix + name]["cut"].append(sortexp[0]["rnd"])
+                cut_game = _select_low_cut_game(bhvalue, vun)
+                bhvalue.remove(cut_game)
+                tbscore[oprefix + name]["cut"].append(cut_game["rnd"])
                 low -= 1
 
             while high > 0:
@@ -1707,4 +1719,3 @@ class tiebreak:
                 return ["match", "mpoints", self.matchscore, "mpoints_"]
         else:
                 return ["game", "points", self.gamescore, "points_"]
-

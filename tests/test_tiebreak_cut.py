@@ -6,6 +6,8 @@ The cut is limited by the number of rounds, not by the number of games the compe
 actually has. A competitor who withdrew, entered late or was given byes has fewer games
 than that, so a cut can consume every game he has.
 """
+from decimal import Decimal
+
 import pytest
 
 import tiebreak
@@ -101,6 +103,46 @@ def test_sonneborn_berger_cuts():
     assert compute(withdrawal_after_round_1(), ["SB/M1"]) == {
         1: "3.00", 2: "2.50", 3: "2.00", 4: "3.00", 5: "0",
     }
+
+
+def test_sonneborn_berger_vur_candidate_is_selected_by_contribution():
+    # C.07 articles 14.1.1.d and 16.5 require two different candidates:
+    #
+    # * the ordinary candidate is the contribution associated with the opponent
+    #   having the lowest score (round 10 here: 2.50), and
+    # * the VUR candidate is the lowest contribution from a VUR (round 4: 0.00),
+    #   regardless of the dummy scores attached to those VURs.
+    #
+    # The March 2026 caps can give VURs different dummy scores. Selecting a VUR by
+    # dummy score would wrongly choose round 1 (2.75) and produce 31.25. Article
+    # 16.5 instead compares 0.00 with 2.50 and cuts the latter, producing 31.50.
+    games = [
+        {"vur": True, "score": Decimal("5.50"), "tbvalue": Decimal("2.75"), "rnd": 1},
+        {"vur": True, "score": Decimal("6.00"), "tbvalue": Decimal("0.00"), "rnd": 4},
+        {"vur": False, "score": Decimal("2.50"), "tbvalue": Decimal("2.50"), "rnd": 10},
+        {"vur": False, "score": Decimal("5.00"), "tbvalue": Decimal("5.00"), "rnd": 2},
+        {"vur": False, "score": Decimal("4.50"), "tbvalue": Decimal("4.50"), "rnd": 3},
+        {"vur": False, "score": Decimal("3.50"), "tbvalue": Decimal("3.50"), "rnd": 5},
+        {"vur": False, "score": Decimal("4.00"), "tbvalue": Decimal("4.00"), "rnd": 6},
+        {"vur": False, "score": Decimal("3.50"), "tbvalue": Decimal("3.50"), "rnd": 7},
+        {"vur": False, "score": Decimal("3.00"), "tbvalue": Decimal("3.00"), "rnd": 8},
+        {"vur": False, "score": Decimal("2.75"), "tbvalue": Decimal("2.75"), "rnd": 9},
+        {"vur": False, "score": Decimal("2.75"), "tbvalue": Decimal("2.50"), "rnd": 11},
+    ]
+
+    cut_game = tiebreak._select_low_cut_game(games)
+
+    assert cut_game["rnd"] == 10
+    assert sum(game["tbvalue"] for game in games if game is not cut_game) == Decimal("31.50")
+
+
+def test_equal_vur_contribution_is_cut_as_not_lower():
+    # Article 16.5 says the VUR is cut when its contribution is "not lower" than
+    # the ordinary candidate, so equality belongs to the VUR side of the comparison.
+    ordinary = {"vur": False, "score": Decimal("1.00"), "tbvalue": Decimal("1.00"), "rnd": 1}
+    vur = {"vur": True, "score": Decimal("4.00"), "tbvalue": Decimal("1.00"), "rnd": 2}
+
+    assert tiebreak._select_low_cut_game([ordinary, vur]) is vur
 
 
 @pytest.mark.parametrize("tb", ["BH/C5", "SB/C5"])
