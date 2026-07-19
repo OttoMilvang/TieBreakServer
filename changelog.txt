@@ -1,6 +1,9 @@
 
 Unreleased
 
+- Added typed engine errors and fixed crashes involving unpairable fields,
+  incomplete results, uncommon scoring systems, invalid pairing numbers,
+  long colour sequences, and tie-break cuts.
 - Added a pytest regression suite, a 6,000-record TRF corpus, and automated
   testing on Python 3.11 and 3.14 with GitHub Actions. Pull requests receive a
   single, automatically updated comment summarising the complete test matrix.
