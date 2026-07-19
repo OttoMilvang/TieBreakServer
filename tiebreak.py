@@ -643,7 +643,10 @@ class tiebreak:
                             self.addtbval(tbscore[prefix + "cod"], rnd, pf)
                             self.addtbval(tbscore[prefix + "cod"], "val", pf)
                             pf = tbscore[prefix + "cod"]["val"]
-                            ncol = (other[ocol] + "bbbbwwww")[pf]
+                            colpref = other[ocol] + "bbbbwwww"
+                            # a competitor with the same color in every game reaches |pf| >= len(colpref),
+                            # which is outside the table. Saturate on the last entry in each direction.
+                            ncol = colpref[max(-len(colpref), min(pf, len(colpref) - 1))]
                             ncol += str(abs(pf)) if ocol != pcol else "2"
     
                             csq += ocol
