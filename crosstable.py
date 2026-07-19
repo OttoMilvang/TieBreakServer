@@ -11,6 +11,7 @@ opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects
 """
 
 from decimal import Decimal
+from errors import GacruxInvariantError
 from tiebreak import tiebreak
 from itertools import combinations  
 from enum import Enum
@@ -247,7 +248,10 @@ class crosstable:
     
         index = [i for i, c in enumerate(f) if c == "0"]
         if len(wres) != len(index):
-            raise
+            raise GacruxInvariantError(
+                "weight format string '" + str(f) + "' has " + str(len(index)) + " digit position(s),"
+                + " but " + str(len(wres)) + " weight component(s) were unpacked from the weight"
+            )
         ptr = list(f)
         for i, c in enumerate(wres):
             ptr[index[i]] = str(c)

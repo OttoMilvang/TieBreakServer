@@ -5,6 +5,7 @@ Created on Tue Oct 31 13:57:55 2023
 """
 
 from decimal import Decimal
+from errors import GacruxInputError
 import helpers
 
 # ==============================
@@ -220,10 +221,12 @@ class scoresystem:
                 score[result] = trans[score[result]]
         self.score["game"] = score
         eqok = False
+        badplayers = []
         for version in ["TRF25", "TRF16"]:
             # print("+EQOK", eqok, version, "162" in self.all_lines,  not eqok and ("162" not in self.all_lines or version == "TRF25"))
             if not eqok and (not istrf25 or version == "TRF25"):
                 eqok = True
+                badplayers = []
                 score = self.fill_default_scoresystem("game") if version == "TRF25" else self.solve_scoresystem(equations)
                 # print(version, score)
                 for lineno, eq in enumerate(equations):
@@ -244,10 +247,14 @@ class scoresystem:
                     if eq["sum"] != checksum:
                         msg = "Incorrect score for player " + str(lineno+1)
                         chessjson["status"]["error"].append(msg)
+                        badplayers.append(str(lineno+1))
                         eqok = False
                 # print("-EQOK", eqok, version, "162" in self.all_lines)
         if not eqok:
-            raise
+            raise GacruxInputError(
+                "no score system adds the results of player(s) " + ", ".join(badplayers)
+                + " up to the points they report. Add a 162 record to declare the score system"
+            )
         if "Z" not in score:
             score["Z"] = Decimal("0.0")
         self.score["game"] = score
