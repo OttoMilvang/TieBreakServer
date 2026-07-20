@@ -24,6 +24,12 @@ so expected failures and plainly skipped records are told apart by the
 ``<skipped>`` element's ``type``, rather than lumped together the way the
 ``<testsuite>`` ``skipped`` attribute would.
 
+The matrix runs the same logical tests under multiple Python versions, and its
+corpus sharding causes the ordinary unit tests to be collected in every shard.
+Headline, group and reason counts therefore de-duplicate by test id.  The
+per-Python table remains version-specific so an interpreter disagreement stays
+visible without multiplying the overall totals.
+
 The report is grouped two ways -- by *test group* (the individual-pairing corpus
 vs. the team corpus vs. the hand-written unit/regression tests) and by *Python
 version* -- so the split the corpus already encodes in each record's name is
@@ -108,11 +114,7 @@ def _skip_reason(skipped):
 
 def collect(directory):
     """Parse every ``results-*.xml`` under *directory* into a report dict."""
-    by_group = collections.defaultdict(_blank)
-    by_python = collections.defaultdict(_blank)
-    failures = []                          # (python, case id, message)
-    skip_reasons = collections.Counter()   # reason -> count
-    xfail_reasons = collections.Counter()  # reason -> count
+    cases_by_python = collections.defaultdict(dict)
     pythons = set()
     file_count = 0
     parse_errors = []
@@ -128,16 +130,57 @@ def collect(directory):
             continue
         file_count += 1
         for testcase in root.iter("testcase"):
+            case_id = _case_id(testcase)
             outcome = _outcome_of(testcase)
-            by_group[_group_of(testcase.get("name", ""))][outcome] += 1
-            by_python[python][outcome] += 1
+            reason = ""
+            message = ""
             if outcome in ("failed", "errors"):
                 kind = "failure" if outcome == "failed" else "error"
-                failures.append((python, _case_id(testcase), _fault_message(testcase, kind)))
-            elif outcome == "xfailed":
-                xfail_reasons[_skip_reason(testcase.find("skipped"))] += 1
-            elif outcome == "skipped":
-                skip_reasons[_skip_reason(testcase.find("skipped"))] += 1
+                message = _fault_message(testcase, kind)
+            elif outcome in ("xfailed", "skipped"):
+                reason = _skip_reason(testcase.find("skipped"))
+
+            result = {
+                "group": _group_of(testcase.get("name", "")),
+                "outcome": outcome,
+                "reason": reason,
+                "message": message,
+            }
+            previous = cases_by_python[python].get(case_id)
+            if previous is None:
+                cases_by_python[python][case_id] = result
+            elif previous != result:
+                parse_errors.append((
+                    path.name,
+                    "conflicting duplicate result for %s under Python %s"
+                    % (case_id, python),
+                ))
+
+    by_group = collections.defaultdict(_blank)
+    by_python = collections.defaultdict(_blank)
+    failures = []                          # (python, case id, message)
+    skip_reasons = collections.Counter()   # reason -> unique logical case count
+    xfail_reasons = collections.Counter()  # reason -> unique logical case count
+
+    logical_cases = collections.defaultdict(dict)
+    for python, cases in cases_by_python.items():
+        for case_id, result in cases.items():
+            by_python[python][result["outcome"]] += 1
+            logical_cases[case_id][python] = result
+            if result["outcome"] in ("failed", "errors"):
+                failures.append((python, case_id, result["message"]))
+
+    # One logical case contributes once to the overall report. If interpreters
+    # disagree, retain the most severe outcome; the per-Python table below shows
+    # exactly which interpreter produced it.
+    severity = {"passed": 0, "xfailed": 1, "skipped": 2, "failed": 3, "errors": 4}
+    for versions in logical_cases.values():
+        result = max(versions.values(), key=lambda item: severity[item["outcome"]])
+        by_group[result["group"]][result["outcome"]] += 1
+        if result["outcome"] == "xfailed":
+            xfail_reasons[result["reason"]] += 1
+        elif result["outcome"] == "skipped":
+            skip_reasons[result["reason"]] += 1
 
     return {
         "by_group": by_group,
@@ -195,7 +238,7 @@ def render(report):
     parse_errors = report["parse_errors"]
 
     grand = _blank()
-    for counts in by_python.values():
+    for counts in by_group.values():
         for outcome in _OUTCOMES:
             grand[outcome] += counts[outcome]
     total_cases = sum(grand.values())
@@ -233,12 +276,12 @@ def render(report):
     out.append("")
     rows = [_row("Python %s" % python, by_python[python])
             for python in sorted(by_python)]
-    rows.append(_row("**Total**", grand))
     out.extend(_table("Python", rows))
     out.append("")
 
-    out.append("_Counts sum every matrix job, so each corpus record appears once "
-               "per Python version (e.g. 158 known-fail records × 2 = 316)._")
+    out.append("_Headline, group and reason counts show each logical test once. "
+               "The rows above remain per Python version so compatibility "
+               "differences are visible._")
     out.append("")
 
     # Explain the non-passing outcomes, straight from the markers' own reasons.
