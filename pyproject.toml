@@ -4,30 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gacrux"
-version = "1.9.56"
+dynamic = ["version"]
 authors = [
   { name="Otto Milvang" },
 ]
 description = "FIDE Tournament Pairing Engine Tool"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 dependencies = [
   "networkx>=2.6"
 ]
+license = {text = "MIT"}
 
-[project.scripts]
-gacrux-server = "gacrux_entry:run_server"
-gacrux-pairing = "gacrux_entry:run_pairing"
-gacrux-tiebreak = "gacrux_entry:run_tiebreak"
-gacrux-generator = "gacrux_entry:run_generator"
+[project.urls]
+Homepage = "https://github.com/OttoMilvang/TieBreakServer"
+Repository = "https://github.com/OttoMilvang/TieBreakServer"
 
-[tool.setuptools]
-py-modules = [
-    "berger", "chessjson", "chessserver", "commonmain", "convert",
-    "crosstable", "crosstabledutch", "drawresult", "fidetables",
-    "gacrux_entry", "games2matches", "helpers", "jsonscheme",
-    "pairing", "pairingberger", "pairingchecker", "pairingdutch",
-    "qdefs", "rating", "ratingsimulation", "scoresystem", "tiebreak", "tiebreakchecker",
-    "tiebreaktest", "tournamentgenerator", "trf2json", "ts2json",
-    "verifyjch", "version", "xxxmain"
-]
+[tool.setuptools.dynamic]
+version = {attr = "gacrux.version.__version__"}

@@ -12,13 +12,13 @@ import json
 import sys
 import time
 from decimal import Decimal
-from crosstable import crosstable
+from gacrux.crosstable import crosstable
 from collections import defaultdict
-import berger
+from gacrux import berger
 
-from pairing import pairing
+from gacrux.pairing import pairing
 from enum import Enum
-import helpers
+from gacrux import helpers
 
 
 

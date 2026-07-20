@@ -5,7 +5,7 @@ Created on Mon Dec 15 16:26:22 2025
 @author: Otto
 """
 from decimal import Decimal
-import scoresystem
+from gacrux import scoresystem
 
 
 
@@ -475,13 +475,13 @@ class games2matches():
         rnd = 0
         board = 0
 
-        for key, tmatch in matches.items():
+        for key, tmatch in self.matches.items():
             if tmatch["round"] != rnd:
                 rnd = tmatch["round"]
                 board = 0
             board += 1
             tmatch["board"] = board
-            self.append_result(tournament["matchList"], tmatch)
+            self.append_result(self.tournament["matchList"], tmatch)
         # json_output('c:/temp/nmatches.json', tournament['matchList'])
         # json_output('c:/temp/ngames.json', tournament['gameList'])
 

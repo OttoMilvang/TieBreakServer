@@ -13,15 +13,15 @@ import sys
 import time
 
 from collections import defaultdict
-import version
-import pairingdutch
-from helpers import *
-from chessjson import chessjson
-from commonmain import commonmain
-from tiebreak import tiebreak
-from pairing import pairing
-from pairingdutch import pairing_dutch
-from pairingberger import pairing_berger
+from gacrux import version
+from gacrux import pairingdutch
+from gacrux import helpers
+from gacrux.chessjson import chessjson
+from gacrux.commonmain import commonmain
+from gacrux.tiebreak import tiebreak
+from gacrux.pairing import pairing
+from gacrux.pairingdutch import pairing_dutch
+from gacrux.pairingberger import pairing_berger
 #from pairingfideteam import pairing_fideteam
 
 AHEAD = "  Tournament analysis   "
@@ -196,8 +196,8 @@ class pairingchecker(commonmain):
             alen = len(AHEAD) if len(a) > 0 else 0
             maxlen = len(AHEAD) - 1
             while len(p) or len(a):
-                (ppart, p) = spilt_my_line(p, maxlen, ",")
-                (apart, a) = spilt_my_line(a, maxlen, ",")
+                (ppart, p) = helpers.split_my_line(p, maxlen, ",")
+                (apart, a) = helpers.split_my_line(a, maxlen, ",")
                 line = label + format("  " + ppart, "<" + str(maxlen + 1)) + format("  " + apart, "<" + str(maxlen + 1))
                 label = "     "
                 lines.append(line)
@@ -339,8 +339,8 @@ class pairingchecker(commonmain):
                 line = "Pairs    :    Pairing      BSN        Analysis      BSN    "
                 lines.append(line)
                 for pno in range(max(len(ppairs), len(apairs))):
-                    pp = format_pair(ppairs[pno], pcomp, bsn, sno) if pno < len(ppairs) else ""
-                    ap = format_pair(apairs[pno], acomp, bsn, sno) if pno < len(apairs) else ""
+                    pp = helpers.format_pair(ppairs[pno], pcomp, bsn, sno) if pno < len(ppairs) else ""
+                    ap = helpers.format_pair(apairs[pno], acomp, bsn, sno) if pno < len(apairs) else ""
                     arrow = "       <=======  " if eq else ""
                     eq = eq and (pp == ap)
                     arrow = arrow if not eq else ""
@@ -352,8 +352,8 @@ class pairingchecker(commonmain):
                     lines.append(line)
                 line = "Down     :"
                 for pno in range(max(len(pdown), len(adown))):
-                    pp = format_down(pdown[pno], pcomp, bsn) if pno < len(pdown) else ""
-                    ap = format_down(adown[pno], acomp, bsn) if pno < len(adown) else ""
+                    pp = helpers.format_down(pdown[pno], pcomp, bsn) if pno < len(pdown) else ""
+                    ap = helpers.format_down(adown[pno], acomp, bsn) if pno < len(adown) else ""
                     eq = eq and (pp == ap)
                     line += f"{pp:>24}" + f"{ap:>24}"
                     lines.append(line)
@@ -529,7 +529,7 @@ class pairingchecker(commonmain):
                         inv[c["rank"]] = c["cid"]
                     self.fakerank(tournament, fwd, [])
                 for rnd in range(firstround, min(numrounds, lastround) + 1):
-                    unpaired = [parse_int(u) for u in params.get("unpaired", [])]
+                    unpaired = [helpers.parse_int(u) for u in params.get("unpaired", [])]
                     if len(unpaired) > 0:
                         for c in tournament["competitors"]:
                             if c["cid"] in unpaired:

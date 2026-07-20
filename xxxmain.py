@@ -15,11 +15,11 @@ import io
 import sys
 import datetime
 import codecs
-import helpers
-from commonmain import commonmain
-from convert2jch import convert2jch
-from tiebreakchecker import tiebreakchecker
-from chessjson import chessjson
+from gacrux import helpers
+from gacrux.commonmain import commonmain
+from gacrux.convert import convert2jch
+from gacrux.tiebreakchecker import tiebreakchecker
+from gacrux.chessjson import chessjson
 
 # ==============================
 

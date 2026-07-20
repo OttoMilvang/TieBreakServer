@@ -17,8 +17,8 @@ from collections import defaultdict
 import networkx as nx
 
 # from networkx.algorithms import bipartite
-from crosstable import crosstable, flt
-import helpers
+from gacrux.crosstable import crosstable, flt
+from gacrux import helpers
 
 
 """

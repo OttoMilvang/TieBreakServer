@@ -6,8 +6,8 @@ Created on Fri Aug  11 11:43:23 2023
 import math
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
-import chessjson as chessjson
-import rating as rating
+from gacrux import chessjson 
+from gacrux import rating
 
 """
 Structure

@@ -10,10 +10,10 @@ import io
 import json
 import sys
 
-import helpers
-from chessjson import chessjson
-from trf2json import trf2json
-from ts2json import ts2json
+from gacrux import helpers
+from gacrux.chessjson import chessjson
+from gacrux.trf2json import trf2json
+from gacrux.ts2json import ts2json
 
 # ==============================
 

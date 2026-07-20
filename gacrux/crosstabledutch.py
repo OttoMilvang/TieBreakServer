@@ -11,8 +11,8 @@ opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects
 """
 
 from decimal import Decimal
-from crosstable import crosstable, flt
-from tiebreak import tiebreak
+from gacrux.crosstable import crosstable, flt
+from gacrux.tiebreak import tiebreak
 from itertools import combinations  
 from enum import Enum
 

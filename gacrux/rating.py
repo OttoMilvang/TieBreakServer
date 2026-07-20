@@ -7,7 +7,7 @@ Created on Fri Aug 18 08:28:13 2023
 from decimal import Decimal
 
 # import tables from FIDE Handbook
-import fidetables
+from gacrux import fidetables
 
 
 #
