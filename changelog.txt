@@ -1,3 +1,14 @@
+2026-07-21 1.9.57
+
+Bug fixes
+Allow 1st round to be paired in a tournament without knowing the teamsize. 
+Fix bug with accellerated system in team tournament.
+
+Implemented EDEC, EDET, EDEB, EDEBT, EDEBB
+
+Change internal representation from result to score for accelleration points. 
+Rewritten direct encounter, so all DE od EDE.. TBs are treated in the same function
+
 
 2026-07-10 1.9.56
 Bug fix National rating support

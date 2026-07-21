@@ -156,7 +156,7 @@ def read_command_line():
 
 def read_input_file(params):
     # Read input file
-    match (params["file_format"]):
+    match (params["input_format"]):
         case "JSON":
             chessfile = chessjson()
             charset = "utf-8"
@@ -168,7 +168,7 @@ def read_input_file(params):
             chessfile = ts2json()
             charset = "ascii"
         case _:
-            error(503, "Error in file format: " + params["file_format"])
+            error(503, "Error in file format: " + params["input_format"])
 
     if "input_file" not in params:
         error(501, "Missing parameter --input-file")

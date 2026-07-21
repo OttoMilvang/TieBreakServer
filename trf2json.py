@@ -217,7 +217,10 @@ class trf2json(chessjson.chessjson):
             else:
                 self.prepare_team_section_310(tournament)
                 self.update_board_number(tournament, "match", True)
-            if tournament["teamSize"] == 0:
+            if tournament["teamSize"] == 0 and len(tournament["gameList"]) > 0:
+                if len(tournament["matchList"]) == 0:
+                    self.put_status(401, "Error in trf-file, Minning 362 record for team tournament")
+     
                 tournament["teamSize"] = round(len(tournament["gameList"]) / len(tournament["matchList"]))
         else:
             self.prepare_player_section(tournament)
@@ -976,10 +979,9 @@ class trf2json(chessjson.chessjson):
         lastcompetitor = parse_int(line[27:31]) if len(line) >= 31 else 0
         if lastcompetitor == 0:
             lastcompetitor = firstcompetitor
-
         value = {
-            "matchResult": self.scores.get_result(tournament, "match", matchPoints),
-            "gameResult": self.scores.get_result(tournament, "game", gamePoints),
+            "matchPoints": matchPoints,
+            "gamePoints": gamePoints,
             "firstRound": firstround,
             "lastRound": lastround,
             "firstCompetitor": firstcompetitor,

@@ -130,3 +130,18 @@ def ComputePerfectTournamentPerformance(score, ratingsopp):
         else:
             low = low + step
     return high
+
+
+
+
+if __name__ == "__main__":
+    maxdiff = 0.0
+    for ratingdiff in range(0,800):
+        fidetab = ComputeExpectedScore(ratingdiff + 1600, 1600)
+        exp = 1.0 / (10.0**(float(-ratingdiff)/400.0) + 1.0)
+        diff = abs(float(fidetab) - exp)
+        if diff > maxdiff:
+            maxdiff = diff
+            print(f"FIDE Rating for diff {ratingdiff}: {fidetab}, Expected: {exp:.3f}")
+
+    print(f"Max difference: {maxdiff:.3f}")
