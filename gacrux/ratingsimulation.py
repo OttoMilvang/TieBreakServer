@@ -3,7 +3,7 @@
 from gacrux import rating
 from gacrux.tournamentgenerator import tournamentgenerator  
 import sys
-#import io
+import json
 import os
 import statistics
 from gacrux import helpers
@@ -56,7 +56,8 @@ class ratingsimulation:
                     cmps = self.comute_tb(chfile["tournaments"][0])
                     for i, cmp in cmps.items():
                         self.update_rating(cmp, newalg >= 0 and fileno > newalg)
-            self.plot_players(self.player_list, params["output_file"], fileno, fileno > newalg)
+            self.output_players(self.player_list, params["output_file"], params["output_format"], fileno, fileno > newalg)
+
 
     ### rating_tournament(self, fileno, players) 
     ### Generate a tournament with players with ratings from rtop down to rtop - rstep*players and with a random sigma added to the rating. The tournament is generated according to the parameters in self.params and the results are generated according to the statistics in self.statistics. The tournament is run and the event is returned as a chessjson object.
@@ -229,6 +230,19 @@ class ratingsimulation:
             player["kfactor"] = KFACTOR40
             player["ratedGames"] = len(player["game_list"])
             player["game_list"] = []
+
+
+    def output_players(self, player_list, filename, fileformat, fileno, newalg):
+            if fileformat.lower() == "json":
+                self.json_players(self.player_list, filename, fileno, fileno > newalg)
+            else:
+                self.plot_players(self.player_list, filename, fileno, fileno > newalg)
+
+    def json_players(self, player_list, filename, fileno, newalg):
+        file = filename.replace("%d", str(fileno).zfill(2))
+        if len(directory := os.path.dirname(file)) > 0:
+            os.makedirs(directory, exist_ok=True)    
+        json_output(file, player_list)
 
     def plot_players(self, player_list, filename, fileno, newalg):
         ratings1 = [player["rating"] for player in player_list if player["rating"] > 0]

@@ -453,8 +453,7 @@ class tiebreak:
                 tmatch = cmps[competitor]["rsts"][rnd]
  
                 if len(tmatch["games"]) > 0 and rst["black"] > 0:
-                    #for game in [self.cgames[game] for game in tmatch["games"]]:   # if game in self.cgames]:
-                    for game in [self.cgames[game] for game in tmatch["games"] if game in self.cgames]:
+                    for game in [self.cgames[game] for game in tmatch["games"]]:
                         white = game["white"]
                         black = game["black"] if "black" in game else 0
                         board = game["board"] if "board" in game else 0
@@ -497,7 +496,7 @@ class tiebreak:
                     tmatch["games"] = games
                 else:
                     if tmatch["opponent"] == 0 and tmatch["played"]:
-                            tmatch["gpoints"] = self.solve_score(self.tournament, score, "match", "PG")
+                        tmatch["gpoints"] = self.solve_score(self.tournament, score, "match", "PG")
                     else:
                         trans = {"W": "F", "D": "H", "L": "Z"}
                         res = trans[tmatch["res"]] if tmatch["res"] in trans else tmatch["res"]
@@ -690,6 +689,8 @@ class tiebreak:
         # part 1, run recursive until no more are tied
         loopcount = 0
         moretodo = compute_singlerun(tb, cmps, rounds, ro, loopcount)
+
+        # part 2, Run loop until no more are tied
         while moretodo:
             moretodo = False
             loopcount += 1
@@ -715,6 +716,7 @@ class tiebreak:
             moreloops = compute_singlerun(tb, cmps, rounds, [], loopcount)
             moretodo = moretodo or moreloops
             ro = sorted(ro, key=lambda p: (p["rank"], p["tbval"][prefix + name]["val"], p["cid"]))
+
         # part 2, Reorder rank
         start = 0
         while start < len(ro):
@@ -734,9 +736,10 @@ class tiebreak:
     # -----------------
     # Direct encounter
     #
+
     
     def compute_direct_encounter(self, tb, cmps, rounds):
-        func = self.compute_singlerun_direct_encounter
+        func = self.compute_singlerun_ext_direct_encounter
         return self.compute_recursive_if_tied(tb, cmps, rounds, func)
  
     def compute_ext_direct_encounter(self, tb, cmps, rounds):
@@ -745,16 +748,37 @@ class tiebreak:
         func = self.compute_singlerun_ext_direct_encounter
         return self.compute_recursive_if_tied(tb, cmps, rounds, func)
 
+    # -----------------
+    # Compute Basic Direct encounter
+    #
+    # The core in DE, EDE and also  EDEBT, EDEBB, EDET, EDEB, 
+    # We compute the average score against all opponents on the same rank. 
+    # If not all opponents have met we compute the maximum possible score against all opponents on the same rank.
+    # Parameters:
+    #   tb - tiebreak structure
+    #   cmps - competitors structure
+    #   subro - subrange of competitors on the same rank
+    #   loopcount - number of recursive run, 0 = first run, 1 = second run, etc
+    #   points - which score to use, mpoints, gpoints or points
+    #   scorename - which score to use, match, game or points
+    #   scoretype - Translate result W, D, L, Z, F .. to score value, for example W=1.0, D=0.5, L=0.0, Z=0.0
+    #   prefix - prefix for score, mpoints_, gpoints_ or points_ 
+    # Output:
+    #   changes - number of changes in rank, if 0 we have finished
+
 
     def compute_basic_direct_encounter(self, tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix):
         name = tb["name"].lower()
-        (xscorename, xpoints, xscoretype, prefix) = self.get_scoreinfo(tb, True)
+        (_, _, _, prefix) = self.get_scoreinfo(tb, True)
+        # changes keep track of number of changes in rank, if 0 we have finished
         changes = 0
-        rpos = loopcount - tb["modifiers"]["swap"]  # Report pos
-        postfix = " " + scorename[0] if tb["name"] == "EDE" else ""
-        currentrank = subro[0]["tbval"][prefix + name]["val"]
+        rpos = loopcount - tb["ede"]["swap"]  # Report pos
+        postfix = "_" + scorename[0] if tb["name"][0:3] == "EDE" else "" # _g or _m for EDE, EDEBT, EDEBB, EDET, EDEB
+        currentrank = subro[0]["tbval"][prefix + name]["val"]  # All players in subro have same rank
         metall = True  # Met all opponents on same range
         metmax = len(subro) - 1  # Max number of opponents
+        # For all plyers in subro compute average score against all opponents on the same rank. 
+        # If not all opponents have met we compute the maximum possible score against all opponents on the same rank.
         for player in range(0, len(subro)):
             de = subro[player]["tbval"]
             de["denum"] = 0  # number of opponens
@@ -791,10 +815,14 @@ class tiebreak:
                 de["demax"] = de["deval"] + (metmax - de["denum"]) * scoretype["W"] * (self.teamsize if points == "gpoints" else 1)
             else:
                 de["demax"] = de["deval"]
+            # print("Player", subro[player]["cid"], "denum", de["denum"], "deval", de["deval"], "demax", de["demax"])
+        
+        # 6.2 If all players have met we compute the average score against all opponents on the same rank.
         if metall:  # 6.2 All players have met
             # print("T")
             subro = sorted(subro, key=lambda p: (-p["tbval"]["deval"], p["cid"]))
-            crank = rank = subro[0]["tbval"][prefix + name]["val"]
+            crank = rank = subro[0]["tbval"][prefix + name]["val"] 
+            # This is still currentrank, but we will change it if we find a different score
             val = subro[0]["tbval"]["deval"]
             sprefix = "\t" if rpos in subro[0]["tbval"][prefix + name] else ""
             self.addtbval(subro[0]["tbval"][prefix + name], rpos, sprefix + str(val) + postfix)
@@ -809,15 +837,18 @@ class tiebreak:
                     de[prefix + name]["val"] = crank
                 sprefix = "\t" if rpos in de[prefix + name] else ""
                 self.addtbval(de[prefix + name], rpos, sprefix + str(val) + postfix)
-        else:  # 6.2 swiss tournament
+        else:  # 6.2 swiss tournament. Not all players have met. We compute the maximum possible score against all opponents on the same rank.
             # print("F")
             subro = sorted(subro, key=lambda p: (-p["tbval"]["deval"], -p["tbval"]["demax"], p["cid"]))
             crank = rank = subro[0]["tbval"][prefix + name]["val"]
+            # This is still currentrank, but we will change it if we find a different score
             val = subro[0]["tbval"]["deval"]
             maxval = subro[0]["tbval"]["demax"]
             sprefix = "\t" if rpos in subro[0]["tbval"][prefix + name] else ""
             self.addtbval(subro[0]["tbval"][prefix + name], rpos, sprefix + str(val) + "/" + str(maxval) + postfix)
             unique = True
+            # continue as long as we have unique maximum score, 
+            # if not we will assign the same rank to all players with the same maximum score
             for i in range(1, len(subro)):
                 rank += 1
                 tbmax = max(subro[i:], key=lambda tbval: tbval["tbval"]["demax"])
@@ -837,14 +868,6 @@ class tiebreak:
                 # self.addtbval(de[prefix + name], rpos,  str(val) + '/' + str(maxval) + postfix)
         return changes
 
-    def compute_singlerun_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
-        (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
-        tb["modifiers"]["swap"] = 0
-        changes = 1 if loopcount == 0 else 0
-        if loopcount > 0 and len(subro) > 0:
-            changes = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
-        # print(f"Loop={loopcount}, Changes={changes}")
-        return changes
 
     """
     EDE - Primary Score - Secondary score
@@ -853,105 +876,97 @@ class tiebreak:
     EDEB - Primary Score - Secondary score - BBE
     EDEBT - Primary Score - Secondary score - BC -TBR
     EDEBB - Primary Score - Secondary score - BC - BBE
-    Does not work ...
+    Does work ...
+
     """
 
-    def xxcompute_singlerun_ext_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
+    def compute_singlerun_ext_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
         (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         # name = tb["name"].lower()
-        # print("compute_singlerun_ext_direct_encounter", loopcount, points, scoretype, prefix, subro[0]['rank'] if len(subro)> 0 else 0 , len(subro))
-        changes = 0
+        # print("compute_singlerun_ext_direct_encounter", loopcount, points, scoretype, prefix, subro[0]['rank'] if len(subro) > 0 else 0, len(subro))
+        # The loops is controlled by:
+        # tb["ede"]["loopcount"] = The current loopcount, for example 0 = initial run, 1 = first run, etc
+        # tb["ede"]["functions"] - The functions to run in order, for example "PSCT" (primary, secondary, count, topboard)
+        # tb["ede"]["edechanges"] - A list of booleans for each function, True = we have changes, False = no changes
+        # tb["ede"]["swap"] - The current function to run, for example 0 = primary, 1 = secondary, 2 = count, 3 = topboard
+        # tb["ede"]["num"] - Number of times a function has been run, used for BC, TBR and BBE.
+        # tb["ede"]["changes"] - The number of changes in the current function,
+
+        changes = 0  # Changes for this subrange
+        # Initialize functions to run in loopcount 0, for example EDEBT = "PSCT" (primary, secondary, count, topboard)
         if loopcount == 0:
             functype = {
+                "DE": "P", 
                 "EDE": "PS", 
                 "EDEC": "PSC", 
-                "EDET": "PST", 
-                "EDEB": "PSB", 
-                "EDEBT": "PSCT", 
-                "EDEBB": "PSCB"
+                "EDET": "PS" + "T" * self.teamsize, 
+                "EDEB": "PS" + "B" * (self.teamsize-1), 
+                "EDEBT": "PSC" + "T" * self.teamsize, 
+                "EDEBB": "PSC" + "B" * (self.teamsize-1),
             }
-            tb["modifiers"]["functions"] = functions = functype[tb["name"]]
-            tb["modifiers"]["loopcount"] = 0
-            tb["modifiers"]["edechanges"] = [True] * len(functions)
-            tb["modifiers"]["swap"] = 0
+            tb["ede"] = {}
+            tb["ede"]["functions"] = functions = functype[tb["name"]]
+            tb["ede"]["loopcount"] = 0
+            tb["ede"]["edechanges"] = [True] * len(functions)
+            tb["ede"]["swap"] = 0
             return True
-        if tb["modifiers"]["loopcount"] != loopcount:
-            tb["modifiers"]["loopcount"] = loopcount
-            tb["modifiers"]["changes"] = 0
+
+        # A new loopcount means we have finished a run, so reset changes to 0
+        if tb["ede"]["loopcount"] != loopcount:
+            tb["ede"]["loopcount"] = loopcount
+            tb["ede"]["changes"] = 0
+
+        # Last competitors finished. We have finished all subranges and will report more_to_do
         if len(subro) == 0:
-            if tb["modifiers"]["changes"] == 0:
-                tb["modifiers"]["primary"] = not tb["modifiers"]["primary"]
-                tb["modifiers"]["edechanges"][scorename] = 0
-                swap = tb["modifiers"]["swap"]
-                tb["modifiers"]["edechanges"][swap] = True
-                tb["modifiers"]["swap"] = (swap + 1) % len(tb["modifiers"]["functions"])
+            # print(tb["ede"])
+            changes = tb["ede"]["changes"] 
+            swap = tb["ede"]["swap"]
+            tb["ede"]["edechanges"][swap] = changes > 0
+            moretodo = any(tb["ede"]["edechanges"])
+            if changes == 0:
+                tb["ede"]["swap"] = (swap + 1) % len(tb["ede"]["functions"])
                 ro = self.rankorder
                 for player in ro:
                     player["tbval"]["moreloops"] = True  # 'de' rank value initial value = rank
             else:
-                tb["modifiers"]["edechanges"] = [True for _ in tb["modifiers"]["edechanges"]]
-            return any(tb["modifiers"]["edechanges"]) and loopcount < 30
-        changes = 0
-        swap = tb["modifiers"]["functions"][tb["modifiers"]["swap"]]
-        if swap == "P":
-                (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
-                while (True): 
-                    ch = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
-                    if ch <= 0:
-                        break
-                    changes += ch
-        if swap == "S":
+                tb["ede"]["edechanges"] = [True for _ in tb["ede"]["edechanges"]] 
+                # print("CNT", loopcount, changes, tb["ede"]["edechanges"], tb["ede"]["swap"], moretodo)      
+            # print("FIN", loopcount, changes, tb["ede"]["edechanges"], tb["ede"]["swap"], moretodo  )         
+            return moretodo and loopcount < 30
+ 
+        # For all subranges we run the function for the current swap (primary, secondary, count, topboard)
+        swap = tb["ede"]["swap"]
+        func = tb["ede"]["functions"][swap]
+        #breakpoint()
+        if func == "P" or func == "S":
+            (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, func == "P")
+            changes += self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
+        elif func == "C" or func == "T" or func == "B":
+            if len(subro) == 2:  # 13.3.2,  If exactly two teams are still tied in both MP and GP
                 (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, False)
-                while (True):
-                    ch = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
-                    if ch <= 0:
-                        break
-                    changes += ch
-        if swap == "B":
-                (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, False)
-                while (True): 
-                    ch = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, "bc", "bc", "bc", prefix)
-                    if ch <= 0:
-                        break
-                    changes += ch
+                substr = tb["ede"]["functions"][0:swap]
+                pos = swap - (len(substr) - substr.count(func))
+                if func == "C":
+                    weights = [i for i in range(1, self.teamsize + 1)]
+                elif func == "T":
+                    weights = [1 if i == pos else 0 for i in range(self.teamsize )]
+                elif func == "B":
+                    weights = [1 if i >  pos else 0 for i in range(self.teamsize-1, -1, -1)]
+                for cmp in subro:
+                    rsts = cmp["rsts"]
+                    for rst in rsts.values():
+                        games = rst["games"] if "games" in rst else []
+                        tscore = Decimal("0.0")
+                        for game in games:
+                            tscore += weights[game["board"]-1] * game["points"]
+                        rst["tpoints"] = tscore
+                # breakpoint()
+                self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, "tpoints", scorename, scoretype, prefix)
 
-        tb["modifiers"]["changes"] += changes
-        return changes > 0 and loopcount < 30
-
-    def compute_singlerun_ext_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
-        name = tb['name'].lower()
-        (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, loopcount == 0 or tb['modifiers']['primary'])
-        #(points, scoretype, prefix) = self.get_scoreinfo(tb, loopcount == 0 or tb['modifiers']['primary'])
-        changes = 0
-        if loopcount == 0:
-            tb['modifiers']['primary'] = True
-            tb['modifiers']['points'] = points
-            (secondary, _, _, _) = self.get_scoreinfo(tb, False)
-            tb['modifiers']['loopcount'] = 0
-            tb['modifiers']['edechanges'] = {scorename: 0, secondary: 1 }
-            tb['modifiers']['swap'] = 0
-            return True
-        if tb['modifiers']['loopcount'] != loopcount:
-            tb['modifiers']['loopcount'] = loopcount
-            tb['modifiers']['changes'] = 0
-        if len(subro) == 0: 
-            if tb['modifiers']['changes'] == 0:
-                tb['modifiers']['primary'] = not tb['modifiers']['primary']
-                tb['modifiers']['edechanges'][scorename] = 0
-                tb['modifiers']['swap'] += 1
-                ro = self.rankorder
-                for player in ro:
-                    player['tbval']['moreloops'] = True  # 'de' rank value initial value = rank
-            else:
-                (secondary, _, _, _) = self.get_scoreinfo(tb, not tb['modifiers']['primary'])
-                tb['modifiers']['edechanges'][secondary] = 1
-            retsum = tb['modifiers']['edechanges']['match'] + tb['modifiers']['edechanges']['game']
-            #print('E', loopcount, tb['modifiers']['changes'], retsum, tb['modifiers']['edechanges'])
-            return retsum > 0  and loopcount < 30
-        changes = self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
-        tb['modifiers']['changes'] += changes
-        return changes > 0 and loopcount < 30
-
+        
+        tb["ede"]["changes"] += changes
+        # print("EDE", loopcount, func, changes, tb["ede"]["edechanges"], tb["ede"]["swap"], tb["ede"]["changes"]  )
+        return changes and loopcount < 30
 
 
     def compute_progressive_score(self, tb, cmps, rounds):
@@ -1289,7 +1304,7 @@ class tiebreak:
         return "sssc"
 
     def get_accelerated(self, prefix, rnd, startno):
-        acc = "Z"
+        acc = Decimal("0.0")
         if self.accelerated is None:
             return acc
         for val in self.accelerated["values"]:
@@ -1299,7 +1314,7 @@ class tiebreak:
                 and startno >= val["firstCompetitor"]
                 and startno <= val["lastCompetitor"]
             ):
-                acc = val["gameResult"] if prefix == "points_" else val["matchResult"]
+                acc = val["gamePoints"] if prefix == "points_" else val["matchPoints"]
         return acc
 
     # STD: 1.0/ 0.5 /0.0 point system
@@ -1355,14 +1370,14 @@ class tiebreak:
         for startno, cmp in cmps.items():
             tbscore = cmp["tbval"]
             acc = self.get_accelerated(prefix, 1, startno)
-            val = scoretype[acc]
-            tbscore[prefix + "acc"] = {"val": val, 0: val}
+            val = acc # scoretype[acc]
+            tbscore[prefix + "acc"] = {"val": acc, 0: acc}
             spoints = 0  # Points so far
             for rnd in range(1, rounds + 1):
                 p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else self.zero(scorename)
                 spoints += p
                 acc = self.get_accelerated(prefix, rnd + 1, startno)  # Round 0 shall have the value of 1 and so on
-                val = spoints + scoretype[acc]
+                val = spoints + acc
                 tbscore[prefix + "acc"][rnd] = val
             tbscore[prefix + "acc"]["val"] = val
         return "acc"

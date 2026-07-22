@@ -147,7 +147,6 @@ class games2matches():
             tournament["teamSize"] = teamsize
         seq = tournament["teamSequence"] if "teamSequence" in tournament else "".join(["WB"] * ((teamsize + 1) // 2))[0:teamsize]
         # bseq =''.join([tother[elem] for elem in list(seq)])
-        wcol = seq[0]
         tournament["teamSize"] = teamsize
  
 

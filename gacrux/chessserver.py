@@ -147,6 +147,7 @@ class chessserver(commonmain):
 
 
 # run program
-jch = chessserver()
-code = jch.common_main()
-sys.exit(code)
+if __name__ == "__main__":
+    jch = chessserver()
+    code = jch.common_main()
+    sys.exit(code)
