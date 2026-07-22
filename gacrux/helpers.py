@@ -10,7 +10,7 @@ import json
 import sys
 import decimal
 from enum import Enum, EnumType
-import qdefs
+from gacrux import qdefs
 
 
 class DecimalEncoder(json.JSONEncoder):

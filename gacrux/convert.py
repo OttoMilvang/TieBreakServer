@@ -4,8 +4,8 @@ Created on Mon Aug  7 16:48:53 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 import sys
-from commonmain import commonmain
-import version
+from gacrux.commonmain import commonmain
+from gacrux import version
 
 # ==============================
 

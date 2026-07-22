@@ -9,11 +9,11 @@ import io
 import json
 import sys
 
-import helpers
-import jsonscheme
-from chessjson import chessjson
-from trf2json import trf2json
-from ts2json import ts2json
+from gacrux import helpers
+from gacrux import jsonscheme
+from gacrux.chessjson import chessjson
+from gacrux.trf2json import trf2json
+from gacrux.ts2json import ts2json
 
 # ==============================
 
@@ -327,4 +327,5 @@ def listjch():
 # tournament.export_trf(params)
 
 # run program
-listjch()
+if __name__ == "__main__":
+    listjch()

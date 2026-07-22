@@ -5,10 +5,10 @@ Created on Mon Aug  7 16:48:53 2023
 """
 import sys
 
-import helpers
-import version
-from commonmain import commonmain
-from tiebreak import tiebreak
+from gacrux import helpers
+from gacrux import version
+from gacrux.commonmain import commonmain
+from gacrux.tiebreak import tiebreak
 
 # ==============================
 

@@ -7,9 +7,9 @@ Created on Fri Apr 18 08:14:29 2025
 
 import json
 import io
-import helpers
+from gacrux import helpers
 import unittest
-import tiebreakchecker
+from gacrux import tiebreakchecker
 from pathlib import Path
 
 FILEPATH = "../otestfiles/"

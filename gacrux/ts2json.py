@@ -11,10 +11,10 @@ Created on Thu Oct 19 11:55:32 2023
 """
 import xml.etree.ElementTree as ET
 from decimal import Decimal
-import chessjson
-import games2matches
-import helpers
-import scoresystem
+from gacrux import chessjson
+from gacrux import games2matches
+from gacrux import helpers
+from gacrux import scoresystem
 
 
 class ts2json(chessjson.chessjson):

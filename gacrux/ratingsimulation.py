@@ -1,17 +1,17 @@
 
 
-import rating
-from tournamentgenerator import tournamentgenerator  
+from gacrux import rating
+from gacrux.tournamentgenerator import tournamentgenerator  
 import sys
 import json
 import os
 import statistics
-from helpers import *
-from chessjson import chessjson
-from trf2json import trf2json
+from gacrux import helpers
+from gacrux.chessjson import chessjson
+from gacrux.trf2json import trf2json
 from decimal import Decimal, ROUND_HALF_UP
-from tiebreak import tiebreak
-import version
+from gacrux.tiebreak import tiebreak
+from gacrux import version
 
 # pip install matplotlib
 # pip install numpy
@@ -105,7 +105,7 @@ class ratingsimulation:
                 "cid": p+1,
                 "profileId": profile,
                 "present": True,
-                "gamePoints": parse_float("0.0"),
+                "gamePoints": helpers.parse_float("0.0"),
                 "orgrank": p+1,
                 "rank": p+1,
                 "realRating": player["strength"],
@@ -164,7 +164,7 @@ class ratingsimulation:
     def save_trf(self, chfile, filename):
         trf = trf2json()  
         txt = trf.output_file(chfile, 1, False)
-        txt_output(filename, txt)
+        helpers.txt_output(filename, txt)
 
     def comute_tb(self, tournament):
         tb = tiebreak(tournament, 9, None)

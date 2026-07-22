@@ -21,18 +21,18 @@ import sys
 import os
 import datetime
 import codecs
-from pairingberger import pairing_berger
-from pairingdutch import pairing_dutch
-import version
-from helpers import *
-from chessjson import chessjson
-from commonmain import commonmain
-from trf2json import trf2json
-from ts2json import ts2json
-from tiebreak import tiebreak
-from crosstable import crosstable
-from pairing import pairing
-from drawresult import drawresult
+from gacrux.pairingberger import pairing_berger
+from gacrux.pairingdutch import pairing_dutch
+from gacrux import version
+from gacrux import helpers
+from gacrux.chessjson import chessjson
+from gacrux.commonmain import commonmain
+from gacrux.trf2json import trf2json
+from gacrux.ts2json import ts2json
+from gacrux.tiebreak import tiebreak
+from gacrux.crosstable import crosstable
+from gacrux.pairing import pairing
+from gacrux.drawresult import drawresult
 #from generator import generator
 
 # ==============================
@@ -124,7 +124,7 @@ class tournamentgenerator(commonmain):
             file = params["output_file"].replace("%d", str(fileno).zfill(4))
             if len(directory := os.path.dirname(file)) > 0:
                 os.makedirs(directory, exist_ok=True)    
-            txt_output(file, txt)
+            helpers.txt_output(file, txt)
                 
     def gen_tournament(self, fileno):
         params = self.params
@@ -158,9 +158,9 @@ class tournamentgenerator(commonmain):
 
         methodlist = params["methodlist"] = [item for sublist in [ s.lower().split("-") for s in params.get("method", ["dutch"])] for item in sublist]
         is_rr = "berger" in methodlist 
-        rtop = rtop if len(rating) < 1 else parse_int(rating[0])
-        rstep = rstep if len(rating) < 2 else parse_int(rating[1])
-        sigma = sigma if len(rating) < 3 else float(parse_float(rating[2]))
+        rtop = rtop if len(rating) < 1 else helpers.parse_int(rating[0])
+        rstep = rstep if len(rating) < 2 else helpers.parse_int(rating[1])
+        sigma = sigma if len(rating) < 3 else float(helpers.parse_float(rating[2]))
 
         stat = params["statistics"]
         zpb = 0.01 if len(stat) < 1 else float(stat[0])
@@ -195,7 +195,7 @@ class tournamentgenerator(commonmain):
                 "cid": player,
                 "profileId": profile,
                 "present": True,
-                "gamePoints": parse_float("0.0"),
+                "gamePoints": helpers.parse_float("0.0"),
                 "orgrank": player,
                 "rank": player,
                 "realRating": rating,

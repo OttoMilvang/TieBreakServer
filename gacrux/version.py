@@ -5,9 +5,11 @@ Created on Tue Apr 29 09:21:45 2025
 @author: otto
 """
 
+__version__ = "1.9.57"
+
 def version():
     return {
-        "version": "1.9.57",
+        "version": __version__,
         "version_major": 1,
         "version_minor": 9,
         "version_patch": 57,
