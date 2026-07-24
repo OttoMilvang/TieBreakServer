@@ -1,0 +1,88 @@
+name: test summary comment
+
+on:
+  workflow_run:
+    workflows: [tests]
+    types: [completed]
+
+# This workflow runs from the trusted default branch after an unprivileged test
+# run.  It may read that run's artifacts and write only a pull-request comment.
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  comment:
+    name: Post fork test summary
+    # Same-repository pull requests are commented on directly by tests.yml.
+    # Cancelled runs may not have a complete set of JUnit artifacts.
+    if: >-
+      ${{
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        github.event.workflow_run.head_repository.full_name != github.repository &&
+        github.event.workflow_run.pull_requests[0]
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the trusted summary script
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/scripts
+      - name: Download test results
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/junit
+          pattern: junit-*
+          merge-multiple: true
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build the test summary
+        run: |
+          python3 .github/scripts/junit_summary.py \
+            "${{ runner.temp }}/junit" > test-summary.md
+          cat test-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Create or update the pull-request comment
+        uses: actions/github-script@v8
+        env:
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- tiebreakserver-test-summary -->';
+            const report = fs.readFileSync('test-summary.md', 'utf8');
+            const body = `${marker}\n${report}`;
+            const issue_number = Number(process.env.PR_NUMBER);
+            if (!Number.isInteger(issue_number)) {
+              throw new Error(`Invalid pull-request number: ${process.env.PR_NUMBER}`);
+            }
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                per_page: 100,
+              }
+            );
+            const previous = comments.find(comment =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body,
+              });
+            }

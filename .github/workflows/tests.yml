@@ -1,0 +1,165 @@
+name: tests
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  # Cancel a superseded pull-request run when new commits arrive, but leave a
+  # manually dispatched run alone so it is never cut short.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Tests and report generation only read the repository.  The separate comment
+# job below gets narrowly-scoped write access, and only for branches in this
+# repository; fork pull requests are reported by test-summary-comment.yml.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Shards are shown to people as 1-8; `index` remains zero-based because it
+    # is passed to the corpus's round-robin partitioner.
+    name: Python ${{ matrix.python-version }} · shard ${{ matrix.shard.number }}/8
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # The lowest and highest interpreter the engine supports.
+        python-version: ["3.11", "3.14"]
+        # The whole corpus runs in CI. Checking a tournament is real pairing work,
+        # so it is split across shards -- each a separate runner doing an eighth of
+        # the corpus -- and xdist then spreads that shard over the runner's cores.
+        shard:
+          - {number: 1, index: 0}
+          - {number: 2, index: 1}
+          - {number: 3, index: 2}
+          - {number: 4, index: 3}
+          - {number: 5, index: 4}
+          - {number: 6, index: 5}
+          - {number: 7, index: 6}
+          - {number: 8, index: 7}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          # Cache the pip wheel/download cache, keyed on the requirement files.
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run tests
+        env:
+          TIEBREAK_CORPUS_FULL: "1"
+          TIEBREAK_CORPUS_SHARDS: "8"
+          TIEBREAK_CORPUS_SHARD: ${{ matrix.shard.index }}
+        run: >
+          pytest tests/ -n auto
+          --junitxml=junit/results-${{ matrix.python-version }}-${{ matrix.shard.number }}.xml
+      - name: Upload test results
+        # Upload even when the tests fail (so their JUnit feeds the summary),
+        # but not when the run was cancelled.
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-${{ matrix.python-version }}-${{ matrix.shard.number }}
+          path: junit/results-*.xml
+          retention-days: 7
+
+  summary:
+    name: Test summary
+    needs: test
+    # Run once every shard has finished, whether they passed or failed, so the
+    # report covers failing runs too; skip only when the run was cancelled.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the summary script
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+      - name: Download test results
+        uses: actions/download-artifact@v8
+        with:
+          path: junit
+          pattern: junit-*
+          merge-multiple: true
+      - name: Write the run summary
+        run: |
+          python3 .github/scripts/junit_summary.py junit > test-summary.md
+          cat test-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the run summary
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-summary
+          path: test-summary.md
+          retention-days: 7
+
+  comment:
+    name: Post test summary
+    needs: summary
+    # A pull_request token is writable only for branches in this repository.
+    # Fork pull requests are handled by the trusted workflow_run workflow.
+    if: >-
+      ${{
+        !cancelled() &&
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Download the run summary
+        uses: actions/download-artifact@v8
+        with:
+          name: test-summary
+          path: test-summary
+      - name: Create or update the pull-request comment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- tiebreakserver-test-summary -->';
+            const report = fs.readFileSync(
+              'test-summary/test-summary.md', 'utf8'
+            );
+            const body = `${marker}\n${report}`;
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                per_page: 100,
+              }
+            );
+            const previous = comments.find(comment =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+            if (previous) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: previous.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
