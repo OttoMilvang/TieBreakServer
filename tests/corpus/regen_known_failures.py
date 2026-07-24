@@ -36,7 +36,10 @@ def _test_fails(record):
     tiebreak_status = _harness.tiebreak_status(trf)
     if tiebreak_status == 510:
         return (record["name"], True)
-    accepts = _harness.pairing_status(trf) == 0 and tiebreak_status == 0
+    pairing_status = _harness.pairing_status(trf)
+    if record["category"] == "team" and pairing_status == 510:
+        return (record["name"], True)
+    accepts = pairing_status == 0 and tiebreak_status == 0
     return (record["name"], accepts != record["valid"])
 
 

@@ -294,14 +294,14 @@ class scoresystem:
         return points
 
     def get_result(self, tournament, scoresystem, points):
-        score = tournament.get("scoresystem", {}).get(scoresystem, {})
+        score = self.fill_default_scoresystem(scoresystem)
 
-        if points == score.get("W", helpers.parse_float("1.0")):
+        if points == score["W"]:
             return "W"
-        if points == score.get("D", helpers.parse_float("0.5")):
+        if points == score["D"]:
             return "D"
-        if points == score.get("Z", helpers.parse_float("0.0")):
+        if points == score["Z"]:
             return "Z"
-        if points == score.get("L", helpers.parse_float("0.0")):
+        if points == score["L"]:
             return "L"
         return "Z"
