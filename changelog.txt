@@ -10,6 +10,14 @@ Change internal representation from result to score for accelleration points.
 Rewritten direct encounter, so all DE od EDE.. TBs are treated in the same function
 
 
+Unreleased
+
+- Removed reachable debug breakpoints from the pairing engine and replaced
+  invariant checks with explicit errors.
+- Fixed parsing of TRF26 record 299 abnormal assignments. The records are now
+  retained; applying their point adjustments remains future work.
+- Corrected the documented minimum Python version to 3.11.
+
 2026-07-10 1.9.56
 Bug fix National rating support
 Unrated in National Rating support shall be represented None

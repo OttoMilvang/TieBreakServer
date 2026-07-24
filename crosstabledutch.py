@@ -158,7 +158,14 @@ class crosstable_dutch(crosstable):
         if update_maxpsd:
             maxpsd = max([node["scorelevel"] for node in nodes]) - scorelevel
             self.maxpsd = nodes[0]["scorelevel"] - scorelevel
-            if maxpsd != self.maxpsd: breakpoint()
+            if maxpsd != self.maxpsd:
+                raise RuntimeError(
+                    "score bracket " + str(scorelevel) + ": the competitors are not ordered by"
+                    + " score. The highest score difference in the bracket is " + str(maxpsd)
+                    + ", but the first competitor has " + str(self.maxpsd) + ". mdp and the"
+                    + " C-weights are indexed on the assumption that the first competitor is the"
+                    + " highest one"
+                )
             self.mdp = [0] * self.maxpsd
             for node in nodes:
                 psd = node["scorelevel"] - scorelevel
@@ -618,7 +625,7 @@ class crosstable_dutch(crosstable):
         elif mode == "BI":
                 weight = c["qcweight"] * self.weight[B0] + c["biweight"]
         else:
-            breakpoint()
+            raise RuntimeError("unknown weight mode " + str(mode))
         c["mode"] = mode
         c["levels"] = category
         c["weight"] = weight

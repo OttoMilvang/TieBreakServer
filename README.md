@@ -4,8 +4,7 @@
 
 - **Downlaod project**
 
-- **Install python 3, min version 3.8**<br>
-3.8 becase this is the last python distribution that runs on Win7
+- **Install python 3, min version 3.11**
 
 - **Install dependencies** - See `requirements.txt`
 
