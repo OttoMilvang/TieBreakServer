@@ -5,6 +5,7 @@ Created on Mon Dec 15 16:26:22 2025
 @author: Otto
 """
 from decimal import Decimal
+from errors import GacruxInputError
 import scoresystem
 
 
@@ -319,8 +320,9 @@ class games2matches():
             unsortedgames = []
             for i in range(teamsize):
                 if i >= len(ooo["order"]):
-                    self.parent.put_status(431, f"Error in Out-of-order record, round {rnd}, {team1}-{team2} has only {len(ooo['order'])} players, but teamSize is {teamsize}")
-                    raise
+                    err = f"Error in Out-of-order record, round {rnd}, {team1}-{team2} has only {len(ooo['order'])} players, but teamSize is {teamsize}"
+                    self.parent.put_status(431, err)
+                    raise GacruxInputError(err)
                 player = ooo["order"][i]
                 if player > 0:
                     [game for game in games if game["white"] == player or game["black"] == player][0]["board"] = i + 1
@@ -385,9 +387,10 @@ class games2matches():
                     else:
                         gamelist = [game for game in games1 if game == 0 or game not in games2]
                         if len(gamelist) == 0:
-                            self.parent.put_status(431, f"Error in teams, round {rnd}, {p1}-{p2} has only {len( tmatch['games'])} games, but teamSize is {teamsize}")
+                            err = f"Error in teams, round {rnd}, {p1}-{p2} has only {len( tmatch['games'])} games, but teamSize is {teamsize}"
+                            self.parent.put_status(431, err)
                             self.parent.put_status(431, "Add 300 Out-of-order records to solve this")
-                            raise
+                            raise GacruxInputError(err + ". Add 300 Out-of-order records to solve this")
                         
                         game1 = gamelist[0]
                         games1.remove(game1)

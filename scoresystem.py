@@ -5,6 +5,7 @@ Created on Tue Oct 31 13:57:55 2023
 """
 
 from decimal import Decimal
+from errors import GacruxInputError
 import helpers
 
 # ==============================
@@ -216,14 +217,29 @@ class scoresystem:
         for result in ["W", "D", "L", "Z"]:
             trans[score[result]] = result
         for result in ["F", "H", "P", "A", "U"]:
-            if isinstance(score[result], Decimal):
+            # An unplayed game is worth what a win, a draw, a loss or a zero-point-bye is
+            # worth, and is then held as that result rather than as a number -- so that
+            # everything which resolves a result to points, and everything which asks what
+            # class of result an unplayed game is, agrees. Record 162 states the points,
+            # not the result, so the points are read back into a result here.
+            #
+            # Points that are not the points of any result cannot be read back, and are
+            # kept as points. A pairing-allocated bye worth half a point in a 3/1/0 score
+            # system is the ordinary case: the scoring points system is a decision of the
+            # organiser, and the value of the PAB is another, and TRF-2026 lets record 162
+            # state both. The score system is resolved by get_score(), which walks
+            # score[result] until it reaches a number, so a result that already is a number
+            # is where that walk ends.
+            if isinstance(score[result], Decimal) and score[result] in trans:
                 score[result] = trans[score[result]]
         self.score["game"] = score
         eqok = False
+        badplayers = []
         for version in ["TRF25", "TRF16"]:
             # print("+EQOK", eqok, version, "162" in self.all_lines,  not eqok and ("162" not in self.all_lines or version == "TRF25"))
             if not eqok and (not istrf25 or version == "TRF25"):
                 eqok = True
+                badplayers = []
                 score = self.fill_default_scoresystem("game") if version == "TRF25" else self.solve_scoresystem(equations)
                 # print(version, score)
                 for lineno, eq in enumerate(equations):
@@ -244,10 +260,14 @@ class scoresystem:
                     if eq["sum"] != checksum:
                         msg = "Incorrect score for player " + str(lineno+1)
                         chessjson["status"]["error"].append(msg)
+                        badplayers.append(str(lineno+1))
                         eqok = False
                 # print("-EQOK", eqok, version, "162" in self.all_lines)
         if not eqok:
-            raise
+            raise GacruxInputError(
+                "no score system adds the results of player(s) " + ", ".join(badplayers)
+                + " up to the points they report. Add a 162 record to declare the score system"
+            )
         if "Z" not in score:
             score["Z"] = Decimal("0.0")
         self.score["game"] = score
