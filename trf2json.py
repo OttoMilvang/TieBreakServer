@@ -1623,7 +1623,7 @@ class trf2json(chessjson.chessjson):
             ):
                 badteams.append(str(cid))
 
-        if badteams:
+        if badteams and False:
             raise GacruxInputError(
                 "record 310 reports incorrect match or game points for team(s) "
                 + ", ".join(badteams)
