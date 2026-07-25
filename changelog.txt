@@ -10,6 +10,28 @@ Change internal representation from result to score for accelleration points.
 Rewritten direct encounter, so all DE od EDE.. TBs are treated in the same function
 
 
+Unreleased
+
+- Added the FIDE Swiss Team Pairing System (C.04.6), including type A and type B
+  colour preferences, automatic TRF selection, and team-corpus coverage.
+- Enabled all 300 previously skipped team records, so every record in the
+  6,000-record corpus now executes in CI.
+- Corrected Sonneborn-Berger cut modifiers to select a voluntary unplayed
+  round by its contribution, as required by FIDE C.07 article 16.5.
+- Fixed absolute colour preferences when the colour difference is +/-1 and the
+  player received the same colour in their last two played games.
+- Added typed engine errors and fixed crashes involving unpairable fields,
+  incomplete results, uncommon scoring systems, invalid pairing numbers,
+  long colour sequences, and tie-break cuts.
+- Added a pytest regression suite, a 6,000-record TRF corpus, and automated
+  testing on Python 3.11 and 3.14 with GitHub Actions. Pull requests receive a
+  single, automatically updated comment summarising the complete test matrix.
+- Removed reachable debug breakpoints from the pairing engine and replaced
+  invariant checks with explicit errors.
+- Fixed parsing of TRF26 record 299 abnormal assignments. The records are now
+  retained; applying their point adjustments remains future work.
+- Corrected the documented minimum Python version to 3.11.
+
 2026-07-10 1.9.56
 Bug fix National rating support
 Unrated in National Rating support shall be represented None

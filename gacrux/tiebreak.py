@@ -8,6 +8,24 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from gacrux import chessjson 
 from gacrux import rating
+from gacrux.errors import GacruxInputError
+
+
+def _select_low_cut_game(games, ignore_vur_exception=False):
+    """Select the next value removed by a low cut under C.07 articles 14 and 16.5."""
+    least_significant = min(games, key=lambda game: (game["score"], game["tbvalue"]))
+    if ignore_vur_exception:
+        return least_significant
+
+    lowest_vur = min(
+        (game for game in games if game["vur"]),
+        key=lambda game: game["tbvalue"],
+        default=None,
+    )
+    if lowest_vur is not None and lowest_vur["tbvalue"] >= least_significant["tbvalue"]:
+        return lowest_vur
+    return least_significant
+
 
 """
 Structure
@@ -161,6 +179,9 @@ class tiebreak:
         self.maxboard = 0
         self.lastplayedround = 0
         self.primaryscore = None  # use default
+        declared_primary = tournament["scoreSystem"].get("primary") if self.isteam else None
+        if declared_primary is not None:
+            self.set_primaryscore(declared_primary)
         self.accelerated = tournament["accelerated"] if "accelerated" in tournament else None
         self.rating = {"W": Decimal("1.0"), "D": Decimal("0.5"), "L": "Z", "Z": Decimal("0.0"), "A": "Z", "U": "Z"}
 
@@ -397,8 +418,7 @@ class tiebreak:
         if black > 0:
             if "bResult" not in rst:
                 err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(rst.get("white", 0)) + ", black=" +  str(rst.get("black", 0))
-                self.chessevent.put_status(451, err)
-                raise
+                raise GacruxInputError(err)
             bPoints = self.get_score(scoresystem, rst, "black")
             brPoints = self.get_score(self.rating, rst, "black")
             bVur = self.is_vur(rst, "black")
@@ -642,7 +662,10 @@ class tiebreak:
                             self.addtbval(tbscore[prefix + "cod"], rnd, pf)
                             self.addtbval(tbscore[prefix + "cod"], "val", pf)
                             pf = tbscore[prefix + "cod"]["val"]
-                            ncol = (other[ocol] + "bbbbwwww")[pf]
+                            colpref = other[ocol] + "bbbbwwww"
+                            # a competitor with the same color in every game reaches |pf| >= len(colpref),
+                            # which is outside the table. Saturate on the last entry in each direction.
+                            ncol = colpref[max(-len(colpref), min(pf, len(colpref) - 1))]
                             ncol += str(abs(pf)) if ocol != pcol else "2"
     
                             csq += ocol
@@ -1126,17 +1149,16 @@ class tiebreak:
                 high = rounds - low
             vun = tb["modifiers"].get("vun", False)
             while low > 0:
-                sortall = sorted(bhvalue, key=lambda game: (game["score"], game["tbvalue"]))
-                sortexp = sorted(bhvalue, key=lambda game: (-game["vur"], game["score"], game["tbvalue"]))
-                if vun or sortall[0]["tbvalue"] > sortexp[0]["tbvalue"]:
-                    bhvalue = sortall[1:]
-                    tbscore[oprefix + name]["cut"].append(sortall[0]["rnd"])
-                else:
-                    bhvalue = sortexp[1:]
-                    tbscore[oprefix + name]["cut"].append(sortexp[0]["rnd"])
+                if len(bhvalue) == 0:  # the cut is larger than the number of games of this competitor
+                    break
+                cut_game = _select_low_cut_game(bhvalue, vun)
+                bhvalue.remove(cut_game)
+                tbscore[oprefix + name]["cut"].append(cut_game["rnd"])
                 low -= 1
 
             while high > 0:
+                if len(bhvalue) == 0:  # the cut is larger than the number of games of this competitor
+                    break
                 sortall = sorted(bhvalue, key=lambda game: (-game["score"], -game["tbvalue"]))
                 # sortexp = sorted(bhvalue, key=lambda game: (-game['vur'], -game['score'], -game['tbvalue'])) // No
                 # exception on high
@@ -1715,4 +1737,3 @@ class tiebreak:
                 return ["match", "mpoints", self.matchscore, "mpoints_"]
         else:
                 return ["game", "points", self.gamescore, "points_"]
-

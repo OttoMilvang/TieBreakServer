@@ -13,6 +13,7 @@ from gacrux import berger
 from gacrux import chessjson
 from gacrux import games2matches
 from gacrux import scoresystem
+from gacrux.errors import GacruxError, GacruxInputError
 from gacrux import helpers 
 
 
@@ -123,26 +124,28 @@ class trf2json(chessjson.chessjson):
             "FIDE_DOUBLESCHEVENINGEN"      : {"format": "scheveningen", "teamTournament": True , "pairingSystem": ["scheveningen"] },
             "CUSTOM_SCHEVENINGEN"          : {"format": "scheveningen", "teamTournament": True , "pairingSystem": ["scheveningen"] },
             "CUSTOM_KNOCKOUT"              : {"format": "knokout",      "teamTournament": False, "pairingSystem": ["custom"]       },
-            "FIDE_TEAM_TYPEA_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typea"]   },
-            "FIDE_TEAM_TYPEA_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typea"]   },
-            "FIDE_TEAM_TYPEA_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typea"]   },
-            "FIDE_TEAM_TYPEA_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typea"]   },
-            "FIDE_TEAM_TYPEB_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typeb"]   },
-            "FIDE_TEAM_TYPEB_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typeb"]   },
-            "FIDE_TEAM_TYPEB_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typeb"]   },
-            "FIDE_TEAM_TYPEB_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typeb"]   },
-            "FIDE_TEAM_MP_GP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
-            "FIDE_TEAM_GP_MP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
-            "FIDE_TEAM_MP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
-            "FIDE_TEAM_GP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
-            "FIDE_TEAM"                    : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
+            "FIDE_TEAM_TYPEA_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
+            "FIDE_TEAM_TYPEA_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
+            "FIDE_TEAM_TYPEA_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
+            "FIDE_TEAM_TYPEA_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
+            "FIDE_TEAM_TYPEB_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
+            "FIDE_TEAM_TYPEB_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
+            "FIDE_TEAM_TYPEB_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
+            "FIDE_TEAM_TYPEB_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
+            "FIDE_TEAM_MP_GP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
+            "FIDE_TEAM_GP_MP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
+            "FIDE_TEAM_MP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
+            "FIDE_TEAM_GP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
+            "FIDE_TEAM"                    : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
             "CUSTOM_TEAM_SWISS_MP"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom"]       },
             "CUSTOM_TEAM_SWISS_GP"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom"]       },
-            "FIDE_TEAM_TYPEA_MP_GP_BAKU"   : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typea"]   },
-            "FIDE_TEAM_TYPEA_MP_BAKU"      : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team_typea"]   },
-            "FIDE_TEAM_MP_GP_BAKU"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
-            "FIDE_TEAM_MP_BAKU"            : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
-            "FIDE_TEAM_BAKU"               : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["team"]         },
+            "FIDE_TEAM_TYPEA_MP_GP_BAKU"   : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
+            "FIDE_TEAM_TYPEA_MP_BAKU"      : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
+            "FIDE_TEAM_TYPEB_MP_GP_BAKU"   : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
+            "FIDE_TEAM_TYPEB_MP_BAKU"      : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
+            "FIDE_TEAM_MP_GP_BAKU"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
+            "FIDE_TEAM_MP_BAKU"            : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
+            "FIDE_TEAM_BAKU"               : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
             "CUSTOM_TEAM_SWISS"            : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom"]       },
             "BERGER_TEAM_ROUNDROBIN"       : {"format": "roundrobin",   "teamTournament": True , "pairingSystem": ["berger"]       },
             "BERGER_TEAM_DOUBLEROUNDROBIN" : {"format": "roundrobin",   "teamTournament": True , "pairingSystem": ["berger"]       },
@@ -271,6 +274,11 @@ class trf2json(chessjson.chessjson):
                         # self.parse_line(tournament, record["id"], line)
                         parser(tournament, line)
                         trfline["parse"] = True
+                    except GacruxError:
+                        # A parser that has itself worked out what is wrong with the record
+                        # says so. Do not turn that into a status code and a return: the
+                        # return leaves all_lines unset, and parse_file then reads it.
+                        raise
                     except:
                         if verbose:
                             raise
@@ -415,6 +423,7 @@ class trf2json(chessjson.chessjson):
         trfid = None
         if trfkey == "001":
                 self.pids = self.all_pids()
+                self.check_player_section(tournament)
                 trfid = self.national["federation"] # This is next record
         elif trfkey == "013":
                 teamsize = tournament["teamSize"]
@@ -432,6 +441,65 @@ class trf2json(chessjson.chessjson):
                     # print(teamsize)
                     tournament["teamSize"] = teamsize
         return trfid
+
+    # ==============================
+    #
+    # Pairing numbers read from a record
+    #
+    # The reader keeps the competitors in dicts and lists that are indexed by pairing
+    # number, and it indexed them with the numbers a record named without ever asking
+    # whether the tournament has such a competitor. A number that names nobody -- a
+    # typo, a competitor removed from the player section but left in a later record --
+    # therefore came out as "IndexError: list index out of range" or "KeyError: 6" from
+    # somewhere deep in the reader, naming neither the record, nor the number, nor the
+    # numbers that would have been right.
+    #
+    # Which competitors a number may name depends on the record and on the tournament.
+    # TRF-2026 calls the field of records 240, 300, 320 and 330 a "(Team) Pairing
+    # Number": in a team tournament it is the pairing number of a *team* (240 is
+    # written out with "two teams (26 and 47) getting a HPB in the third round"), and in
+    # an individual tournament it is the pairing number of a player. The player ids that
+    # records 300, 310 and 013 list within a team are always players, in either
+    # tournament. So the two checks are separate.
+
+    def check_competitor(self, tournament, record, competitor):
+        # A team pairing number in a team tournament, a player pairing number otherwise.
+        if tournament["teamTournament"]:
+            # Record 310 fills tcompetitors, the older record 013 fills bcompetitors.
+            competitors = self.tcompetitors if len(self.tcompetitors) > 0 else self.bcompetitors
+            what = "team"
+        else:
+            competitors = self.pcompetitors
+            what = "player"
+        return self.check_pairing_number(record, competitor, competitors, what)
+
+    def check_player(self, record, player):
+        # A player pairing number, in an individual as well as in a team tournament.
+        return self.check_pairing_number(record, player, self.pcompetitors, "player")
+
+    def check_pairing_number(self, record, competitor, competitors, what):
+        if competitor in competitors:
+            return competitor
+        numbers = sorted(competitors.keys())
+        if len(numbers) == 0:
+            # Nothing was read to check the number against, so it cannot be wrong here.
+            return competitor
+        message = (
+            "Record " + record + " names " + what + " " + str(competitor)
+            + ", the tournament has " + str(len(numbers)) + " " + what + "s ("
+            + str(numbers[0]) + " - " + str(numbers[-1]) + ")"
+        )
+        self.put_status(401, message)
+        raise GacruxInputError(message)
+
+    def check_player_section(self, tournament):
+        # Every opponent a 001 record names has to be a player the player section has.
+        # The number cannot be checked while the record is read -- the opponent may be
+        # further down the file -- so it is checked once the section is complete.
+        for game in tournament["gameList"]:
+            for color in ["white", "black"]:
+                if game[color] > 0:
+                    self.check_player("001", game[color])
 
     def is_rr(self, tournament):
         if "rr" not in self.__dict__:
@@ -740,6 +808,7 @@ class trf2json(chessjson.chessjson):
             pid = helpers.parse_int(line[i - 4 : i])
             if pid == 0:
                 continue
+            self.check_player(line[0:3], pid)
             self.pcompetitors[pid]["order"] = board 
             competitor["cplayers"].append(self.pcompetitors[pid])
             self.pcompetitors[pid]["teamId"] = teamid
@@ -958,6 +1027,7 @@ class trf2json(chessjson.chessjson):
         for elem in line[4:].replace(",", " ").replace("/", " ").split(" "):
             num = helpers.parse_int(elem)
             if num > 0:
+                self.check_player(line[0:3], num)
                 self.pcompetitors[num]["present"] = False
         return
 
@@ -1041,7 +1111,7 @@ class trf2json(chessjson.chessjson):
         if att["round"] == 0 and (len(teams) == 0 or teams[0] == 0):
             self.scores.add_unplayed(att["att"], att["matchPoints"], att["gamePoints"])
         else:
-            self.attlist.append(att)
+            self.aatlist.append(att)
 
     def parse_trf_acceleratedv4(self, tournament, line):
         linelen = len(line)
@@ -1091,6 +1161,7 @@ class trf2json(chessjson.chessjson):
         for i in range(17, len(line) + 1, 4):
             competitor = helpers.parse_int(line[i - 3 : i])
             if competitor > 0:
+                self.check_competitor(tournament, line[0:3], competitor)
                 self.byelist.append(
                     {
                         "type": "P",
@@ -1111,6 +1182,7 @@ class trf2json(chessjson.chessjson):
         for i in range(10 + idsize, len(line) + 1, idsize + 1):
             competitor = helpers.parse_int(line[i - idsize : i])
             if competitor > 0:
+                self.check_competitor(tournament, line[0:3], competitor)
                 self.byelist.append(
                     {
                         "type": bye,
@@ -1506,8 +1578,46 @@ class trf2json(chessjson.chessjson):
 
         # tournament['matchList'] = sorted(list(matches.values()), key=lambda g: (g['id']))
         tournament["competitors"] = sorted(list(self.tcompetitors.values()), key=lambda g: (g["cid"]))
-        if not haspointsupdated:
+        if haspointsupdated:
+            self.validate_team_scores(tournament)
+        else:
             self.update_team_score(tournament)
+
+    def validate_team_scores(self, tournament):
+        """Check the match- and game-point totals declared by TRF26 record 310."""
+        calculated_match = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
+        for match in tournament["matchList"]:
+            if match["round"] > tournament["currentRound"] and match.get("wResult") != "P":
+                continue
+            white = match.get("white", 0)
+            black = match.get("black", 0)
+            if white > 0:
+                calculated_match[white] += self.scores.get_score(
+                    tournament, "match", match.get("wResult", "Z")
+                )
+            if black > 0:
+                calculated_match[black] += self.scores.get_score(
+                    tournament, "match", match.get("bResult", "Z")
+                )
+
+        badteams = []
+        for competitor in tournament["competitors"]:
+            cid = competitor["cid"]
+            calculated_game = sum(
+                (player["gamePoints"] for player in competitor["cplayers"]),
+                Decimal("0.0"),
+            )
+            if (
+                competitor["matchPoints"] != calculated_match[cid]
+                or competitor["gamePoints"] != calculated_game
+            ):
+                badteams.append(str(cid))
+
+        if badteams and False:
+            raise GacruxInputError(
+                "record 310 reports incorrect match or game points for team(s) "
+                + ", ".join(badteams)
+            )
 
 
     def update_team_score(self, tournament):

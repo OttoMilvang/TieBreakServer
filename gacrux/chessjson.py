@@ -317,10 +317,11 @@ class chessjson:
 
 
     def get_score(self, slist, result, color):
+        other = ("b" if color[0] == "w" else "w") + "Result"
         if color[0] + "Result" in result:
             res = result[color[0] + "Result"]
-        elif result["black"] > 0:
-            res = self.reverse[result[color[0] + "Result"]]
+        elif result["black"] > 0 and other in result:
+            res = self.reverse[result[other]]
         else:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
@@ -335,10 +336,11 @@ class chessjson:
         if result["played"]:
             return False
 
+        other = ("b" if color[0] == "w" else "w") + "Result"
         if color[0] + "Result" in result:
             res = result[color[0] + "Result"]
-        elif result["black"] > 0:
-            res = self.reverse[result[color[0] + "Result"]]
+        elif result["black"] > 0 and other in result:
+            res = self.reverse[result[other]]
         else:
             return Decimal("0.0")
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur

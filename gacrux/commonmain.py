@@ -311,7 +311,7 @@ class commonmain:
             if len(methodlist) > 0:
                 tournament["pairingSystem"] = methodlist
             if "pairingSystem" not in tournament:
-                tournament["pairingSystem"] = ["dutch"]
+                tournament["pairingSystem"] = ["fideteam"] if tournament.get("teamTournament") else ["dutch"]
             methodlist = tournament["pairingSystem"]
 
             primary = [arg for arg in methodlist if arg in ["mp", "gp", "match", "game"]]
@@ -364,4 +364,3 @@ class commonmain:
         if self.exit:
             self.write_error_file()
         return self.chessfile.chessjson["status"]["code"]
-

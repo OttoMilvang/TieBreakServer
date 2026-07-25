@@ -19,6 +19,7 @@ import networkx as nx
 # from networkx.algorithms import bipartite
 from gacrux.crosstable import crosstable, flt
 from gacrux import helpers
+from gacrux import errors
 
 
 """
@@ -213,8 +214,10 @@ class pairing:
                 self.roundpairing.append(bracket)
             scorelevel -= 1
         if len(nodes) > 0:
-            breakpoint()
-            raise            
+            raise GacruxNoLegalPairing(
+                str(len(nodes)) + " competitor(s) remain after every score bracket has been paired"
+                + " (no legal pairing of the whole field exists, see C.04.3 art. 1.9.3)"
+            )
         if pabbracket:
             self.roundpairing.append(pabbracket)
         self.update_board(self.roundpairing)
@@ -420,8 +423,6 @@ class pairing:
                 lf_hist[ll_id[edge["cb"] if edge["sa"] < edge["sb"] else edge["ca"]]] += 1
 
         # laste += 1
-        if bp:
-            breakpoint()
         return hamilton
 
     def is_complete(self, nodes, edges, weight=False, hist=None, pab=False):

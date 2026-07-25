@@ -13,6 +13,7 @@ opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects
 from decimal import Decimal
 from gacrux.crosstable import crosstable, flt
 from gacrux.tiebreak import tiebreak
+from gacrux.errors import GacruxInvariantError
 from itertools import combinations  
 from enum import Enum
 
@@ -127,9 +128,20 @@ class crosstable_dutch(crosstable):
     def color_preference(self, cod, csq):
         # Implementation for determining color preference
         #print(cod, csq)
-        if cod <= -2 or cod <= 0 and csq[-2:] == "bb":
+        # C.04.3 art. 1.7.1: "The preference is for White when the colour difference is less
+        # than -1 OR when the last two games were played with Black." The second clause is
+        # unconditional on the colour difference. Gating it at cod <= 0 (resp. cod >= 0) drops
+        # the |cod| == 1 cases, which then fall through to art. 1.7.2 and come back as a STRONG
+        # preference for the OPPOSITE colour -- e.g. a player with the colour history wwwbb
+        # (cod = +1, last two Black) has an absolute preference for White by 1.7.1, but was
+        # returned "b1". Widening to cod <= 1 / cod >= -1 covers them.
+        #
+        # cod >= +2 with the last two games Black (and its mirror) is left resolving by the
+        # colour difference, as before: there art. 1.7.1 asserts BOTH preferences, and the
+        # article does not say which wins.
+        if cod <= -2 or cod <= 1 and csq[-2:] == "bb":
              return "w2"
-        elif cod >= 2 or cod >= 0 and csq[-2:] == "ww":
+        elif cod >= 2 or cod >= -1 and csq[-2:] == "ww":
              return "b2"
         elif cod == -1:
              return "w1"
@@ -158,7 +170,13 @@ class crosstable_dutch(crosstable):
         if update_maxpsd:
             maxpsd = max([node["scorelevel"] for node in nodes]) - scorelevel
             self.maxpsd = nodes[0]["scorelevel"] - scorelevel
-            if maxpsd != self.maxpsd: breakpoint()
+            if maxpsd != self.maxpsd:
+                raise GacruxInvariantError(
+                    "score bracket " + str(scorelevel) + ": the competitors are not ordered by score."
+                    + " The highest score difference in the bracket is " + str(maxpsd) + ", but the first"
+                    + " competitor has " + str(self.maxpsd) + ". mdp and the C-weights are indexed on the"
+                    + " assumption that the first competitor is the highest one"
+                )
             self.mdp = [0] * self.maxpsd
             for node in nodes:
                 psd = node["scorelevel"] - scorelevel
@@ -250,8 +268,21 @@ class crosstable_dutch(crosstable):
                     # bsq = b["csq"][-2:] + ("w" if b["cid"] == c["w"] else "b")
                     acop = a["cop"]
                     bcop = b["cop"]
-                    opp = {"w": "bb", "b":"ww", " ":"nc"}[acop[0]]
 
+                    # `opp` used to be computed here as well, from a table with no entry for a
+                    # competitor who has NO colour preference:
+                    #
+                    #     opp = {"w": "bb", "b": "ww", " ": "nc"}[acop[0]]
+                    #
+                    # color_preference() returns "nc" for exactly that competitor -- one with no
+                    # played games at all, which a small field with byes or forfeits reaches by
+                    # the third round -- so acop[0] is "n", the table has no "n", and the pairing
+                    # died with KeyError: 'n'.
+                    #
+                    # The value was never used. It is read only inside the branch below, which
+                    # cannot be entered unless acop[0] is "w" or "b", and which recomputes it from
+                    # a two-entry table anyway. So the line computed a value it did not need, and
+                    # crashed the engine doing it, on a legal tournament.
                     if acop[0] == bcop[0] == "w" or acop[0] == bcop[0] == "b":
                         opp = {"w": "bb", "b":"ww"}[acop[0]]
                         anp = int(acop[1])
@@ -471,7 +502,10 @@ class crosstable_dutch(crosstable):
                 for eval in range(len(weight[nval])-1, -1, -1):
                     (w, weight[nval][eval], depth[nval][eval]) = (w*depth[nval][eval], w, len(str(weight[nval][eval])))
             else:
-                raise
+                raise GacruxInvariantError(
+                    "criterion " + str(nval) + " has a depth of type " + type(depth[nval]).__name__
+                    + ", but a weight can only be cascaded over an int or a list of int"
+                )
         # print("Weights", let[start], self.weight[acc[start]], self.weight[start:stop+1])
         return w
 
@@ -618,7 +652,7 @@ class crosstable_dutch(crosstable):
         elif mode == "BI":
                 weight = c["qcweight"] * self.weight[B0] + c["biweight"]
         else:
-            breakpoint()
+            raise GacruxInvariantError("unknown weight mode " + str(mode))
         c["mode"] = mode
         c["levels"] = category
         c["weight"] = weight
