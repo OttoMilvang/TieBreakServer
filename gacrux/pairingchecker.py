@@ -23,7 +23,7 @@ from gacrux.pairing import pairing
 from gacrux.pairingdutch import pairing_dutch
 from gacrux.pairingberger import pairing_berger
 from gacrux.errors import GacruxNoLegalPairing
-#from pairingfideteam import pairing_fideteam
+from gacrux.pairingfideteam import pairing_fideteam
 
 AHEAD = "  Tournament analysis   "
 PHEAD = "  Checker pairing       "

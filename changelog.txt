@@ -1,17 +1,6 @@
-2026-07-21 1.9.57
+2026-07-21 1.10.59
 
-Bug fixes
-Allow 1st round to be paired in a tournament without knowing the teamsize. 
-Fix bug with accellerated system in team tournament.
-
-Implemented EDEC, EDET, EDEB, EDEBT, EDEBB
-
-Change internal representation from result to score for accelleration points. 
-Rewritten direct encounter, so all DE od EDE.. TBs are treated in the same function
-
-
-Unreleased
-
+Contribution from @russellb - Russel Bryant
 - Added the FIDE Swiss Team Pairing System (C.04.6), including type A and type B
   colour preferences, automatic TRF selection, and team-corpus coverage.
 - Enabled all 300 previously skipped team records, so every record in the
@@ -31,6 +20,24 @@ Unreleased
 - Fixed parsing of TRF26 record 299 abnormal assignments. The records are now
   retained; applying their point adjustments remains future work.
 - Corrected the documented minimum Python version to 3.11.
+
+
+2026-07-21 1.10.58
+Contribution from @denisabucur - Denisa-Andreea Bucur
+Rebuid structure. Preapare for pip package
+
+
+2026-07-21 1.9.57
+
+Bug fixes
+Allow 1st round to be paired in a tournament without knowing the teamsize. 
+Fix bug with accellerated system in team tournament.
+
+Implemented EDEC, EDET, EDEB, EDEBT, EDEBB
+
+Change internal representation from result to score for accelleration points. 
+Rewritten direct encounter, so all DE od EDE.. TBs are treated in the same function
+
 
 2026-07-10 1.9.56
 Bug fix National rating support

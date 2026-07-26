@@ -35,9 +35,9 @@ from itertools import combinations, combinations_with_replacement
 
 import networkx as nx
 
-from crosstablefideteam import crosstable_fideteam, qdefs, QC6
-from errors import GacruxInputError, GacruxInvariantError, GacruxNoLegalPairing
-from pairing import pairing
+from gacrux.crosstablefideteam import crosstable_fideteam, qdefs, QC6
+from gacrux.errors import GacruxInputError, GacruxInvariantError, GacruxNoLegalPairing
+from gacrux.pairing import pairing
 
 
 class pairing_fideteam(pairing):

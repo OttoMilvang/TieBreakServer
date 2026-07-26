@@ -25,7 +25,7 @@ Everything else - the competitor and opponent structures, the score levels, the 
 the prohibited pairings of record 260 - is the one of the base class.
 """
 
-from crosstable import crosstable
+from gacrux.crosstable import crosstable
 from enum import Enum
 
 
