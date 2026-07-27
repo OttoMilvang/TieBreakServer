@@ -15,12 +15,12 @@ board (art. 1.6.1), which is what "white" and "black" mean in a match record.
 import copy
 import decimal
 
-import pytest
+from gacrux import pytest
 
-from crosstablefideteam import crosstable_fideteam
-from drawresult import drawresult
-from errors import GacruxNoLegalPairing
-from pairingfideteam import pairing_fideteam
+from gacrux.crosstablefideteam import crosstable_fideteam
+from gacrux.drawresult import drawresult
+from gacrux.gacruxexeptions import GacruxNoLegalPairing
+from gacrux.pairingfideteam import pairing_fideteam
 
 WIN = decimal.Decimal("1.0")
 DRAW = decimal.Decimal("0.5")

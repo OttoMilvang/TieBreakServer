@@ -13,7 +13,7 @@ from gacrux import berger
 from gacrux import chessjson
 from gacrux import games2matches
 from gacrux import scoresystem
-from gacrux.errors import GacruxError, GacruxInputError
+from gacrux.gacruxexeptions import GacruxError, GacruxInputError
 from gacrux import helpers 
 
 

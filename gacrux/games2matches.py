@@ -5,7 +5,7 @@ Created on Mon Dec 15 16:26:22 2025
 @author: Otto
 """
 from decimal import Decimal
-from gacrux import errors
+from gacrux import gacruxexeptions
 from gacrux import scoresystem
 
 

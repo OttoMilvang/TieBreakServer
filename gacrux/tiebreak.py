@@ -8,7 +8,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from gacrux import chessjson 
 from gacrux import rating
-from gacrux.errors import GacruxInputError
+from gacrux.gacruxexeptions import GacruxInputError
 
 
 def _select_low_cut_game(games, ignore_vur_exception=False):

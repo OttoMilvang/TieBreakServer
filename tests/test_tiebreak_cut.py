@@ -8,10 +8,10 @@ than that, so a cut can consume every game he has.
 """
 from decimal import Decimal
 
-import pytest
+from gacrux import pytest
 
-import tiebreak
-import trf2json
+from gacrux import tiebreak
+from gacrux import trf2json
 
 PAB = (0, "-", "U")  # pairing-allocated bye
 ZPB = (0, "-", "Z")  # zero-point bye

@@ -15,11 +15,11 @@ non-team tournament calls prepare_competitors() -> prepare_result() for every ga
 gameList, so a tournament with an incomplete game record crashes the moment tie-breaks
 are computed for it, not from poking prepare_result() directly.
 """
-import pytest
+from gacrux import pytest
 
-import errors
-import tiebreak
-import trf2json
+from gacrux import gacruxexeptions
+from gacrux import tiebreak
+from gacrux import trf2json
 
 
 def player_line(startno, name, rating, points, games):
@@ -61,7 +61,7 @@ def test_computing_tiebreaks_reports_the_missing_result_cleanly():
     assert "bResult" not in round_two
 
     params = {"tiebreak": ["PTS"], "check": False, "unrated": None}
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         tiebreak.tiebreak(tournament, -1, params)
 
     # Not AttributeError ("'tiebreak' object has no attribute 'chessevent'") and not

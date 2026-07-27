@@ -14,11 +14,11 @@ round six every pair in the field has already met -- deliberately a different sh
 from the four-player fixture in test_errors.py, so this test does not just repeat
 that one under a new name; it independently pins the same commit's fix.
 """
-import pytest
+from gacrux import pytest
 
-import errors
-import trf2json
-from pairingdutch import pairing_dutch
+from gacrux import gacruxexeptions
+from gacrux import trf2json
+from gacrux.pairingdutch import pairing_dutch
 
 
 def player_line(startno, name, rating, points, games):
@@ -73,7 +73,7 @@ def pair_round(lines, rnd):
 
 
 def test_round_six_of_an_exhausted_round_robin_is_reported_cleanly():
-    with pytest.raises(errors.GacruxNoLegalPairing) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxNoLegalPairing) as excinfo:
         pair_round(full_round_robin_of_six(), 6)
 
     # Not "RuntimeError: No active exception to reraise", which is what the bare

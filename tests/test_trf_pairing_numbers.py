@@ -15,10 +15,10 @@ a team tournament it is a team, and the specification's own example of record 24
 is a player. The player ids that records 300 and 310 list within a team are players in
 either kind of tournament.
 """
-import pytest
+from gacrux import pytest
 
-import errors
-import trf2json
+from gacrux import gacruxexeptions
+from gacrux import trf2json
 
 
 def player_line(startno, name, rating, points, games):
@@ -92,7 +92,7 @@ def parse(lines):
 
 def test_240_naming_a_player_who_does_not_exist():
     # Four players, and a half-point-bye for number 6 in round three.
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(individual(["240 H 003    6"]))
 
     message = str(excinfo.value)
@@ -137,7 +137,7 @@ def test_240_in_a_team_tournament_does_not_accept_a_player_number():
     # 6 is a player in this event, and no team. The bye goes to a team, so the number is
     # read against the teams -- checking it against the players would let this through
     # and hand the pairing a team that does not exist.
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["240 H 003    6"]))
 
     message = str(excinfo.value)
@@ -148,7 +148,7 @@ def test_240_in_a_team_tournament_does_not_accept_a_player_number():
 
 def test_320_naming_a_team_that_does_not_exist():
     # Record 320, the pairing-allocated bye: the team getting the PAB in each round.
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["320  1.0  1.0 000 000 006"]))
 
     assert "320" in str(excinfo.value)
@@ -157,7 +157,7 @@ def test_320_naming_a_team_that_does_not_exist():
 
 def test_330_naming_a_team_that_does_not_exist():
     # Record 330, a forfeited match: the two teams scheduled to play it.
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["330 +-   2   9   3"]))
 
     assert "330" in str(excinfo.value)
@@ -166,7 +166,7 @@ def test_330_naming_a_team_that_does_not_exist():
 
 def test_300_naming_a_team_that_does_not_exist():
     # Record 300, out of default order: the team playing OOdO and its opponent.
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["300   2   7   4    3    4"]))
 
     assert "300" in str(excinfo.value)
@@ -176,7 +176,7 @@ def test_300_naming_a_team_that_does_not_exist():
 def test_300_naming_a_player_who_does_not_exist():
     # The same record then lists the players of the team, board by board. Those are
     # players, and 99 is not one.
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["300   2   2   3   99    4"]))
 
     assert "300" in str(excinfo.value)
@@ -188,7 +188,7 @@ def test_310_naming_a_player_who_does_not_exist():
     lines = [team_line(1, "Team One", [1, 99]) if line.startswith("310   1") else line
              for line in teams([])]
 
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(lines)
 
     assert "310" in str(excinfo.value)
@@ -206,7 +206,7 @@ def test_001_naming_an_opponent_who_does_not_exist():
     lines.append(player_line(3, "Three, Player", 2200, "1.0", [(4, "w", "1"), (0, "-", "Z")]))
     lines.append(player_line(4, "Four, Player", 2100, "0.5", [(3, "b", "0"), (2, "b", "=")]))
 
-    with pytest.raises(errors.GacruxInputError) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(lines)
 
     assert "001" in str(excinfo.value)

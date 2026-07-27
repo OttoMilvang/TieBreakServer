@@ -19,7 +19,7 @@ import networkx as nx
 # from networkx.algorithms import bipartite
 from gacrux.crosstable import crosstable, flt
 from gacrux import helpers
-from gacrux import errors
+from gacrux import gacruxexeptions
 
 
 """

@@ -10,7 +10,7 @@ specification writes out in its own note.
 """
 import decimal
 
-import trf2json
+from gacrux import trf2json
 
 
 def player_line(startno, name, rating, points, games):

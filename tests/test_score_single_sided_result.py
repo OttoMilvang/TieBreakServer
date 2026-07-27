@@ -27,7 +27,7 @@ that someone else's half. trf2json.parse_file() calls update_board_number() on e
 individual tournament, which calls get_score() unconditionally for "white" on every
 game -- so this crashes on ordinary parsing, not just on tie-break computation.
 """
-import trf2json
+from gacrux import trf2json
 
 
 def player_line(startno, name, rating, points, games):

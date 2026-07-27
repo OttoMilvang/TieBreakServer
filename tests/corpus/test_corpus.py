@@ -22,7 +22,7 @@ By default a fast deterministic sample of the corpus runs, for quick local
 feedback; set ``TIEBREAK_CORPUS_FULL=1`` to run all of it, which CI does on every
 run.
 """
-import pytest
+from gacrux import pytest
 
 import _harness
 

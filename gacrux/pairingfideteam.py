@@ -36,7 +36,7 @@ from itertools import combinations, combinations_with_replacement
 import networkx as nx
 
 from gacrux.crosstablefideteam import crosstable_fideteam, qdefs, QC6
-from gacrux.errors import GacruxInputError, GacruxInvariantError, GacruxNoLegalPairing
+from gacrux.gacruxexeptions import GacruxInputError, GacruxInvariantError, GacruxNoLegalPairing
 from gacrux.pairing import pairing
 
 

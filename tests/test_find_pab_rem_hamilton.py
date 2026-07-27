@@ -20,11 +20,11 @@ so it does reach the buggy line. This is a legal, if unfortunate, tournament sta
 (FIDE C.04.3 art. 1.9.3): A genuinely cannot be paired, which the fixed engine now
 reports as GacruxNoLegalPairing instead of crashing on an internal KeyError.
 """
-import pytest
+from gacrux import pytest
 
-import errors
-import trf2json
-from pairingdutch import pairing_dutch
+from gacrux import gacruxexeptions
+from gacrux import trf2json
+from gacrux.pairingdutch import pairing_dutch
 
 
 def header(startno, name, rating, points):
@@ -92,7 +92,7 @@ def test_isolated_leader_fixture_has_edges_but_none_reach_the_top_level():
 
 
 def test_isolated_leader_is_reported_as_no_legal_pairing_not_a_keyerror():
-    with pytest.raises(errors.GacruxNoLegalPairing) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxNoLegalPairing) as excinfo:
         pair_round(isolated_leader(), 6)
 
     # Not "KeyError: 'rem_hamilton'", which is what the direct (unguarded) dict read

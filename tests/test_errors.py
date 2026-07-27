@@ -6,11 +6,11 @@ The one that matters is GacruxNoLegalPairing: a field can run out of legal pairi
 input that is valid in every respect, and the caller has to be able to recognise that
 state (C.04.3 art. 1.9.3) rather than read it as a crash.
 """
-import pytest
+from gacrux import pytest
 
-import errors
-import trf2json
-from pairingdutch import pairing_dutch
+from gacrux import gacruxexeptions
+from gacrux import trf2json
+from gacrux.pairingdutch import pairing_dutch
 
 
 def player_line(startno, name, rating, points, games):
@@ -52,7 +52,7 @@ def pair_round(lines, rnd):
 
 
 def test_no_legal_pairing_is_reported_as_such():
-    with pytest.raises(errors.GacruxNoLegalPairing) as excinfo:
+    with pytest.raises(gacruxexeptions.GacruxNoLegalPairing) as excinfo:
         pair_round(exhausted_round_robin(), 4)
 
     # Not "RuntimeError: No active exception to reraise", which is what a bare raise
@@ -62,16 +62,16 @@ def test_no_legal_pairing_is_reported_as_such():
 
 
 def test_no_legal_pairing_is_catchable_as_a_gacrux_error():
-    with pytest.raises(errors.GacruxError):
+    with pytest.raises(gacruxexeptions.GacruxError):
         pair_round(exhausted_round_robin(), 4)
 
 
 def test_no_legal_pairing_is_not_an_invariant_violation():
     # A caller has to be able to tell a tournament state apart from a bug in the engine.
-    assert not issubclass(errors.GacruxNoLegalPairing, errors.GacruxInvariantError)
-    assert not issubclass(errors.GacruxNoLegalPairing, errors.GacruxInputError)
-    for cls in [errors.GacruxNoLegalPairing, errors.GacruxInputError, errors.GacruxInvariantError]:
-        assert issubclass(cls, errors.GacruxError)
+    assert not issubclass(gacruxexeptions.GacruxNoLegalPairing, gacruxexeptions.GacruxInvariantError)
+    assert not issubclass(gacruxexeptions.GacruxNoLegalPairing, gacruxexeptions.GacruxInputError)
+    for cls in [gacruxexeptions.GacruxNoLegalPairing, gacruxexeptions.GacruxInputError, gacruxexeptions.GacruxInvariantError]:
+        assert issubclass(cls, gacruxexeptions.GacruxError)
 
 
 def test_a_pairable_round_still_pairs():

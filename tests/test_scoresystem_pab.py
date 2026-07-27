@@ -14,9 +14,9 @@ held as its points.
 """
 import decimal
 
-import trf2json
-from scoresystem import scoresystem
-from tiebreak import tiebreak
+from gacrux import trf2json
+from gacrux.scoresystem import scoresystem
+from gacrux.tiebreak import tiebreak
 
 
 def player_line(startno, name, rating, points, games):

@@ -12,7 +12,7 @@ opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects
 
 from decimal import Decimal
 from gacrux.tiebreak import tiebreak
-from gacrux.errors import GacruxInvariantError
+from gacrux.gacruxexeptions import GacruxInvariantError
 from itertools import combinations  
 
 from itertools import combinations  
