@@ -8,6 +8,7 @@ dynamic = ["version"]
 authors = [
   { name="Otto Milvang" },
 ]
+
 description = "FIDE Tournament Pairing Engine Tool"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,6 +16,12 @@ dependencies = [
   "networkx>=2.6"
 ]
 license = {text = "MIT"}
+
+[tool.setuptools]
+packages = ["gacrux"]
+
+[tool.setuptools.package-dir]
+gacrux = "."
 
 [project.urls]
 Homepage = "https://github.com/OttoMilvang/TieBreakServer"

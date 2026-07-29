@@ -15,7 +15,7 @@ a team tournament it is a team, and the specification's own example of record 24
 is a player. The player ids that records 300 and 310 list within a team are players in
 either kind of tournament.
 """
-from gacrux import pytest
+import pytest
 
 from gacrux import gacruxexeptions
 from gacrux import trf2json

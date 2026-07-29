@@ -14,7 +14,7 @@ round six every pair in the field has already met -- deliberately a different sh
 from the four-player fixture in test_errors.py, so this test does not just repeat
 that one under a new name; it independently pins the same commit's fix.
 """
-from gacrux import pytest
+import pytest
 
 from gacrux import gacruxexeptions
 from gacrux import trf2json

@@ -15,7 +15,7 @@ non-team tournament calls prepare_competitors() -> prepare_result() for every ga
 gameList, so a tournament with an incomplete game record crashes the moment tie-breaks
 are computed for it, not from poking prepare_result() directly.
 """
-from gacrux import pytest
+import pytest
 
 from gacrux import gacruxexeptions
 from gacrux import tiebreak

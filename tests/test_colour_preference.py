@@ -18,7 +18,7 @@ There is one place where art. 1.7.1 asserts BOTH preferences at once -- a colour
 say which sentence wins. The engine resolves those by the colour difference. TestArticleConflict
 pins that choice so it cannot drift silently, and does not claim it is the only reading.
 """
-from gacrux import pytest
+import pytest
 from gacrux.crosstabledutch import crosstable_dutch
 
 

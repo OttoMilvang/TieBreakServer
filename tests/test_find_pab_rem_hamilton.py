@@ -20,7 +20,7 @@ so it does reach the buggy line. This is a legal, if unfortunate, tournament sta
 (FIDE C.04.3 art. 1.9.3): A genuinely cannot be paired, which the fixed engine now
 reports as GacruxNoLegalPairing instead of crashing on an internal KeyError.
 """
-from gacrux import pytest
+import pytest
 
 from gacrux import gacruxexeptions
 from gacrux import trf2json

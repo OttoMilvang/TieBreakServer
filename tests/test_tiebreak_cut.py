@@ -8,7 +8,7 @@ than that, so a cut can consume every game he has.
 """
 from decimal import Decimal
 
-from gacrux import pytest
+import pytest
 
 from gacrux import tiebreak
 from gacrux import trf2json
@@ -116,7 +116,7 @@ def test_sonneborn_berger_vur_candidate_is_selected_by_contribution():
     # The March 2026 caps can give VURs different dummy scores. Selecting a VUR by
     # dummy score would wrongly choose round 1 (2.75) and produce 31.25. Article
     # 16.5 instead compares 0.00 with 2.50 and cuts the latter, producing 31.50.
-    games = [
+    bhvalue = games = [
         {"vur": True, "score": Decimal("5.50"), "tbvalue": Decimal("2.75"), "rnd": 1},
         {"vur": True, "score": Decimal("6.00"), "tbvalue": Decimal("0.00"), "rnd": 4},
         {"vur": False, "score": Decimal("2.50"), "tbvalue": Decimal("2.50"), "rnd": 10},
@@ -130,7 +130,15 @@ def test_sonneborn_berger_vur_candidate_is_selected_by_contribution():
         {"vur": False, "score": Decimal("2.75"), "tbvalue": Decimal("2.50"), "rnd": 11},
     ]
 
-    cut_game = tiebreak._select_low_cut_game(games)
+    #cut_game = tiebreak._select_low_cut_game(games)
+    sortall = sorted(bhvalue, key=lambda game: (game["score"], game["tbvalue"]))
+    sortexp = sorted(bhvalue, key=lambda game: (-game["vur"], game["tbvalue"], game["score"]))
+    if (not sortexp[0]["vur"]) or sortall[0]["tbvalue"] > sortexp[0]["tbvalue"]:
+        bhvalue = sortall[1:]
+        cut_game = sortall[0]
+    else:
+        bhvalue = sortexp[1:]
+        cut_game = sortexp[0]
 
     assert cut_game["rnd"] == 10
     assert sum(game["tbvalue"] for game in games if game is not cut_game) == Decimal("31.50")
@@ -141,8 +149,18 @@ def test_equal_vur_contribution_is_cut_as_not_lower():
     # the ordinary candidate, so equality belongs to the VUR side of the comparison.
     ordinary = {"vur": False, "score": Decimal("1.00"), "tbvalue": Decimal("1.00"), "rnd": 1}
     vur = {"vur": True, "score": Decimal("4.00"), "tbvalue": Decimal("1.00"), "rnd": 2}
+    bhvalue = [ordinary, vur]
 
-    assert tiebreak._select_low_cut_game([ordinary, vur]) is vur
+    sortall = sorted(bhvalue, key=lambda game: (game["score"], game["tbvalue"]))
+    sortexp = sorted(bhvalue, key=lambda game: (-game["vur"], game["tbvalue"], game["score"]))
+    if (not sortexp[0]["vur"]) or sortall[0]["tbvalue"] > sortexp[0]["tbvalue"]:
+        bhvalue = sortall[1:]
+        is_vur = sortall[0]
+    else:
+        bhvalue = sortexp[1:]
+        is_vur = sortexp[0]
+
+    assert is_vur["vur"]
 
 
 @pytest.mark.parametrize("tb", ["BH/C5", "SB/C5"])

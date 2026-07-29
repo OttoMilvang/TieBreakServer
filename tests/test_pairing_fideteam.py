@@ -15,7 +15,7 @@ board (art. 1.6.1), which is what "white" and "black" mean in a match record.
 import copy
 import decimal
 
-from gacrux import pytest
+import pytest
 
 from gacrux.crosstablefideteam import crosstable_fideteam
 from gacrux.drawresult import drawresult

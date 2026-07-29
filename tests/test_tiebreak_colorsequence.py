@@ -6,7 +6,7 @@ A competitor who gets the same colour in every game accumulates a colour differe
 outside the range of the colour-preference table used by tiebreak.compute_score().
 That must not crash the score preparation.
 """
-from gacrux import pytest
+import pytest
 
 from gacrux import tiebreak
 from gacrux import trf2json

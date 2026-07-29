@@ -2,7 +2,7 @@
 """Team PTS follows the primary score declared by TRF record 192."""
 from decimal import Decimal
 
-from gacrux import pytest
+import pytest
 
 from gacrux import tiebreak
 

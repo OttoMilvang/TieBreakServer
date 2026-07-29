@@ -37,8 +37,8 @@ REPO_ROOT = CORPUS_DIR.parent.parent
 
 sys.path.insert(0, str(REPO_ROOT))
 
-import pairingchecker  # noqa: E402
-import tiebreakchecker  # noqa: E402
+from gacrux.pairingchecker import pairingchecker  # noqa: E402
+from gacrux.tiebreakchecker import tiebreakchecker  # noqa: E402
 
 # Number of records a non-full run samples from the corpus.  A deterministic
 # stride is used so every worker (and every run) selects the same subset.

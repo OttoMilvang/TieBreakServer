@@ -6,7 +6,7 @@ The one that matters is GacruxNoLegalPairing: a field can run out of legal pairi
 input that is valid in every respect, and the caller has to be able to recognise that
 state (C.04.3 art. 1.9.3) rather than read it as a crash.
 """
-from gacrux import pytest
+import pytest
 
 from gacrux import gacruxexeptions
 from gacrux import trf2json
