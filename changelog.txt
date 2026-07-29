@@ -1,6 +1,6 @@
 2026-07-21 1.10.59
 
-Contribution from @russellb - Russel Bryant
+Contribution from Colin Scheriff,  
 - Added the FIDE Swiss Team Pairing System (C.04.6), including type A and type B
   colour preferences, automatic TRF selection, and team-corpus coverage.
 - Enabled all 300 previously skipped team records, so every record in the
