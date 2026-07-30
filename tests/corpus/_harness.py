@@ -84,12 +84,12 @@ def _write_trf(trf_text):
 
 def pairing_status(trf_text):
     _write_trf(trf_text)
-    return _drive(pairingchecker.pairingchecker, [])
+    return _drive(pairingchecker, [])
 
 
 def tiebreak_status(trf_text):
     _write_trf(trf_text)
-    return _drive(tiebreakchecker.tiebreakchecker, [])
+    return _drive(tiebreakchecker, [])
 
 
 def engine_accepts(trf_text):
