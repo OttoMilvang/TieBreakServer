@@ -1,3 +1,11 @@
+
+2026-08-12
+Change rating structure in order to meet new requirements.
+The rating is mow a dict containing {"list":.., "rating":..., kFactor":..., "category":...}
+where list is a pointer to the origin of the rating.
+Checked all faild tests
+
+
 2026-07-21 1.10.59
 
 Contribution from Colin Scheriff,  
@@ -8,7 +16,7 @@ Contribution from Colin Scheriff,
 - Corrected Sonneborn-Berger cut modifiers to select a voluntary unplayed
   round by its contribution, as required by FIDE C.07 article 16.5.
 - Fixed absolute colour preferences when the colour difference is +/-1 and the
-  player received the same colour in their last two played games.
+  player received the same eir last two played games.
 - Added typed engine errors and fixed crashes involving unpairable fields,
   incomplete results, uncommon scoring systems, invalid pairing numbers,
   long colour sequences, and tie-break cuts.

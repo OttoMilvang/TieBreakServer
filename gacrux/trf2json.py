@@ -24,7 +24,6 @@ class trf2json(chessjson.chessjson):
     # constructor function
     def __init__(self):
         super().__init__()
-
         self.trfrecords = [
             {"id": "###", "read": self.parse_trf_noop,          "write": self.output_trf_noop,          "desc": "Comments"},
             {"id": "012", "read": self.parse_trf_tournament,    "write": self.output_trf_info,          "desc": "Tournament Name"},
@@ -155,8 +154,6 @@ class trf2json(chessjson.chessjson):
             "CUSTOM_TEAM_KNOCKOUT"         : {"format": "knokout",      "teamTournament": True , "pairingSystem": ["custom"]       }, 
         }       
         
-        self.chessjson["origin"] = "trf2json ver. 1.03"
-        self.chessjson["event"]["ratingLists"] = [{"listName": "TRF"}]
         self.cteam = {}  # pointer from cid-player to cid-team
         self.cboard = {}
         self.p001 = {}
@@ -207,6 +204,9 @@ class trf2json(chessjson.chessjson):
                 "timeControl": {"description": "", "encoded": ""},
             }
         )
+
+        self.chessjson["origin"] = "trf2json ver. 1.03"
+        self.add_ratinglist("TRF")
 
         tournament = self.get_tournament(1)
         self.all_lines = self.read_all_lines(tournament, alines, verbose)
@@ -729,7 +729,7 @@ class trf2json(chessjson.chessjson):
             "federation": line[53:56].strip(),
             "fideId": helpers.parse_int(line[57:68]),
             "fideName": fideName,
-            "rating": [rating],
+            "rating": [{"list": "TRF", "rating": rating}] if rating > 0 else [],
             "fideTitle": ftitle,
         }
         self.append_profile(profile)
@@ -748,7 +748,7 @@ class trf2json(chessjson.chessjson):
             "present": startno > 0,
             "gamePoints": gamePoints,
             "rank": helpers.parse_int(line[85:89]),
-            "rating": rating if rating > 0 else None,
+            "rating": profile["rating"][0] if rating > 0 else None,
         }
         score = {"sum": gamePoints, "W": 0, "D": 0, "L": 0, "P": 0, "A": 0, "U": 0, "Z": 0}
         self.gamescores.append(score)
@@ -1001,7 +1001,7 @@ class trf2json(chessjson.chessjson):
             national["func"] = helpers.rating_other
         else:
             self.put_status(472, "parse_trf_nationalsupport: " + national["mode"] + " not matched")
-        self.chessjson["event"]["ratingLists"].append({"listName": national["federation"]})
+        self.add_ratinglist(national["federation"])
 
     def parse_trf_natrating(self, tournament, line):
         startno = helpers.parse_int(line[4:8])
@@ -1019,7 +1019,9 @@ class trf2json(chessjson.chessjson):
         profile["lastName"] = names[0].strip()
         profile["lfirstName"] = names[1].strip()
         profile["sex"] = line[9:10]
-        profile["rating"].append(rating)
+        rating = {"list": self.national["federation"], "rating": rating} if rating is not None else None
+        if rating is not None:
+            profile["rating"].append(rating)
         competitor["rating"] = self.national["func"](competitor["rating"], rating)
         return 1
 
@@ -1102,7 +1104,7 @@ class trf2json(chessjson.chessjson):
             "att": line[4],
             "matchPoints": helpers.parse_float(line[7:11]),
             "gamePoints": helpers.parse_float(line[13:17]),
-            "round": helpers.parse_int(line[13:17]),
+            "round": helpers.parse_int(line[19:22]),
             "teams": teams,
         }
         for i in range(27, linelen + 1, 5):

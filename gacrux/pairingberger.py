@@ -110,11 +110,11 @@ class pairing_berger(pairing):
             rnd = self.rnd
             if self.fide and self.maxmeets == 2 and (rnd == self.cycle or rnd == self.cycle - 1):
                 rnd = 2*self.cycle - rnd - 1  
-            elif self.gacrux and rnd > self.cycle:
-                rnd -= 1
+            elif self.gacrux and rnd <= self.cycle:
+                rnd += self.cycle -1
                 cycle = rnd //self.cycle
                 rnd = (rnd % self.cycle + self.cycle - cycle) % self.cycle + 1
-            elif self.reverse and rnd > self.cycle:
+            elif self.reverse and rnd <= self.cycle:
                 rnd -= 1
                 cycle = rnd //self.cycle
                 #rnd = (rnd % self.cycle + self.cycle - cycle) % self.cycle + 1

@@ -44,7 +44,7 @@ class TestColourPreferenceIsTotal:
     """Every value color_preference() can return, update_edge() must be able to consume."""
 
     def test_a_competitor_with_no_played_games_has_no_colour_preference(self):
-        from crosstabledutch import crosstable_dutch
+        from gacrux.crosstabledutch import crosstable_dutch
 
         assert crosstable_dutch.color_preference(None, 0, "") == "nc"
 

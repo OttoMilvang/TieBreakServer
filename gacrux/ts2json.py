@@ -25,12 +25,10 @@ class ts2json(chessjson.chessjson):
         self.pcompetitors = {}  # pointer to player section competitors
         self.bcompetitors = {}  # pointer to team competitors via 1st board player
         self.tcompetitors = {}  # pointer to team section competitors
-        self.chessjson["event"]["ratingLists"] = [
-            {"listName": "Local", "listDescription": "Local rating"},
-            {"listName": "FIDE", "listDescription": "FIDE standard rating"},
-            {"listName": "FIDErapid", "listDescription": "FIDE rapid rating"},
-            {"listName": "FIDEblitz", "listDescription": "FIDE blitz rating"},
-        ]
+        self.add_ratinglist("Local", "Local rating")
+        self.add_ratinglist("FIDE", "FIDE standard rating")
+        self.add_ratinglist("Rapid", "FIDE rapid rating")
+        self.add_ratinglist("Blitz", "FIDE blitz rating")
         self.translatetb = {
             "Points": "PTS",
             "ExpectedPoints": "ExpectedPoints",
@@ -645,16 +643,12 @@ class ts2json(chessjson.chessjson):
                 cround = tround
         if cround is not None:
             ratinglist = cround["ratingList"]
-        ratinglists = self.chessjson["event"]["ratingLists"]
-        ratingindex = 0
-        for nlist in range(0, len(ratinglists)):
-            if ratinglist == ratinglists[nlist]["listName"]:
-                ratingindex = nlist
-                break
+        ratinglist = {"Local": "Local", "FIDE": "FIDE", "FIDErapid": "Rapid", "FIDEblitz": "Blitz"}.get(ratinglist, "Local")           
         pids = self.all_pids()
         for key, player in self.pcompetitors.items():
-            rating = int(pids[player["profileId"]]["rating"][ratingindex])
-            player["rating"] = rating if rating > 0 else None
+            ratingentry = [r for r in pids[player["profileId"]]["rating"] if r["list"] == ratinglist]
+            # player["rating"] = int(ratingentry[0]["rating"]) if ratingentry else None
+            player["rating"] = ratingentry[0] if ratingentry else None
         
     def update_tournament_teamcompetitors(self, tournament):
         if not tournament["teamTournament"]:
@@ -719,7 +713,14 @@ class ts2json(chessjson.chessjson):
     # Read tournament player in TS file
     #
     def parse_ts_player(self, player, tournament, rank):
-        profile = {"id": 0, "rating": [0, 0, 0, 0], "kFactor": [0, 0, 0, 0], "other": {}}
+        profile = {"id": 0, "rating": [
+            {"list": "Local", "rating": 0, "kFactor": 0, "category": ""},
+            {"list": "FIDE", "rating": 0, "kFactor": 0, "category": ""},
+            {"list": "Rapid", "rating": 0, "kFactor": 0, "category": ""},
+            {"list": "Blitz", "rating": 0, "kFactor": 0, "category": ""}
+            ], 
+            "other": {}
+        }
         competitor = {"cid": 0}
         self.parse_ts_player_attrib(player.attrib, profile, competitor)
         profileid = competitor["profileId"] = self.append_profile(profile)
@@ -789,17 +790,17 @@ class ts2json(chessjson.chessjson):
             elif key == "LocalID":
                 profile["localId"] = helpers.parse_int(value)
             elif key == "LocalRating":
-                profile["rating"][0] = helpers.parse_int(value)
+                profile["rating"][0] = {"list": "Local", "rating": helpers.parse_int(value)}
             elif key == "LocalGames":
                 pass
             elif key == "FideId":
                 profile["fideId"] = helpers.parse_int(value)
             elif key == "FideRating":
-                profile["rating"][1] = helpers.parse_int(value)
+                profile["rating"][1] = {"list": "FIDE", "rating": helpers.parse_int(value)}
             elif key == "FideRapidRating":
-                profile["rating"][2] = helpers.parse_int(value)
+                profile["rating"][2] = {"list": "Rapid", "rating": helpers.parse_int(value)}
             elif key == "FideBlitzRating":
-                profile["rating"][3] = helpers.parse_int(value)
+                profile["rating"][3] = {"list": "Blitz", "rating": helpers.parse_int(value)}
             elif key == "FideGames":
                 pass
             elif key == "FideRapidGames":
@@ -807,11 +808,11 @@ class ts2json(chessjson.chessjson):
             elif key == "FideBlitzGames":
                 pass
             elif key == "RatingFactor":
-                profile["kFactor"][1] = helpers.parse_float(value)
+                profile["rating"][0]["kFactor"] = helpers.parse_float(value)
             elif key == "RapidRatingFactor":
-                profile["kFactor"][2] = helpers.parse_float(value)
+                profile["rating"][2]["kFactor"] = helpers.parse_float(value)
             elif key == "BlitzRatingFactor":
-                profile["kFactor"][3] = helpers.parse_float(value)
+                profile["rating"][3]["kFactor"] = helpers.parse_float(value)
             elif key == "BornYear":
                 profile["yearBirth"] = helpers.parse_int(value)
             elif key == "MemberAsOf":
@@ -824,6 +825,7 @@ class ts2json(chessjson.chessjson):
                 profile["email"] = value
             else:
                 self.print_warning("parse_ts_player attrib: " + key + " not matched")
+        profile["rating"] = [r for r in profile["rating"] if r["rating"] > 0]
         profile["fideName"] = helpers.ascii_name(profile["lastName"]) + ", " + helpers.ascii_name(profile["firstName"])  
         return
 

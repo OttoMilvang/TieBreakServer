@@ -25,7 +25,7 @@ class chessjson:
             "event": {
                 "name": "",
                 "eventInfo": {},
-                "ratingLists": [{"listName": "Rating"}],
+                "ratingLists": [],
                 "profiles": [],
                 "teams": [],
                 "tournaments": [],
@@ -110,6 +110,15 @@ class chessjson:
             }
         )
         return self.get_tournament(tournamentno)
+
+    def add_ratinglist(self, name, description = None):
+        for ratingList in self.chessjson["event"]["ratingLists"]:
+            if ratingList["listName"] == name:
+                return
+        self.chessjson["event"]["ratingLists"].append({"listName": name})
+        if description is not None:
+            self.chessjson["event"]["ratingLists"][-1]["description"] = description
+
 
     def get_tournament(self, tournamentno):
         for tournament in self.chessjson["event"]["tournaments"]:

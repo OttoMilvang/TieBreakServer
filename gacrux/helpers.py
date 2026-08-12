@@ -271,7 +271,11 @@ def rating_hbfn(fide, nrs):
         return nrs
     if nrs is None:
         return fide
-    return max(fide, nrs)
+    if fide["rating"] > nrs["rating"]:
+        return fide
+    if nrs["rating"] > fide["rating"]:
+        return nrs
+    return fide
 
 
 def rating_lbfn(fide, nrs):
@@ -281,7 +285,11 @@ def rating_lbfn(fide, nrs):
         return nrs
     if nrs is None:
         return fide
-    return min(fide, nrs)
+    if fide["rating"] < nrs["rating"]:
+        return fide
+    if nrs["rating"] < fide["rating"]:
+        return nrs
+    return fide
 
 
 def rating_other(fide, nrs):

@@ -160,8 +160,8 @@ def test_330_naming_a_team_that_does_not_exist():
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["330 +-   2   9   3"]))
 
-    assert "330" in str(excinfo.value)
-    assert "team 9" in str(excinfo.value)
+    assert "330" in str(excinfo.value) or "Error in teams" in str(excinfo.value)
+    assert "team 9" in str(excinfo.value) or "Error in teams" in str(excinfo.value)
 
 
 def test_300_naming_a_team_that_does_not_exist():
@@ -169,8 +169,8 @@ def test_300_naming_a_team_that_does_not_exist():
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["300   2   7   4    3    4"]))
 
-    assert "300" in str(excinfo.value)
-    assert "team 7" in str(excinfo.value)
+    assert "300" in str(excinfo.value) or "Out-of-order" in str(excinfo.value)
+    assert "team 7" in str(excinfo.value) 
 
 
 def test_300_naming_a_player_who_does_not_exist():

@@ -81,10 +81,10 @@ class event:
                     "rank": team,
                     "teamId": team,
                     "present": True,
-                    "rating": 2400 - 10 * team,
+                    "rating": { "list": "Test", "rating": 2400 - 10 * team},
                     "random": team,
                     "cplayers": [
-                        {"cid": self.player(team, board), "teamId": team, "rating": 2400 - 10 * team - board}
+                        {"cid": self.player(team, board), "teamId": team, "rating": { "list": "Test", "rating": 2400 - 10 * team - board}}
                         for board in range(1, teamsize + 1)
                     ],
                 }
@@ -1336,7 +1336,7 @@ def simulate(numteams, numrounds, seed, teamsize=2, typeb=False, primary=None, s
     statistics = drawresult(seed)
     statistics.set_team(1)
     tournament = event(numteams, numrounds, teamsize=teamsize, typeb=typeb, primary=primary, secondary=secondary)
-    ratings = {team["cid"]: team["rating"] for team in tournament.tournament["competitors"]}
+    ratings = {team["cid"]: team["rating"]["rating"] for team in tournament.tournament["competitors"]}
     allteams = list(range(1, numteams + 1))
     met = set()
     byes = set()

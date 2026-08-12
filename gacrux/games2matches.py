@@ -5,7 +5,7 @@ Created on Mon Dec 15 16:26:22 2025
 @author: Otto
 """
 from decimal import Decimal
-from gacrux import gacruxexeptions
+from gacrux.gacruxexeptions import GacruxInputError
 from gacrux import scoresystem
 
 
@@ -313,6 +313,10 @@ class games2matches():
             team1 = ooo["oooteam"]
             team2 = ooo["otherteam"]
             key = str(rnd) + "-" + str(team1)
+            if key not in tmatches:
+                err = f"Error in Out-of-order record (300), round {rnd}, team {team1}-{team2}, No such match found"
+                self.parent.put_status(431, err)
+                raise GacruxInputError(err)
             tmatch = tmatches[key]
             zgame = {'id': 0, 'round': rnd, 'white': 0, 'black': 0, 'played': False, 'rated': False, 'wResult': 'Z', 'bResult': 'Z', 'board': 0}
             games = [cgames[game] if game > 0 else zgame.copy() for game in tmatch["games"]]
@@ -320,12 +324,17 @@ class games2matches():
             unsortedgames = []
             for i in range(teamsize):
                 if i >= len(ooo["order"]):
-                    err = f"Error in Out-of-order record, round {rnd}, {team1}-{team2} has only {len(ooo['order'])} players, but teamSize is {teamsize}"
+                    err = f"Error in Out-of-order record (300), round {rnd}, {team1}-{team2} has only {len(ooo['order'])} players, but teamSize is {teamsize}"
                     self.parent.put_status(431, err)
                     raise GacruxInputError(err)
                 player = ooo["order"][i]
                 if player > 0:
-                    [game for game in games if game["white"] == player or game["black"] == player][0]["board"] = i + 1
+                    playergames = [game for game in games if game["white"] == player or game["black"] == player]
+                    if len(playergames) == 0:
+                        err = f"Error in Out-of-order record (300), round {rnd}, team {team1} has no player {player}"
+                        self.parent.put_status(431, err)
+                        raise GacruxInputError(err)
+                    playergames[0]["board"] = i + 1
             for game in games:
                 board = game['board']
                 if board > 0:

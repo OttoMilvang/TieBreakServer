@@ -343,7 +343,7 @@ class tiebreak:
                 "rsts": {},
                 "orgrank": competitor["rank"] if "rank" in competitor else 0,
                 "rank": 1,
-                "rating": (competitor["rating"] if "rating" in competitor else 0),
+                "rating": (competitor["rating"]["rating"] if "rating" in competitor and competitor["rating"] is not None else None),
                 "present": competitor["present"] if "present" in competitor else True,
                 "tiebreakScore": [],
                 "tiebreakDetails": [],
