@@ -86,9 +86,9 @@ def test_isolated_leader_fixture_has_edges_but_none_reach_the_top_level():
     chessfile = trf2json.trf2json()
     chessfile.parse_file("\n".join(isolated_leader()), True)
     tournament = chessfile.get_tournament(1)
-    a_games = [g for g in tournament["gameList"] if g["white"] == 1 or g["black"] == 1]
+    a_games = [g for g in tournament["gameList"] if chessfile.get_result_cid(g, "white") == 1 or chessfile.get_result_cid(g, "black") == 1]
     assert len(a_games) == 5
-    assert {g["white"] + g["black"] - 1 for g in a_games} == {2, 3, 4, 5, 6}
+    assert {chessfile.get_result_cid(g, "white") + chessfile.get_result_cid(g, "black") - 1 for g in a_games} == {2, 3, 4, 5, 6}
 
 
 def test_isolated_leader_is_reported_as_no_legal_pairing_not_a_keyerror():

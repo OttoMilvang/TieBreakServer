@@ -142,7 +142,7 @@ class tiebreak:
             "RND":   {"name": "RND",   "func": self.compute_random,                      "rev": False, "flag": ""   ,"desc": "Unique random number"},
             }
 
-        chessevent = chessjson.chessjson()    
+        self.chj = chessevent = chessjson.chessjson()    
         self.tournament = tournament
         self.tiebreaks = []
         if tournament is None:
@@ -388,17 +388,14 @@ class tiebreak:
         ptype = "mpoints" if self.isteam else "points"
         scoresystem = self.matchscore if self.isteam else self.gamescore
         rnd = rst["round"]
-        white = rst["white"]
+        white = self.chj.get_result_cid(rst, "white")
         wPoints = self.get_score(scoresystem, rst, "white")
         wrPoints = self.get_score(self.rating, rst, "white")
         wVur = self.is_vur(rst, "white")
         wrating = None
         brating = None
         expscore = None
-        if "black" in rst:
-            black = rst["black"]
-        else:
-            black = 0
+        black = self.chj.get_result_cid(rst, "black")
         if black > 0:
             if "bResult" not in rst:
                 err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(rst.get("white", 0)) + ", black=" +  str(rst.get("black", 0))
@@ -448,18 +445,18 @@ class tiebreak:
 
     def prepare_teamgames(self, cmps, rst, score):
         maxboard = 0
+        chj = self.chj
         rnd = rst["round"]
         for col in ["white", "black"]:
-            if col in rst and rst[col] > 0:
+            if col in rst and (competitor := chj.get_result_cid(rst, col)) > 0:
                 gpoints = 0
-                competitor = rst[col]
                 games = []
                 tmatch = cmps[competitor]["rsts"][rnd]
  
-                if len(tmatch["games"]) > 0 and rst["black"] > 0:
+                if len(tmatch["games"]) > 0 and chj.get_result_cid(rst, "black") > 0:
                     for game in [self.cgames[game] for game in tmatch["games"]]:
-                        white = game["white"]
-                        black = game["black"] if "black" in game else 0
+                        white = chj.get_result_cid(rst, "white")
+                        black = chj.get_result_cid(rst, "black")
                         board = game["board"] if "board" in game else 0
                         maxboard = max(maxboard, board)
                         wVur = self.is_vur(game, "white")

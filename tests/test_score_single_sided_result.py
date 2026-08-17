@@ -61,7 +61,8 @@ def test_parsing_a_one_sided_game_record_does_not_crash():
 
     assert chessfile.get_status() == 0
     tournament = chessfile.get_tournament(1)
-    games = {(game["round"], game["white"], game["black"]): game for game in tournament["gameList"]}
+    games = {(game["round"], chessfile.get_result_cid(game, "white"), chessfile.get_result_cid(game, "black")): 
+             game for game in tournament["gameList"]}
 
     round_two = games[(2, 1, 2)]
     assert round_two["bResult"] == "W"

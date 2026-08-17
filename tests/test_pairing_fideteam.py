@@ -17,6 +17,7 @@ import decimal
 
 import pytest
 
+from gacrux import chessjson
 from gacrux.crosstablefideteam import crosstable_fideteam
 from gacrux.drawresult import drawresult
 from gacrux.gacruxexeptions import GacruxNoLegalPairing
@@ -109,8 +110,8 @@ class event:
                 "id": self.gameid,
                 "round": rnd,
                 "board": board,
-                "white": self.player(first, board),
-                "black": self.player(second, board),
+                "white": { "cid": self.player(first, board) },
+                "black": { "cid": self.player(second, board) },
                 "played": True,
                 "rated": True,
                 "wResult": fres,
@@ -124,8 +125,8 @@ class event:
             {
                 "id": 1000 + len(self.tournament["matchList"]),
                 "round": rnd,
-                "white": white,
-                "black": black,
+                "white": { "cid": white },
+                "black": { "cid": black },
                 "played": True,
                 "wResult": wresult,
                 "bResult": REVERSE[wresult],
@@ -136,27 +137,27 @@ class event:
     def pab(self, rnd, team):
         """art. 1.4 - the pairing-allocated-bye: no opponent, no colour."""
         self.tournament["matchList"].append(
-            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": team, "black": 0,
+            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": { "cid": team }, "black": None,
              "played": True, "wResult": "P", "games": []}
         )
 
     def fullpointbye(self, rnd, team):
         """The FIDE-deprecated full-point bye: a win without playing and without opponent."""
         self.tournament["matchList"].append(
-            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": team, "black": 0,
+            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": { "cid": team }, "black": None,
              "played": False, "wResult": "W", "games": []}
         )
 
     def halfpointbye(self, rnd, team):
         self.tournament["matchList"].append(
-            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": team, "black": 0,
+            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": { "cid": team }, "black": Mone,
              "played": False, "wResult": "D", "games": []}
         )
 
     def forfeit(self, rnd, winner, loser):
         """A match won by forfeit: it was not played, so it gives no colour (art. 1.6.1)."""
         self.tournament["matchList"].append(
-            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": winner, "black": loser,
+            {"id": 1000 + len(self.tournament["matchList"]), "round": rnd, "white": { "cid": winner }, "black": { "cid": loser },
              "played": False, "wResult": "W", "bResult": "Z", "games": []}
         )
 
@@ -1420,10 +1421,12 @@ def test_c3_carries_a_five_team_event_through_its_whole_round_robin(seed):
     (tournament, rounds) = simulate(5, 5, seed=seed)
     assert rounds == 5
     played = {}
+    chj = chessjson.chessjon()
     for match in tournament.tournament["matchList"]:
         if match["black"] > 0:
-            key = (min(match["white"], match["black"]), max(match["white"], match["black"]))
+            key = (min(chj.get_result_cid(match, "white"), chj.get_result_cid(match, "black")), 
+                   max(chj.get_result_cid(match, "white"), chj.get_result_cid(match, "black")))
             played[key] = played.get(key, 0) + 1
     assert sorted(played.values()) == [1] * 10          # all ten pairs, once each
-    byes = [match["white"] for match in tournament.tournament["matchList"] if match["black"] == 0]
+    byes = [chj.get_result_cid(match, "white") for match in tournament.tournament["matchList"] if chj.get_result_cid(match, "black") == 0]
     assert sorted(byes) == [1, 2, 3, 4, 5]              # and one bye each

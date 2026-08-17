@@ -8,6 +8,8 @@ import sys
 from decimal import Decimal
 import random
 
+from narwhals import col
+
 
 class chessjson:
 
@@ -219,10 +221,7 @@ class chessjson:
     # if False: Add the result to the result list
 
     def append_result(self, results, result):
-        # gamelist = list(
-        #    filter(lambda elem: elem["round"] == result["round"] and elem["white"] == result["white"], results)
-        # )
-        gamelist = [game for game in results if game["round"] == result["round"] and game["white"] == result["white"]]
+        gamelist = [game for game in results if game["round"] == result["round"] and self.get_result_cid(game, "white") == self.get_result_cid(result, "white")]
         if len(gamelist) > 0:
             elem = gamelist[0]
             if not ("wResult" in elem) and ("wResult" in result):
@@ -247,7 +246,7 @@ class chessjson:
     def append_game_to_match(self, results, result):
         # trace = 0
         for elem in results:
-            if elem["round"] == result["round"] and (elem["white"] == result["white"]):
+            if elem["round"] == result["round"] and (self.get_result_cid(elem, "white") == self.get_result_cid(result, "white")):
                 if not ("wResult" in elem) and ("wResult" in result):
                     elem["wResult"] = result["wResult"]
                     # if (result['white'] == trace or result['black'] == trace):
@@ -329,7 +328,7 @@ class chessjson:
         other = ("b" if color[0] == "w" else "w") + "Result"
         if color[0] + "Result" in result:
             res = result[color[0] + "Result"]
-        elif result["black"] > 0 and other in result:
+        elif self.get_result_cid(result, "black") > 0 and other in result:
             res = self.reverse[result[other]]
         else:
             # print("get_score" ,  slist, result, color, "Null")
@@ -348,7 +347,7 @@ class chessjson:
         other = ("b" if color[0] == "w" else "w") + "Result"
         if color[0] + "Result" in result:
             res = result[color[0] + "Result"]
-        elif result["black"] > 0 and other in result:
+        elif self.get_result_cid(result, "black") > 0 and other in result:
             res = self.reverse[result[other]]
         else:
             return Decimal("0.0")
@@ -378,7 +377,7 @@ class chessjson:
             if rnd not in allgames:
                 allgames[rnd] = {}
             arnd = allgames[rnd]
-            for col in [game["white"], game["black"]]:
+            for col in [self.get_result_cid(game, "white"), self.get_result_cid(game, "black")]:
                 if col in cteam:
                     nteam = cteam[col]
                     if nteam not in arnd:
@@ -415,8 +414,7 @@ class chessjson:
     def update_chessjson_format(self, tournament, isteam):
         pass
 
-    def get_topcolor(self, tournamentno, defcolor):
-        tournament = self.get_tournament(tournamentno)
+    def get_topcolor(self, tournament, defcolor):
         if "topColor" in tournament:
             # print("Topcolor if", tournament["topColor"].lower())
             return tournament["topColor"].lower()
@@ -424,9 +422,19 @@ class chessjson:
         glist = tournament["gameList"]
         clist = mlist if "matchList" in tournament and len(mlist) > 0 else glist
         if len(clist) > 0:
-            clist = sorted(clist, key=lambda p: (p["round"], (p["black"] == 0), min(p["white"], p["black"])))
-            topcolor = "w" if clist[0]["white"] < clist[0]["black"] else "b"
+            clist = sorted(clist, key=lambda p: (p["round"], 
+                self.get_result_cid(p, "black") == 0, 
+                min(self.get_result_cid(p, "white"), self.get_result_cid(p, "black"))))
+            topcolor = "w" if self.get_result_cid(clist[0], "white") < self.get_result_cid(clist[0], "black") else "b"
             return topcolor.lower()
-        if defcolor in ["w", "b", "W", "B"]:
+        if defcolor is not None and defcolor in ["w", "b", "W", "B"]:
             return defcolor.lower()
-        return "w" if random.random() < 0.5 else "b"
+        return defcolor
+
+
+
+    def get_result_cid(self, result, color):
+        if color in result and result[color] is not None:
+            return result.get(color, {}).get("cid", 0)
+        return 0
+    

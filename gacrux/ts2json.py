@@ -120,6 +120,9 @@ class ts2json(chessjson.chessjson):
                         self.update_tournament_teamcompetitors(tournament)
                         self.update_tournament_random(tournament, self.isteam)
                         self.add_accelerated(tournament)
+                        if (topcolor := self.get_topcolor(tournament, None)) is not None:
+                            tournament["topColor"] = topcolor
+
         return
 
     def parse_ts_tournament_attrib(self, attrib):
@@ -663,50 +666,6 @@ class ts2json(chessjson.chessjson):
         self.current_id = g2m.get_current_id()
         return
 
-        [cplayers, cteam] = self.build_tournament_teamcompetitors(tournament)
-        competitors = tournament["competitors"]
-        allgames = self.build_all_games(tournament, cteam, False)
-        pscore = tournament["scoreSystem"]["game"]
-        tscore = tournament["scoreSystem"]["match"]
-        for competitor in competitors:
-            competitor["matchPoints"] = 0
-            competitor["gamePoints"] = 0
-        for tmatch in tournament["matchList"]:
-            rnd = tmatch["round"]
-            gpoints = {}
-            played = False
-            games = []
-            for col in ["white", "black"]:
-                if col in tmatch and tmatch[col] > 0:
-                    teamno = tmatch[col]
-                    teamres = allgames[rnd][teamno]
-                    tsum = 0
-                    for game in teamres:
-                        if teamno == cteam[game["white"]]:
-                            tsum += self.get_score(pscore, game, "white")
-                            played = played or game["played"]
-                            games.append(game["id"])
-                        if "black" in game and game["black"] > 0 and teamno == cteam[game["black"]]:
-                            tsum += self.get_score(pscore, game, "black")
-                            played = played or game["played"]
-                    gpoints[col] = tsum
-            tmatch["played"] = played
-            tmatch["games"] = games
-            if "black" in gpoints:
-                if gpoints["white"] > gpoints["black"]:
-                    tmatch["wResult"] = "W"
-                    tmatch["bResult"] = "L" if played else "Z"
-                elif gpoints["white"] < gpoints["black"]:
-                    tmatch["bResult"] = "W"
-                    tmatch["wResult"] = "L" if played else "Z"
-                else:
-                    tmatch["wResult"] = "D"
-                    tmatch["bResult"] = "D"
-                competitors[tmatch["black"] - 1]["gamePoints"] += gpoints["black"]
-                competitors[tmatch["black"] - 1]["matchPoints"] += self.get_score(tscore, tmatch, "black")
-                competitors[tmatch["white"] - 1]["gamePoints"] += gpoints["white"]
-                competitors[tmatch["white"] - 1]["matchPoints"] += self.get_score(tscore, tmatch, "white")
-        return
 
     # ==============================
     #
@@ -856,12 +815,12 @@ class ts2json(chessjson.chessjson):
 
         score = self.parse_result(res, opponent, isteam)
         if myclr == "B":
-            result["white"] = max(0, opponent)
-            result["black"] = playerno
+            result["white"] = {"cid": max(0, opponent)}
+            result["black"] = {"cid": playerno}
             result["bResult"] = score
         else:
-            result["white"] = playerno
-            result["black"] = max(0, opponent)
+            result["white"] = {"cid": playerno}
+            result["black"] = {"cid": max(0, opponent)}
             result["wResult"] = score
         result["played"] = ((res == "1" or res == "=" or res == "0" or res == "A") and opponent > 0) or (opponent == -1)
         if score != "U":
