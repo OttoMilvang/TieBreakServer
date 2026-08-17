@@ -109,7 +109,7 @@ def from_base36(s):
     return b36
 
 
-def spilt_my_line(line, maxlen, delimiter):
+def split_my_line(line, maxlen, delimiter):
     if len(line) < maxlen:
         return (line, "")
     pos = line[:maxlen].rfind(delimiter)
