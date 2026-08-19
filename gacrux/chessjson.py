@@ -8,9 +8,6 @@ import sys
 from decimal import Decimal
 import random
 
-from narwhals import col
-
-
 class chessjson:
 
     # Read trf into a JSON for Chess data structure
@@ -434,6 +431,8 @@ class chessjson:
 
 
     def get_result_cid(self, result, color):
+        if color != "white" and color != "black":
+            raise ValueError("Color must be 'white' or 'black'")
         if color in result and result[color] is not None:
             return result.get(color, {}).get("cid", 0)
         return 0

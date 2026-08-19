@@ -228,10 +228,12 @@ class tiebreak:
             self.primaryscore = "points"
 
     def get_score(self, slist, result, color):
-        if color[0] + "Result" in result:
-            res = result[color[0] + "Result"]
-        elif result["black"] > 0:
-            res = self.reverse[result[color[0] + "Result"]]
+        cres = color[0]
+        if cres + "Result" in result:
+            res = result[cres + "Result"]
+        elif result["black"] != None and result["black"]["cid"] > 0:
+            ores = {"w": "b", "b": "w"}[cres]
+            res = self.chj.reverse[result[ores + "Result"]]
         else:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
@@ -245,11 +247,12 @@ class tiebreak:
     def is_vur(self, result, color):  #
         if result["played"]:
             return False
-
-        if color[0] + "Result" in result:
-            res = result[color[0] + "Result"]
-        elif result["black"] > 0:
-            res = self.reverse[result[color[0] + "Result"]]
+        cres = color[0]
+        if cres + "Result" in result:
+            res = result[cres + "Result"]
+        elif result["black"] != None and result["black"]["cid"] > 0:
+            ores = {"w": "b", "b": "w"}[cres]
+            res = self.chj.reverse[result[ores + "Result"]]
         else:
             return Decimal("0.0")
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur

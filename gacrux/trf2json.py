@@ -682,6 +682,8 @@ class trf2json(chessjson.chessjson):
             game["wResult"] = points
         # if result == "U":
         #    score["pab"] = game
+        if game["black"]["cid"] == 0:
+            game["black"] = None
         self.append_result(tournament["gameList"], game)
         return game
 
