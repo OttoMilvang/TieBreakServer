@@ -1075,7 +1075,8 @@ class trf2json(chessjson.chessjson):
         for i in range(20, len(line) + 1, 5):
             if len(line[i - 4:]):
                 player = helpers.parse_int(line[i - 4 : i])
-                self.check_competitor(tournament, line[0:3], player, "player")
+                if player > 0:
+                    self.check_competitor(tournament, line[0:3], player, "player")
                 order.append(player)
         ooo = {"round": rnd, "oooteam": oooteam, "otherteam": otherteam, "order": order}
         self.ooolist.append(ooo)
