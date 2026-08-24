@@ -81,13 +81,13 @@ class games2matches():
         matchList = self.tournament["matchList"]
         matches = self.matches
         byes = self.byes
-        
+
         for tmatch in matchList:
             tmatch["board"] = 0
             tmatch["games"] = []
             rnd = tmatch["round"]
-            wt = tmatch["white"]
-            bt = tmatch["black"] if "black" in tmatch and tmatch["black"] > 0 else 0
+            wt = self.parent.get_result_cid(tmatch, "white")
+            bt = self.parent.get_result_cid(tmatch, "black")
             if wt > bt:
                 index = str(rnd) + "-" + str(wt) + "-" + str(bt)
             else:
@@ -113,8 +113,8 @@ class games2matches():
         for game in self.games:
             game["board"] = 0
             rnd = game["round"]
-            wt = cteam[game["white"]]
-            bt = cteam[game["black"]] if "black" in game and game["black"] > 0 else 0
+            wt = cteam[self.parent.get_result_cid(game, "white")] if "white" in game else 0
+            bt = cteam[self.parent.get_result_cid(game, "black")] if "black" in game else 0
             if wt > bt:
                 index = str(rnd) + "-" + str(wt) + "-" + str(bt)
             else:
@@ -156,7 +156,7 @@ class games2matches():
     def add_byes(self):
         for bye in self.byelist:
             key = str(bye["round"]) + "-" + str(bye["competitor"]) + "-0"
-            wres = bye["wResult"] if "wResult" in bye else "Z"
+            wres = self.parent.get_result_res(bye, "white")
             byetrans = {"Z": "Z", "H": "D", "F": "W", "P": "P"  }
             wres = byetrans[bye["type"]]
             if key not in self.byes:
@@ -170,11 +170,10 @@ class games2matches():
                 }
                 # print("Match", matches[key] )
             self.byes[key].update({
-                "white": bye["competitor"], 
-                "black": 0, 
-                "played": bye["type"] == "P", 
-                "wResult": wres,
-                })
+                "white": {"cid": bye["competitor"], "result": wres},
+                "black": None,
+                "played": bye["type"] == "P"
+            })
 
  
 
@@ -189,11 +188,9 @@ class games2matches():
                                      "round": forfeited["round"], 
                                      "games": []}
             self.matches[key].update({
-                "white": forfeited["white"], 
-                "black": forfeited["black"], 
-                "played": False, 
-                "wResult": forfeited["type"][0],
-                "bResult": forfeited["type"][1],
+                "white": {"cid": forfeited["white"], "result": forfeited["type"][0]},
+                "black": {"cid": forfeited["black"], "result": forfeited["type"][1]},
+                "played": False
                 })
     # If outOfOrder records gives information, so use it
 
@@ -243,14 +240,14 @@ class games2matches():
         cteam = self.cteam
         cgames = self.cgames
         for key, tmatch in matches.items():
-            (rnd, p1, p2) = key.split("-")
-            if len([game for game in tmatch["games"] if cgames[game]["black"] != 0 or cgames[game]["wResult"] != "Z"]) == 0:
-                if "wResult" not in tmatch:
+            (rnd, teama, teamb) = key.split("-")
+            #breakpoint()
+            if len([game for game in tmatch["games"] if cgames[game]["black"] != 0 or cgames[game]["white"]["result"] != "Z"]) == 0:
+                if "result" not in tmatch["white"]:
                     tmatch.update({
-                        "white": int(p1), 
-                        "black": 0, 
-                        "played": False, 
-                        "wResult": "Z",
+                        "white": {"cid": int(teama), "result": "Z"},
+                        "black": None,
+                        "played": False
                         })
             
 
@@ -264,19 +261,20 @@ class games2matches():
         cteam = self.cteam
         cgames = self.cgames
         for key, tmatch in matches.items():
-            if tmatch.get("black", -1) != 0:
-                (rnd, p1, p2) = key.split("-")
-                for px in [p1, p2]:
-                    tkey = rnd + "-" + px
-                    ipx = int(px)
-                    if ipx > 0:
-                        tkey = rnd + "-" + px
+            # if tmatch.get("black", -1) != 0:
+            if "black" not in tmatch or tmatch["black"] is not None:
+                (rnd, teama, teamb) = key.split("-")
+                for teamx in [teama, teamb]:
+                    tkey = rnd + "-" + teamx
+                    teamno = int(teamx)
+                    if teamno > 0:
+                        tkey = rnd + "-" + teamx
                         tmatches[tkey] = {
                             "id": tmatch["id"], 
-                            "games": [game for game in tmatch["games"] if cteam.get(cgames[game]["white"], 0) == ipx or cteam.get(cgames[game]["black"], 0) == ipx],
+                            "games": [gameid for gameid in tmatch["games"] \
+                                    if cteam.get(self.parent.get_result_cid(cgames[gameid], "white"), 0) == teamno \
+                                    or cteam.get(self.parent.get_result_cid(cgames[gameid], "black"), 0) == teamno],
                         } 
-                        #if len(tmatches[tkey]["games"]) < self.tournament["teamSize"]:
-                        #    print("Build", tkey, len(tmatches[tkey]["games"]), tmatches[tkey])    
             else:
                 tmatch["games"] = []
         
@@ -289,14 +287,14 @@ class games2matches():
         cteam = self.cteam
         cplayer = self.cplayer
         for key, tmatch in tmatches.items():
-            (rnd, p1) = key.split("-")
-            p1 = int(p1)
+            (rnd, teama) = key.split("-")
+            teamno = int(teama)
             a = str(tmatch["games"])
             # print("A", key, a)
             tmatch["games"] = [game["id"] for game in sorted([cgames[game] for game in tmatch["games"]], 
                     key=lambda game: (
-                        game["black"] == 0 and game["wResult"] == "Z" or game["white"] == 0 and game["bResult"] == "Z" , 
-                        (cplayer[game.get("white", 0)] if cteam[game.get("white",0)] == p1 else cplayer[game.get("black", 0)]).get("order", 0))
+                        self.parent.get_result_cid(game, "black") == 0 and self.parent.get_result_res(game, "white") == "Z" or self.parent.get_result_cid(game, "white") == 0 and self.parent.get_result_res(game, "black") == "Z" , 
+                        (cplayer[self.parent.get_result_cid(game, "white")] if cteam[self.parent.get_result_cid(game, "white")] == teamno else cplayer[self.parent.get_result_cid(game, "black")]).get("order", 0))
                     )]
             b = str(tmatch["games"])
             # if (a!= b): print(a, b)
@@ -318,7 +316,7 @@ class games2matches():
                 self.parent.put_status(431, err)
                 raise GacruxInputError(err)
             tmatch = tmatches[key]
-            zgame = {'id': 0, 'round': rnd, 'white': 0, 'black': 0, 'played': False, 'rated': False, 'wResult': 'Z', 'bResult': 'Z', 'board': 0}
+            zgame = {'id': 0, 'round': rnd, 'white': {'cid': 0}, 'black': {'cid': 0}, 'played': False, 'rated': False, 'wResult': 'Z', 'bResult': 'Z', 'board': 0}
             games = [cgames[game] if game > 0 else zgame.copy() for game in tmatch["games"]]
             sortedgames = [None]*teamsize
             unsortedgames = []
@@ -329,7 +327,7 @@ class games2matches():
                     raise GacruxInputError(err)
                 player = ooo["order"][i]
                 if player > 0:
-                    playergames = [game for game in games if game["white"] == player or game["black"] == player]
+                    playergames = [game for game in games if self.parent.get_result_cid(game, "white") == player or self.parent.get_result_cid(game, "black") == player]
                     if len(playergames) == 0:
                         err = f"Error in Out-of-order record (300), round {rnd}, team {team1} has no player {player}"
                         self.parent.put_status(431, err)
@@ -363,28 +361,28 @@ class games2matches():
         teamsize = self.tournament["teamSize"]
         seq = self.tournament.get("teamSequence", "WB")
         for key, tmatch in matches.items():
-            (rnd, p1, p2) = key.split("-")
-            if tmatch.get("black", -1) != 0 and int(p2) != 0:
-                games1 = tmatches[rnd + "-" + p1]["games"][:teamsize]
-                games2 = tmatches[rnd + "-" + p2]["games"][:teamsize]
+            (rnd, teama, teamb) = key.split("-")
+            if (("black" not in tmatch) or tmatch["black"] is not None) and int(teamb) != 0:
+                games1 = tmatches[rnd + "-" + teama]["games"][:teamsize]
+                games2 = tmatches[rnd + "-" + teamb]["games"][:teamsize]
 
                 if "black" in tmatch:  # decide color
-                    white = tmatch["white"]
-                    black = tmatch["black"]
+                    white = self.parent.get_result_cid(tmatch, "white")
+                    black = self.parent.get_result_cid(tmatch, "black")
                 else: 
                     for game in range(teamsize):  # Go through games2, find same game in game1
                         if games2[game] != 0 and games2[game] in games1: 
                             cgame = cgames[games2[game]]
                             wcol = self.tindex[seq[game % len(seq)]]  # Team with wcol is white 
                             bcol = "black" if wcol == "white" else "white"
-                            white = cteam[cgame[wcol]]
-                            black = cteam[cgame[bcol]]
-                            tmatch.update({"white": white, "black": black})
+                            white = cteam[self.parent.get_result_cid(cgame, wcol)]
+                            black = cteam[self.parent.get_result_cid(cgame, bcol)]
+                            tmatch.update({"white": {"cid": white}, "black": {"cid": black}})
                             break
                     else:
                         # unable to decide color
                         white = black = 0
-                        tmatch.update({"white": white, "black": black})
+                        tmatch.update({"white": {"cid": white}, "black": None})
 
                 tmatch["games"] = []
                 for game in range(teamsize): 
@@ -396,7 +394,7 @@ class games2matches():
                     else:
                         gamelist = [game for game in games1 if game == 0 or game not in games2]
                         if len(gamelist) == 0:
-                            err = f"Error in teams, round {rnd}, {p1}-{p2} has only {len( tmatch['games'])} games, but teamSize is {teamsize}"
+                            err = f"Error in teams, round {rnd}, {teama}-{teamb} has only {len( tmatch['games'])} games, but teamSize is {teamsize}"
                             self.parent.put_status(431, err)
                             self.parent.put_status(431, "Add 300 Out-of-order records to solve this")
                             raise GacruxInputError(err + ". Add 300 Out-of-order records to solve this")
@@ -412,17 +410,24 @@ class games2matches():
                         else:
                             wgame = cgames[game1]
                             bgame = cgames[game2]
-                            if cteam[wgame["white"]] != tmatch[wcol]:
+                            # now we have two games, both White, find the correct white and update it with results from the other game
+                            if cteam[self.parent.get_result_cid(wgame, "white")] != self.parent.get_result_cid(tmatch, wcol):
                                 wgame, bgame = bgame, wgame
-                            wgame.update({"black": bgame["white"], "bResult": bgame["wResult"]}) 
+                            if wgame["black"] is None:
+                                wgame["black"] = {"cid": self.parent.get_result_cid(bgame, "white"),
+                                                  "result": self.parent.get_result_res(bgame, "white")}
+                            else:
+                                wgame["black"].update({"cid": self.parent.get_result_cid(bgame, "white"),
+                                                       "result": self.parent.get_result_res(bgame, "white")})
                             tmatch["games"].append(wgame["id"])
                             self.tournament["gameList"].remove(bgame)
                 for board, game in enumerate(tmatch["games"]): 
                     if game in cgames:
                         cgames[game]["board"] = board + 1 
+
             elif "white" not in tmatch:
-                w0 = cgames[tmatch["games"][0]]["white"]
-                tmatch.update({"white": cteam[w0], "black": 0, "played": False})
+                w0 = self.parent.get_result_cid(cgames[tmatch["games"][0]], "white")
+                tmatch.update({"white": {"cid":  cteam[w0]}, "black": None, "played": False})
                 # print("R", tmatch)
     # Decide score
         
@@ -436,13 +441,13 @@ class games2matches():
         scores = self.scores
 
         for key, tmatch in matches.items():
-            (rnd, p1, p2) = key.split("-")
-            arg = int(p1)
+            (rnd, teama, teamb) = key.split("-")
+            arg = int(teama)
             games = [cgames[game] for game in tmatch["games"] if game in cgames]
             points = {"white": Decimal("0.0"), "black": Decimal("0.0")}
             if len(games) > 0:
-                white = tmatch["white"]
-                black = tmatch["black"]
+                whitecid = self.parent.get_result_cid(tmatch, "white")
+                blackcid = self.parent.get_result_cid(tmatch, "black")
                 played = False
                 ind = 0
                 preres = None
@@ -453,26 +458,28 @@ class games2matches():
                         continue
                     cgame = games[game]
                     # wcol = self.tindex[seq[game % len(seq)]]  # Team with wcol is white (wrong) 
-                    wcol = "white" if cteam[cgame["white"]] == white else "black"
+                    wcol = "white" if cteam[self.parent.get_result_cid(cgame, "white")] == whitecid else "black"
                     bcol = "black" if wcol == "white" else "white"
                     played = played or cgame["played"]
-                    points[wcol] += scores.get_score(self.tournament, "game", cgame["wResult"])
-                    points[bcol] += scores.get_score(self.tournament, "game", cgame.get("bResult", "Z"))
+                    points[wcol] += scores.get_score(self.tournament, "game", self.parent.get_result_res(cgame, "white"))
+                    points[bcol] += scores.get_score(self.tournament, "game", self.parent.get_result_res(cgame, "black"))
                 tmatch["played"] = played
-            if tmatch["black"] > 0:
+            if self.parent.get_result_cid(tmatch, "black") > 0:
                 loss = "L" if played else "Z"
                 if points["white"] > points["black"]:
-                    tmatch.update({"wResult": "W", "bResult": loss})
+                    tmatch["white"].update({"result": "W"})
+                    tmatch["black"].update({"result": loss})
                 elif points["white"] < points["black"]:
-                    tmatch.update({"wResult": loss, "bResult": "W"})
-                elif points["white"] > 0 and points["black"] > 0:
-                    tmatch.update({"wResult": "D", "bResult": "D"})
+                    tmatch["white"].update({"result": loss})
+                    tmatch["black"].update({"result": "W"})
+                elif points["white"] > Decimal("0.0") and points["black"] > Decimal("0.0"):
+                    tmatch["white"].update({"result": "D"})
+                    tmatch["black"].update({"result": "D"})
                 else:
-                    tmatch.update({"wResult": loss, "bResult": loss})
-            else:
-                if "wResult" not in tmatch:
-                    wr = cgames[tmatch["games"][0]]["wResult"]
-                    tmatch["wResult"] = cgames[tmatch["games"][0]]["wResult"]
+                    tmatch["white"].update({"result": loss})
+                    tmatch["black"].update({"result": loss})
+            elif self.parent.get_result_res(tmatch, "white", default=None) is None:
+                tmatch["white"].update({"result": self.parent.get_result_res(tmatch, "white")})
         # with open('c:/temp/matches.json', 'w') as f:
         #    json.dump(matches, f, indent=2)
 

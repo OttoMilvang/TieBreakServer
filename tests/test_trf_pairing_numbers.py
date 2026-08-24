@@ -104,9 +104,9 @@ def test_240_naming_a_player_who_does_not_exist():
 def test_240_naming_a_player_who_exists_is_read():
     chessfile = parse(individual(["240 H 003    3"]))
     gameList = chessfile.get_tournament(1)["gameList"]
-
+    
     byes = [game for game in gameList if game["round"] == 3]
-    assert [(game["white"], game["black"], game["wResult"]) for game in byes] == [(3, 0, "D")]
+    assert [(chessfile.get_result_cid(game, "white"), chessfile.get_result_cid(game, "black"), game["white"]["result"]) for game in byes] == [(3, 0, "D")]
 
 
 def test_240_names_a_team_in_a_team_tournament():
@@ -115,7 +115,7 @@ def test_240_names_a_team_in_a_team_tournament():
     matchList = chessfile.get_tournament(1)["matchList"]
 
     byes = [match for match in matchList if match["round"] == 3]
-    assert [(match["white"], match["black"], match["wResult"]) for match in byes] == [(3, 0, "D")]
+    assert [(chessfile.get_result_cid(match, "white"), chessfile.get_result_cid(match, "black"), match["white"]["result"]) for match in byes] == [(3, 0, "D")]
 
 
 @pytest.mark.parametrize(

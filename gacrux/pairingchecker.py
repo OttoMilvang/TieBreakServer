@@ -404,6 +404,7 @@ class pairingchecker(commonmain):
 
     def compute_pairing(self, chessfile, pairingengine, params):
         # print('PARAMS', params)
+        chessfile = self.chessfile
         self.pairingengine = pairingengine
         analysis = pairing = []
         degenerate = False
@@ -416,7 +417,7 @@ class pairingchecker(commonmain):
                     raise
                 degenerate = True
                 current = [
-                    {"w": match["white"], "b": match.get("black", 0), "board": match["board"]}
+                    {"w": chessfile.get_result_cid(match, "white"), "b": chessfile.get_result_cid(match, "black"), "board": match["board"]}
                     for match in pairingengine.tournament["matchList"]
                     if match["round"] == pairingengine.rnd
                 ]

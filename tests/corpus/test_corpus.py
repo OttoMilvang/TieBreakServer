@@ -65,5 +65,5 @@ def test_corpus_record(record):
     # standings produced by the fixture's declared tie-breaks.
     accepts = pairing_status == 0 and tiebreak_status == 0
     assert accepts == record["valid"], (
-        "engine %s %s, but the corpus marks it valid=%s"
-        % ("accepted" if accepts else "rejected", record["name"], record["valid"]))
+        "engine %s %s, but the corpus marks it valid=%s (%s %s)"
+        % ("accepted" if accepts else "rejected", record["name"], record["valid"], str(pairing_status), str(tiebreak_status)))

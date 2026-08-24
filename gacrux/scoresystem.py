@@ -140,7 +140,7 @@ class scoresystem:
                         # if loss != 0.0 or draw != 0.5 or win != 1.0 or unknown != 'D':
                         #    continue
                         for result in equations:
-                            tsum = 0
+                            tsum = Decimal("0.0")
                             tsum += result["W"] * win
                             tsum += result["D"] * draw
                             tsum += result["L"] * loss
@@ -165,7 +165,7 @@ class scoresystem:
                             ok = ok and pok
 
                         if ok:
-                            ret = {key: value for key, value in res.items() if score[key] != 0}
+                            ret = {key: value for key, value in res.items() if score[key] != Decimal("0")}
                             for key in ["X", "U"]:
                                 if key in ret and res[key] in ["W", "D", "L", "Z"] and ret[key] not in ret:
                                     ret[res[key]] = res[res[key]]

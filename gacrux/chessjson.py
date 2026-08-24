@@ -8,7 +8,6 @@ import sys
 from decimal import Decimal
 import random
 
-
 class chessjson:
 
     # Read trf into a JSON for Chess data structure
@@ -144,9 +143,27 @@ class chessjson:
         except:
             self.put_status(402, "Error in score system, " + str(txt))
 
+    def replace_str_with_decimal(self, parent, key, obj, isPoints):
+        isPoints = isPoints or key in ["gamePoints", "matchPoints", "teamPoints", "points", "scoreSystem"]
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                self.replace_str_with_decimal(obj, k, v, isPoints)
+        elif isinstance(obj, list):
+            for v in obj:
+                self.replace_str_with_decimal(obj, "key", v, isPoints)
+        elif isPoints and isinstance(obj, str):
+            try:
+                parent[key] = Decimal(obj)
+            except:
+                pass
+        return
+    
     def parse_file(self, lines, verbose):
         # now = time.time()
-        self.chessjson = json.loads(lines, parse_float=Decimal)
+        # self.chessjson = json.loads(lines, parse_float=Decimal)
+        self.chessjson = json.loads(lines)
+        self.replace_str_with_decimal(None, "key", self.chessjson, False)
+        
 
     def tournament_getvalue(self, tournamentno, key):
         tournament = self.get_tournament(tournamentno)
@@ -219,18 +236,17 @@ class chessjson:
     # if False: Add the result to the result list
 
     def append_result(self, results, result):
-        # gamelist = list(
-        #    filter(lambda elem: elem["round"] == result["round"] and elem["white"] == result["white"], results)
-        # )
-        gamelist = [game for game in results if game["round"] == result["round"] and game["white"] == result["white"]]
+        gamelist = [game for game in results if game["round"] == result["round"] and self.get_result_cid(game, "white") == self.get_result_cid(result, "white")]
         if len(gamelist) > 0:
             elem = gamelist[0]
-            if not ("wResult" in elem) and ("wResult" in result):
-                elem["wResult"] = result["wResult"]
+            if self.get_result_res(elem, "white", None) is None and self.get_result_res(result, "white", None) is not None:
+                if elem["white"] is not None:
+                    elem["white"]["result"] = self.get_result_res(result, "white")
                 # if (result['white'] == trace or result['black'] == trace):
                 #    print('Update white', elem)
-            if not ("bResult" in elem) and ("bResult" in result):
-                elem["bResult"] = result["bResult"]
+            if self.get_result_res(elem, "black", None) is None and self.get_result_res(result, "black", None) is not None:
+                if elem["black"] is not None:
+                    elem["black"]["result"] = self.get_result_res(result, "black")
                 # if (result['white'] == trace or result['black'] == trace):
                 #    print('Update black', elem)
             return elem["id"]
@@ -239,21 +255,23 @@ class chessjson:
         return rid
 
     def update_results(self, results):
-        for res in ["wResult", "bResult"]:
+        for res in ["white", "black"]:
             for elem in results:
-                if not (res in elem):
-                    elem[res] = "Z"
+                if res in elem and "result" not in elem[res]:
+                    elem[res]["result"] = "Z"
 
     def append_game_to_match(self, results, result):
         # trace = 0
         for elem in results:
-            if elem["round"] == result["round"] and (elem["white"] == result["white"]):
-                if not ("wResult" in elem) and ("wResult" in result):
-                    elem["wResult"] = result["wResult"]
+            if elem["round"] == result["round"] and (self.get_result_cid(elem, "white") == self.get_result_cid(result, "white")):
+                if self.get_result_res(elem, "white", None) is None and self.get_result_res(result, "white", None) is not None:
+                    if elem["white"] is not None:
+                        elem["white"]["result"] = self.get_result_res(result, "white")
                     # if (result['white'] == trace or result['black'] == trace):
                     #    print('Update white', elem)
-                if not ("bResult" in elem) and ("bResult" in result):
-                    elem["bResult"] = result["bResult"]
+                if not ("black" in elem) and ("black" in result):
+                    if elem["black"] is not None:
+                        elem["black"]["result"] = result["black"]["result"]
                     # if (result['white'] == trace or result['black'] == trace):
                     #    print('Update black', elem)
                 return elem["id"]
@@ -326,12 +344,11 @@ class chessjson:
 
 
     def get_score(self, slist, result, color):
-        other = ("b" if color[0] == "w" else "w") + "Result"
-        if color[0] + "Result" in result:
-            res = result[color[0] + "Result"]
-        elif result["black"] > 0 and other in result:
+        other = "black" if color == "white" else "white"
+        res = self.get_result_res(result, color)
+        if res is None and self.get_result_cid(result, "black") > 0 and other in result:
             res = self.reverse[result[other]]
-        else:
+        elif res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
         while res in slist:
@@ -344,14 +361,12 @@ class chessjson:
     def is_vur(self, result, color):  #
         if result["played"]:
             return False
-
-        other = ("b" if color[0] == "w" else "w") + "Result"
-        if color[0] + "Result" in result:
-            res = result[color[0] + "Result"]
-        elif result["black"] > 0 and other in result:
+        other = "black" if color == "white" else "white"
+        res = self.get_result_res(result, color)
+        if res is None and self.get_result_cid(result, "black") > 0 and other in result:
             res = self.reverse[result[other]]
-        else:
-            return Decimal("0.0")
+        elif res is None:
+            return True
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
         if res == "W":
             return False
@@ -378,7 +393,7 @@ class chessjson:
             if rnd not in allgames:
                 allgames[rnd] = {}
             arnd = allgames[rnd]
-            for col in [game["white"], game["black"]]:
+            for col in [self.get_result_cid(game, "white"), self.get_result_cid(game, "black")]:
                 if col in cteam:
                     nteam = cteam[col]
                     if nteam not in arnd:
@@ -415,8 +430,7 @@ class chessjson:
     def update_chessjson_format(self, tournament, isteam):
         pass
 
-    def get_topcolor(self, tournamentno, defcolor):
-        tournament = self.get_tournament(tournamentno)
+    def get_topcolor(self, tournament, defcolor):
         if "topColor" in tournament:
             # print("Topcolor if", tournament["topColor"].lower())
             return tournament["topColor"].lower()
@@ -424,9 +438,26 @@ class chessjson:
         glist = tournament["gameList"]
         clist = mlist if "matchList" in tournament and len(mlist) > 0 else glist
         if len(clist) > 0:
-            clist = sorted(clist, key=lambda p: (p["round"], (p["black"] == 0), min(p["white"], p["black"])))
-            topcolor = "w" if clist[0]["white"] < clist[0]["black"] else "b"
+            clist = sorted(clist, key=lambda p: (p["round"], 
+                self.get_result_cid(p, "black") == 0, 
+                min(self.get_result_cid(p, "white"), self.get_result_cid(p, "black"))))
+            topcolor = "w" if self.get_result_cid(clist[0], "white") < self.get_result_cid(clist[0], "black") else "b"
             return topcolor.lower()
-        if defcolor in ["w", "b", "W", "B"]:
+        if defcolor is not None and defcolor in ["w", "b", "W", "B"]:
             return defcolor.lower()
-        return "w" if random.random() < 0.5 else "b"
+        return defcolor
+
+
+    def get_result_value(self, result, color, key, default=None):
+        if color != "white" and color != "black":
+            raise ValueError("Color must be 'white' or 'black'")
+        if color in result and result[color] is not None:
+            return result[color].get(key, default)
+        return default
+
+    def get_result_cid(self, result, color):
+        return self.get_result_value(result, color, "cid", 0)
+
+    def get_result_res(self, result, color, default="Z"):
+        return self.get_result_value(result, color, "result", default)
+    

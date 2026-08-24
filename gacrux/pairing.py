@@ -131,15 +131,6 @@ class pairing:
         if "topColor" in tournament:
             # print("Topcolor if", tournament["topColor"].lower())
             return tournament["topColor"].lower()
-        mlist = tournament["matchList"]
-        glist = tournament["gameList"]
-        clist = mlist if "matchList" in tournament and len(mlist) > 0 else glist
-        if len(clist) > 0:
-            clist = sorted(clist, key=lambda p: (p["round"], (p["black"] == 0), min(p["white"], p["black"])))
-            topcolor = "w" if clist[0]["white"] < clist[0]["black"] else "b"
-            return topcolor.lower()
-        if defcolor in ["w", "b", "W", "B"]:
-            return defcolor.lower()
         return "w" if random.random() < 0.5 else "b"
 
     """

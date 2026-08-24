@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Created on Tue Oct 31 13:57:55 2023
 @author: Otto Milvang, sjakk@milvang.no
@@ -9,14 +9,15 @@ import decimal
 import json
 import sys
 import decimal
-from enum import Enum, EnumType
+from enum import Enum #  EnumType is not defined in ver 3.8.10
 from gacrux import qdefs
 
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, o):
-        if isinstance(o, EnumType): 
-            return [str(q.name) for q in o]        
+        #if isinstance(o, EnumType): 
+        #    return [str(q.name) for q in o]
+               
         if isinstance(o, decimal.Decimal):
             return str(o)
         return super(DecimalEncoder, self).default(o)
@@ -335,7 +336,7 @@ def query_yes_no(question, default="yes"):
 
 
 
-def json_input(file, json, obj):
+def xxjson_input(file, json, obj):
     if isinstance(file, str):
         f = sys.stdin if file == "-" else open(file, "r")
     else:
