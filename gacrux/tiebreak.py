@@ -228,13 +228,25 @@ class tiebreak:
             self.primaryscore = "points"
 
     def get_score(self, slist, result, color):
-        cres = color[0]
-        if cres + "Result" in result:
-            res = result[cres + "Result"]
-        elif result["black"] != None and result["black"]["cid"] > 0:
-            ores = {"w": "b", "b": "w"}[cres]
-            res = self.chj.reverse[result[ores + "Result"]]
-        else:
+        res = self.get_scorex(slist, result, color)
+        #print("getscore:", slist)
+        #print(result)
+        #print(color)
+        #print(res)
+        #print()
+        return res
+
+    def get_scorex(self, slist, result, color):    
+        if color not in result:
+            return Decimal("0.0")
+        if "score" in result[color]:
+            return result[color]["score"]
+
+        res = self.chj.get_result_res(result, color, default=None)
+        if res is None and self.chj.get_result_cid(result, color) > 0:
+            ores = {"white": "black", "black": "white"}[color]
+            res = self.chj.reverse[self.chj.get_result_res(result, ores, default=None)]
+        elif res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
         while res in slist:
@@ -247,14 +259,13 @@ class tiebreak:
     def is_vur(self, result, color):  #
         if result["played"]:
             return False
-        cres = color[0]
-        if cres + "Result" in result:
-            res = result[cres + "Result"]
-        elif result["black"] != None and result["black"]["cid"] > 0:
-            ores = {"w": "b", "b": "w"}[cres]
-            res = self.chj.reverse[result[ores + "Result"]]
-        else:
-            return Decimal("0.0")
+        res = self.chj.get_result_res(result, color, default=None)
+        if res is None and self.chj.get_result_cid(result, color) > 0:
+            ores = {"white": "black", "black": "white"}[color]
+            res = self.chj.reverse[self.chj.get_result_res(result, ores, default=None)]
+        elif res is None:
+            # print("get_score" ,  slist, result, color, "Null")
+            return True
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
         if res == "W":
             return False
@@ -400,7 +411,7 @@ class tiebreak:
         expscore = None
         black = self.chj.get_result_cid(rst, "black")
         if black > 0:
-            if "bResult" not in rst:
+            if "result" not in rst["black"]:
                 err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(rst.get("white", 0)) + ", black=" +  str(rst.get("black", 0))
                 raise GacruxInputError(err)
             bPoints = self.get_score(scoresystem, rst, "black")
@@ -417,7 +428,7 @@ class tiebreak:
             cmps[white]["rsts"][rnd] = {
                 ptype: wPoints,
                 "rpoints": wrPoints,
-                "res": rst["wResult"],
+                "res": self.chj.get_result_res(rst, "white"),
                 "color": "w",
                 "played": rst["played"],
                 "vur": wVur,
@@ -433,7 +444,7 @@ class tiebreak:
             cmps[black]["rsts"][rnd] = {
                 ptype: bPoints,
                 "rpoints": brPoints,
-                "res": rst["bResult"],
+                "res": self.chj.get_result_res(rst, "black"),
                 "color": "b",
                 "played": rst["played"],
                 "vur": bVur,
@@ -452,14 +463,14 @@ class tiebreak:
         rnd = rst["round"]
         for col in ["white", "black"]:
             if col in rst and (competitor := chj.get_result_cid(rst, col)) > 0:
-                gpoints = 0
+                gpoints = Decimal("0")
                 games = []
                 tmatch = cmps[competitor]["rsts"][rnd]
  
                 if len(tmatch["games"]) > 0 and chj.get_result_cid(rst, "black") > 0:
                     for game in [self.cgames[game] for game in tmatch["games"]]:
-                        white = chj.get_result_cid(rst, "white")
-                        black = chj.get_result_cid(rst, "black")
+                        white = chj.get_result_cid(game, "white")
+                        black = chj.get_result_cid(game, "black")
                         board = game["board"] if "board" in game else 0
                         maxboard = max(maxboard, board)
                         wVur = self.is_vur(game, "white")
@@ -545,8 +556,8 @@ class tiebreak:
             tbscore[prefix + "num"] = {"val": 0}  # number of games played (for pairing)
             tbscore[prefix + "lmp"] = 0  # last round met for pairing
             tbscore[prefix + "lna"] = 0  # last round without absent (vur)
-            tbscore[prefix + "pfp"] = 0  # points from played games
-            tbscore[prefix + "lg"] = 0  # Result of last game
+            tbscore[prefix + "pfp"] = Decimal("0")  # points from played games
+            tbscore[prefix + "lg"] = Decimal("0")  # Result of last game
             tbscore[prefix + "bp"] = {}  # Boardpoints
             # cmpr = sorted(cmp, key=lambda p: (p['rank'], p['tbval'][prefix + name]['val'], p['cid']))
             pcol = " "  # Previous color
@@ -789,8 +800,8 @@ class tiebreak:
         for player in range(0, len(subro)):
             de = subro[player]["tbval"]
             de["denum"] = 0  # number of opponens
-            de["deval"] = 0  # sum score against of opponens
-            de["demax"] = 0  # sum score against of opponens, unplayed = win
+            de["deval"] = Decimal("0")  # sum score against of opponens
+            de["demax"] = Decimal("0")  # sum score against of opponens, unplayed = win
             de["delist"] = {}  # list of results numgames, score, maxscore
             for rnd, rst in subro[player]["rsts"].items():
                 if rnd <= rounds:
@@ -1111,7 +1122,7 @@ class tiebreak:
                             else:             # 16.4.2
                                 score = min(score, opointsfordraw * rounds)
                     else:
-                        score = 0
+                        score = Decimal("0")
                     if tb["modifiers"].get("urd", False) and not self.rr:
                         sres = spointsfordraw
                     else:
@@ -1237,7 +1248,7 @@ class tiebreak:
                     ratingopp = newopp[:-1]
                 trounds -= 1
                 high -= 1
-            rscore = 0
+            rscore = Decimal("0")
             ratings = []
             for p in ratingopp:
                 rscore += p["rpoints"]
@@ -1378,7 +1389,7 @@ class tiebreak:
             acc = self.get_accelerated(prefix, 1, startno)
             val = acc # scoretype[acc]
             tbscore[prefix + "acc"] = {"val": acc, 0: acc}
-            spoints = 0  # Points so far
+            spoints = Decimal("0")  # Points so far
             for rnd in range(1, rounds + 1):
                 p = cmp["rsts"][rnd][points] if rnd in cmp["rsts"] and points in cmp["rsts"][rnd] else self.zero(scorename)
                 spoints += p

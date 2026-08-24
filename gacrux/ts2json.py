@@ -815,13 +815,19 @@ class ts2json(chessjson.chessjson):
 
         score = self.parse_result(res, opponent, isteam)
         if myclr == "B":
-            result["white"] = {"cid": max(0, opponent)}
-            result["black"] = {"cid": playerno}
-            result["bResult"] = score
+            wr = {"cid": max(0, opponent)}
+            br = {"cid": playerno, "result": score}
         else:
-            result["white"] = {"cid": playerno}
-            result["black"] = {"cid": max(0, opponent)}
-            result["wResult"] = score
+            wr = {"cid": playerno, "result": score}
+            br = {"cid": max(0, opponent)}
+        if "white" in result: 
+            result["white"].update(wr)
+        else:
+            result["white"] = wr
+        if "black" in result:
+            result["black"].update(br)
+        else:
+            result["black"] = br
         result["played"] = ((res == "1" or res == "=" or res == "0" or res == "A") and opponent > 0) or (opponent == -1)
         if score != "U":
             self.append_result(cresults, result)

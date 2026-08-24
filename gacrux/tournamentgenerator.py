@@ -251,11 +251,10 @@ class tournamentgenerator(commonmain):
                 game = {
                     "id": 0,
                     "round": rnd,
-                    "white": competitor["cid"],
-                    "black": 0,
+                    "white": {"cid": competitor["cid"], "result": tr[has_bye]},
+                    "black": None,
                     "played": False,
                     "rated": False,
-                    "wResult": tr[has_bye],
                     }
                 ch.append_result(tournament["gameList"], game)
                 if has_bye == "H":
@@ -297,12 +296,10 @@ class tournamentgenerator(commonmain):
                 game = {
                     "id": 0,
                     "round": rnd,
-                    "white": pair["w"],
-                    "black": pair["b"] ,
+                    "white": {"cid": pair["w"], "result": wResult},
+                    "black": {"cid": pair["b"], "result": bResult},
                     "played": played,
                     "rated": played,
-                    "wResult": wResult,
-                    "bResult": bResult,
                     }
                 ch.append_result(tournament["gameList"], game)
  
@@ -310,8 +307,8 @@ class tournamentgenerator(commonmain):
         for competitor in tm["competitors"]:
             competitor["cid"] = trans[competitor["cid"]]
         for game in tm["gameList"]:
-            game["white"] = trans[game["white"]]
-            game["black"] = trans[game["black"]]
+            game["white"]["cid"] = trans[game["white"]["cid"]]
+            game["black"]["cid"] = trans[game["black"]["cid"]]
         tm["competitors"] = sorted(tm["competitors"], key=lambda c: c["cid"])
         for cpairing in pairing:
             for pair in cpairing["pairs"]:

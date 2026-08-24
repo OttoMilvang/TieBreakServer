@@ -65,8 +65,8 @@ def test_parsing_a_one_sided_game_record_does_not_crash():
              game for game in tournament["gameList"]}
 
     round_two = games[(2, 1, 2)]
-    assert round_two["bResult"] == "W"
-    assert "wResult" not in round_two
+    assert round_two["black"]["result"] == "W"
+    assert "result" not in round_two["white"]
 
 
 def test_one_sided_game_still_reports_a_score_for_the_recorded_side():
