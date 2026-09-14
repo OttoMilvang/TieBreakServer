@@ -1,3 +1,6 @@
+2026-09-14
+Adjust tournamentgenerator to new structures for rating and score in accelleration
+
 2026-09-08
 Added support for 299 Abnormal Assignenet points.
 To implement this there was need for a change in the game/match record

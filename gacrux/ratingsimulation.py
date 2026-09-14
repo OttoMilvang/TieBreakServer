@@ -109,7 +109,7 @@ class ratingsimulation:
                 "orgrank": p+1,
                 "rank": p+1,
                 "realRating": player["strength"],
-                "rating": player[rating_key],
+                "rating": { "rating": player[rating_key] },
                 "random" : player["playerno"],
                 }
             )
@@ -242,7 +242,7 @@ class ratingsimulation:
         file = filename.replace("%d", str(fileno).zfill(2))
         if len(directory := os.path.dirname(file)) > 0:
             os.makedirs(directory, exist_ok=True)    
-        json_output(file, player_list)
+        helpers.json_output(file, player_list)
 
     def plot_players(self, player_list, filename, fileno, newalg):
         ratings1 = [player["rating"] for player in player_list if player["rating"] > 0]

@@ -21,6 +21,7 @@ import sys
 import os
 import datetime
 import codecs
+from decimal import Decimal
 from gacrux.pairingberger import pairing_berger
 from gacrux.pairingdutch import pairing_dutch
 from gacrux import version
@@ -199,7 +200,7 @@ class tournamentgenerator(commonmain):
                 "orgrank": player,
                 "rank": player,
                 "realRating": rating,
-                "rating": self.statistics.add_sigma(rating),
+                "rating": {"list": "FIDE", "rating": self.statistics.add_sigma(rating)},
                 "random" : self.statistics.get_random(),
                 }
             )
@@ -213,7 +214,7 @@ class tournamentgenerator(commonmain):
         if is_rr:
             tournament["competitors"] = self.statistics.do_shuffle(tournament["competitors"])
         else:
-            tournament["competitors"] = sorted(tournament["competitors"],  key=lambda comp: (-comp["rating"], comp["random"]))
+            tournament["competitors"] = sorted(tournament["competitors"],  key=lambda comp: (-comp["rating"]["rating"], comp["random"]))
 
         for i, competitor in enumerate(tournament["competitors"]):
             competitor["cid"] = i + 1
@@ -264,11 +265,12 @@ class tournamentgenerator(commonmain):
             q = ((len(present)+3) // 4) * 2 # From handbook
             rounds = max(self.params["number_of_rounds"], self.params["current_round"])
             accrounds = [0, (rounds+3)//4, (rounds+1)//2 ]
-            gscrounds = ["Z", "W", "D" ]
+            mscrounds = [Decimal("0.0"), Decimal("2.0"), Decimal("1.0") ]
+            gscrounds = [Decimal("0.0"), Decimal("1.0"), Decimal("0.5") ]
             for acc in [1,2]: 
                 value = {
-                "matchResult": gscrounds[acc],
-                "gameResult": gscrounds[acc],
+                "matchPoints": mscrounds[acc],
+                "gamePoints": gscrounds[acc],
                 "firstRound": accrounds[acc-1] + 1,
                 "lastRound": accrounds[acc],
                 "firstCompetitor": 1,
