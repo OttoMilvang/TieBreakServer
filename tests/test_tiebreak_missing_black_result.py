@@ -56,9 +56,9 @@ def build_tournament():
 def test_computing_tiebreaks_reports_the_missing_result_cleanly():
     tournament = build_tournament()
     # trf2json itself parses this fine -- get_score("black") is never called because
-    # "bResult" not in result, so nothing crashes until tie-breaks are computed.
+    # "black" "result" not in result, so nothing crashes until tie-breaks are computed.
     round_two = next(g for g in tournament["gameList"] if g["round"] == 2)
-    assert "bResult" not in round_two
+    assert "black" in round_two and "result" not in round_two["black"]
 
     params = {"tiebreak": ["PTS"], "check": False, "unrated": None}
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:

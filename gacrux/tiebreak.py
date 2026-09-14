@@ -81,9 +81,9 @@ class tiebreak:
     def __init__(self, tournament, currentround, params):
         self.tiebreaklist = {
             "NUL":   {"name": "NUL",   "func": self.get_nul,                             "rev": False, "flag": ""   ,"desc": "Null"},
-            "PTS":   {"name": "POINTS","func": self.get_builtin,                         "rev": True , "flag": ""   ,"desc": "Points (default)"},
-            "MPTS":  {"name": "POINTS","func": self.get_builtin,                         "rev": True , "flag": ""   ,"desc": "Match Points"},
-            "GPTS":  {"name": "POINTS","func": self.get_builtin,                         "rev": True , "flag": ""   ,"desc": "Game Points"},
+            "PTS":   {"name": "PTS",   "func": self.compute_pts,                         "rev": True , "flag": ""   ,"desc": "Points (default)"},
+            "MPTS":  {"name": "PTS",   "func": self.compute_pts,                         "rev": True , "flag": ""   ,"desc": "Match Points"},
+            "GPTS":  {"name": "PTS",   "func": self.compute_pts,                         "rev": True , "flag": ""   ,"desc": "Game Points"},
             "SNO":   {"name": "SNO",   "func": self.get_builtin,                         "rev": False, "flag": ""   ,"desc": "Start number"},
             "TPN":   {"name": "SNO",   "func": self.get_builtin,                         "rev": False, "flag": ""   ,"desc": "Start number"},
             "RANK":  {"name": "RANK",  "func": self.get_builtin,                         "rev": False, "flag": ""   ,"desc": "Original rank in tournament file"},
@@ -227,7 +227,7 @@ class tiebreak:
         else:
             self.primaryscore = "points"
 
-    def get_score(self, slist, result, color):
+    def get_scorex(self, slist, result, color):
         res = self.get_scorex(slist, result, color)
         #print("getscore:", slist)
         #print(result)
@@ -236,7 +236,7 @@ class tiebreak:
         #print()
         return res
 
-    def get_scorex(self, slist, result, color):    
+    def get_score(self, slist, result, color):    
         if color not in result:
             return Decimal("0.0")
         if "score" in result[color]:
@@ -362,6 +362,7 @@ class tiebreak:
                 "tiebreakScore": [],
                 "tiebreakDetails": [],
                 "rnd": rnd,
+                "adjust": competitor["adjust"] if "adjust" in competitor else [],
                 "tbval": {},
             }
             # Be sure that missing results are replaced by zero
@@ -405,6 +406,8 @@ class tiebreak:
         white = self.chj.get_result_cid(rst, "white")
         wPoints = self.get_score(scoresystem, rst, "white")
         wrPoints = self.get_score(self.rating, rst, "white")
+        if ptype in rst:
+            wPoints = rst[ptype]
         wVur = self.is_vur(rst, "white")
         wrating = None
         brating = None
@@ -416,6 +419,8 @@ class tiebreak:
                 raise GacruxInputError(err)
             bPoints = self.get_score(scoresystem, rst, "black")
             brPoints = self.get_score(self.rating, rst, "black")
+            if ptype in rst:
+                bPoints = rst[ptype]
             bVur = self.is_vur(rst, "black")
             if rst["played"]:
                 if cmps.get(white, {}).get("rating", None) is not None:
@@ -508,6 +513,8 @@ class tiebreak:
                                 }
                             )
                     tmatch["gpoints"] = gpoints
+                    if rst[col] is not None and "gpoints" in rst[col]:
+                        tmatch["gpoints"] = rst[col]["gpoints"]
                     tmatch["games"] = games
                 else:
                     if tmatch["opponent"] == 0 and tmatch["played"]:
@@ -550,7 +557,7 @@ class tiebreak:
             tbscore[prefix + "rep"] = {"val": 0}  # number of rounds elected to play (same as GE)
             tbscore[prefix + "rip"] = {"val": 0}  # number of rounds paired (for TPN assignment)
             tbscore[prefix + "vur"] = {"val": 0}  # number of vurs (check algorithm)
-            tbscore[prefix + "cop"] = {"val": "  "}  # color preference (for pairing)
+            tbscore[prefix + "cop"] = {"val": "nc"}  # color preference (for pairing)
             tbscore[prefix + "cod"] = {"val": 0}  # color difference (for pairing)
             tbscore[prefix + "csq"] = {"val": ""}  # color sequence (for pairing)
             tbscore[prefix + "num"] = {"val": 0}  # number of games played (for pairing)
@@ -684,6 +691,13 @@ class tiebreak:
                                 tbscore[prefix + "lmp"] = rnd
                         elif "points" in comp and comp["points"] == scoretype["W"]:
                             self.addtbval(tbscore[prefix + "num"], rnd, 0)
+            adjtype = prefix[:-1]
+            adj = sum(adjust[adjtype] for adjust in cmp["adjust"] if adjust["round"] <= norounds and adjust["pairing"])
+            top = sum(adjust[adjtype] for adjust in cmp["adjust"] if not adjust["pairing"])
+            tbscore[prefix + "points"]["adj"] = adj
+            tbscore[prefix + "points"]["top"] = top
+            tbscore[prefix + "points"]["val"] += adj
+
 
 
 
@@ -1090,6 +1104,7 @@ class tiebreak:
                     tbval = rst[opoints] if hasopponent else points_no_opp
                     tbscore[oprefix + "abh"][rnd] = tbval
                     tbscore[oprefix + "abh"]["val"] += tbval
+            # tbscore[oprefix + "abh"]["val"] += tbscore[oprefix + "points"]["adj"]
             fbscore = tbscore[oprefix + "points"]["val"]
             if adjustfore:
                 adjust = opointsfordraw - tbscore[oprefix + "points"][rnd]
@@ -1379,6 +1394,18 @@ class tiebreak:
                 #breakpoint()
         return "std"
 
+    def compute_pts(self, tb, cmps, rounds):
+        (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
+        if prefix + "pts" in cmps[1]["tbval"]:
+            return "pts"
+
+        for startno, cmp in cmps.items():
+            tbscore = cmp["tbval"]
+            tbscore[prefix + "pts"] = tbscore[prefix + "points"].copy()
+            tbscore[prefix + "pts"]["val"] += tbscore[prefix + "pts"]["top"]
+        return "pts"
+
+
     def compute_acc(self, tb, cmps, rounds):
         (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         if prefix + "acc" in cmps[1]["tbval"]:
@@ -1396,7 +1423,7 @@ class tiebreak:
                 acc = self.get_accelerated(prefix, rnd + 1, startno)  # Round 0 shall have the value of 1 and so on
                 val = spoints + acc
                 tbscore[prefix + "acc"][rnd] = val
-            tbscore[prefix + "acc"]["val"] = val
+            tbscore[prefix + "acc"]["val"] = val + tbscore[prefix + "points"]["adj"]
         return "acc"
 
     def compute_flt(self, tb, cmps, rounds, rules):

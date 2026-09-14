@@ -212,7 +212,11 @@ class trf2json(chessjson.chessjson):
         self.all_lines = self.read_all_lines(tournament, alines, verbose)
         # json_output("-", self.scores.score)
 
-        self.scores.update_gamescore(self.chessjson, tournament, self.gamescores, "162" in self.all_lines or "222" in self.all_lines)
+        if "299" not in self.all_lines:
+            # If no 299 records, then no abnormal assignment points, so we can check scores for all players.
+            self.scores.update_gamescore(self.chessjson, tournament, self.gamescores, "162" in self.all_lines or "222" in self.all_lines)
+        else:
+            self.scores.score["game"] = self.scores.fill_default_scoresystem("game")
         if tournament["teamTournament"]:
             self.scores.update_teamscore(tournament, self.teamscores, "310" in self.all_lines)
             if len(self.tcompetitors) == 0:
@@ -230,8 +234,10 @@ class trf2json(chessjson.chessjson):
             self.update_board_number(tournament, "game", False)
         self.update_individualbye_list(tournament)
         self.update_forfeited_list(tournament)
+        self.update_abnormal_list(tournament)
         if (topcolor := self.get_topcolor(tournament, None)) is not None:
             tournament["topColor"] = topcolor
+
         return
 
     # Read all lines into a structure
@@ -543,7 +549,10 @@ class trf2json(chessjson.chessjson):
             for result in roundresults:
                 wScore = self.get_score(slist, result, "white")
                 bScore = Decimal("0")
-                points[self.get_result_cid(result, "white")] += wScore
+                try:
+                    points[self.get_result_cid(result, "white")] += wScore
+                except TypeError:
+                    breakpoint()
                 if self.get_result_res(result, "black", None) is not None:
                     bScore = self.get_score(slist, result, "black")
                     points[self.get_result_cid(result, "black")] += bScore
@@ -644,6 +653,79 @@ class trf2json(chessjson.chessjson):
                     matches = filter(lambda match: match["id"] != black["id"], tournament["matchList"])
                     tournament["matchList"] = list(matches)
 
+    # 299 Abnormal has 4 different meanings
+    #
+    # 299 +   2.0   2.5     
+    # The default value for forfeited win. This is stored in the score record
+    #
+    # 299 W   2.0   2.5    2   17
+    # In round 2 the result for team 17 is set to Win with Team score 2.0, game score 2.5
+    # This is set in the game record under wite/black, for example:
+    # white: {"cid": 17, "result": "W", "mpoints": Decimal("2.0"), "gpoints": Decimal("2.5") } 
+    #
+    # 299    -1.0  -2.0    4   31
+    # In round 4 the result for team 31 get a penalty on 1 MP and 2 GP
+    # This is set in the adjust array under competitor, for example:
+    # adjust: [{"cid": 31, "round": 4, "mpoints": Decimal("-1.0"), "gpoints": Decimal("-2.0"), "pairing": True } 
+    # This will be used in intermediate tiebreaks and standings from round 4 up to the final standing after the last round,
+    # and also for pairing from round 5 up to the last round, pairing => pairing == True
+    #
+    # 299     0.0  -4.0  999   14
+    # The result for team 24 get a penalty on 0 MP and 4 GP
+    # This will be used in the standing, but not used for tiebreaks.
+    # This is set in the adjust array under competitor, for example:
+    # adjust: [{"cid": 24, "round": 0, "mpoints": Decimal("0.0"), "gpoints": Decimal("-4.0"), "pairing": False } 
+    # pairing => Pairing == False, round does not care. 
+
+    def update_abnormal_list(self, tournament):
+        if tournament["teamTournament"]:
+            plist = self.tcompetitors
+            mpoints = "mpoints"
+            gpoints = "gpoints"
+        else:
+            plist = self.pcompetitors
+            mpoints = "points"
+            gpoints = "points"
+        for att in self.aatlist:
+            res = att["att"].upper()
+            rnd = att["round"]
+            mp = att["matchPoints"]
+            gp = att["gamePoints"]
+            if res != " " and rnd == 0 and len(att["teams"]) == 0:
+                # 299 +   2.0   2.5     
+                mkey = {'+': "F", "-": "Z"}.get(res, res)
+                gkey = {'+': "FG", "-": "ZG"}.get(res, res + "G")
+                if tournament["teamTournament"]:
+                    tournament["scoreSystem"]["match"][mkey] = mp
+                    tournament["scoreSystem"]["game"][gkey] = gp
+                else:
+                    tournament["scoreSystem"]["game"][mkey] = gp
+            elif res != " " and rnd > 0 and len(att["teams"]) > 0:
+                # 299 W   2.0   2.5    2   17
+                for team in att["teams"]:
+                    collection = tournament["matchList"] if tournament["teamTournament"] else tournament["gameList"]
+                    gmlist = [comp["white"] for comp in collection if comp["round"] == rnd and self.get_result_cid(comp, "white") == team] \
+                           + [comp["black"] for comp in collection if comp["round"] == rnd and self.get_result_cid(comp, "black") == team] 
+                    if len(gmlist) != 1:
+                        self.put_status(419, f"Error in 299 Abnormal, Round = {rnd}, player/team {team}")
+                        return
+                    gm = gmlist[0]
+                    gm[mpoints] = mp
+                    gm[gpoints] = gp
+                    gm["result"] = {"-": "Z", "+": "W"}.get(res, res)                                        
+            elif res == " " and len(att["teams"]) > 0:
+                # 299    -1.0  -2.0    4   31
+                # 299     0.0  -4.0  999   14
+                pairing = rnd < 999
+                for team in att["teams"]:
+                    competitor = self.check_competitor(tournament, "299", team)
+                    if "adjust" not in plist[competitor]:
+                        plist[competitor]["adjust"] = []
+                    plist[competitor]["adjust"].append({"cid": competitor, "round": rnd % 999, "mpoints": mp, "gpoints": gp, "pairing": pairing})
+            else:
+                self.put_status(419, f"Error in 299 Abnormal, Att = {att['att']}, round = {rnd}, player/team {att['teams']}")
+                return
+
 
     # ==============================
     #
@@ -726,7 +808,7 @@ class trf2json(chessjson.chessjson):
             "rank": helpers.parse_int(line[85:89]),
             "rating": profile["rating"][0] if rating > 0 else None,
         }
-        score = {"sum": gamePoints, "W": 0, "D": 0, "L": 0, "P": 0, "A": 0, "U": 0, "Z": 0}
+        score = {"sum": gamePoints, "cid": startno, "W": 0, "D": 0, "L": 0, "P": 0, "A": 0, "U": 0, "Z": 0}
         self.gamescores.append(score)
         # section['competitors'].append(competitor)
         self.pcompetitors[competitor["cid"]] = competitor

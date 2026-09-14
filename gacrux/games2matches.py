@@ -427,7 +427,8 @@ class games2matches():
 
             elif "white" not in tmatch:
                 w0 = self.parent.get_result_cid(cgames[tmatch["games"][0]], "white")
-                tmatch.update({"white": {"cid":  cteam[w0]}, "black": None, "played": False})
+                wr = self.parent.get_result_res(cgames[tmatch["games"][0]], "white")
+                tmatch.update({"white": {"cid":  cteam[w0]}, "black": None, "played": wr == "P"})
                 # print("R", tmatch)
     # Decide score
         
@@ -479,7 +480,8 @@ class games2matches():
                     tmatch["white"].update({"result": loss})
                     tmatch["black"].update({"result": loss})
             elif self.parent.get_result_res(tmatch, "white", default=None) is None:
-                tmatch["white"].update({"result": self.parent.get_result_res(tmatch, "white")})
+                wr = self.parent.get_result_res(cgames[tmatch["games"][0]], "white")
+                tmatch["white"].update({"result": wr})
         # with open('c:/temp/matches.json', 'w') as f:
         #    json.dump(matches, f, indent=2)
 

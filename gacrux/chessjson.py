@@ -125,14 +125,6 @@ class chessjson:
                 return tournament
         return None
 
-    def get_scoresystemxx(self, scoreLists, name):
-        for scoreList in scoreLists:
-            if scoreList["listName"] == name:
-                return scoreList["scoreSystem"]
-        newlist = {"listName": name, "scoreSystem": {}}
-        scoreLists.append(newlist)
-        return newlist["scoreSystem"]
-
     def parse_score_system(self, name, txt):
         scoresystem = self.get_scoresystem(self.chessjson["event"]["scoreLists"], name)
         try:

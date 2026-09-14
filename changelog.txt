@@ -1,3 +1,39 @@
+2026-09-08
+Added support for 299 Abnormal Assignenet points.
+To implement this there was need for a change in the game/match record
+In version 1.10.59 and earlier, the player and result were represented by:
+"white": 17,
+"wResult": "W"
+With the need for score values. In a match record this is written:
+"white": {
+  "cid”: 17,
+  "result": "W",
+  "mpoints": Decimal("2.0"),
+  "gpoints": Decimal("2.5")
+}
+For games "points" is used instead of "gpoints"/"mpoints"
+Similar for black. For Byes black is None, or also accepted "cid" == 0.
+This will be used for standings, pairing and tiebreaks.
+
+For penalties eack competitor may have an "adjust" array
+"adjust": [
+  {
+    "cid": 31,
+    "round": 4,
+    "mpoints": Decimal("-1.0"),
+    "gpoints": Decimal("-2.0"),
+    "pairing": True
+  }
+]
+Adjustments will be used for standings, not for tiebreaks.
+If pairing == True it will also be used for pairing.
+
+Internaly 'no color preference' is represented with "nc" insted of "  "
+Added support for PAB score != score for Win, Draw or Loss
+
+Fix player number in error message if score system does not match total score
+
+
 
 2026-08-12
 Change rating structure in order to meet new requirements.

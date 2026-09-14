@@ -148,7 +148,7 @@ class scoresystem:
                             res["U"] = unknown
                             res["Z"] = Decimal("0.0")
                             for key, value in result.items():
-                                if key != "pab" and key != "pres":
+                                if key not in ["cid", "pab", "pres"]:
                                     score[key] += value
                             pok = False
                             if result["P"] > 0:
@@ -258,9 +258,9 @@ class scoresystem:
                             checksum += num * val
                     # print(eq)
                     if eq["sum"] != checksum:
-                        msg = "Incorrect score for player " + str(lineno+1)
+                        msg = "Incorrect score for player " + str(eq["cid"])
                         chessjson["status"]["error"].append(msg)
-                        badplayers.append(str(lineno+1))
+                        badplayers.append(str(eq["cid"]))
                         eqok = False
                 # print("-EQOK", eqok, version, "162" in self.all_lines)
         if not eqok:

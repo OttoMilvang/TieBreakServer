@@ -792,7 +792,7 @@ class ts2json(chessjson.chessjson):
         result = {"id": 0, "isTeam": isteam}
         myclr = "W"
         opponent = 0
-        res = "?"
+        gres = "?"
         for key, value in game.attrib.items():
             if key == "Rd":
                 result["round"] = helpers.parse_int(value)
@@ -801,7 +801,7 @@ class ts2json(chessjson.chessjson):
             elif key == "Opnt":
                 opponent = helpers.parse_int(value)
             elif key == "Res":
-                res = value
+                gres = value
             elif key == "Table":
                 result["board"] = helpers.parse_int(value)
             elif key == "PublishSerial":
@@ -813,12 +813,12 @@ class ts2json(chessjson.chessjson):
             else:
                 self.print_warning("parse_ts_game attrib: " + key + " not matched")
 
-        score = self.parse_result(res, opponent, isteam)
+        res = self.parse_result(gres, opponent, isteam)
         if myclr == "B":
             wr = {"cid": max(0, opponent)}
-            br = {"cid": playerno, "result": score}
+            br = {"cid": playerno, "result": res}
         else:
-            wr = {"cid": playerno, "result": score}
+            wr = {"cid": playerno, "result": res}
             br = {"cid": max(0, opponent)}
         if "white" in result: 
             result["white"].update(wr)
@@ -828,8 +828,8 @@ class ts2json(chessjson.chessjson):
             result["black"].update(br)
         else:
             result["black"] = br
-        result["played"] = ((res == "1" or res == "=" or res == "0" or res == "A") and opponent > 0) or (opponent == -1)
-        if score != "U":
+        result["played"] = ((gres == "1" or gres == "=" or gres == "0" or gres == "A") and opponent > 0) or (opponent == -1)
+        if res != "U":
             self.append_result(cresults, result)
         return
 
