@@ -108,3 +108,48 @@ def test_known_failure_regeneration_skips_records_marked_skip(tmp_path, monkeypa
 
     assert [record["name"] for record in regen_known_failures.load_records()] == \
         ["ind_00000", "ind_00002"]
+
+def test_known_failures_has_no_unclassified_entries():
+    """The committed baseline never carries an UNCLASSIFIED reason.
+
+    UNCLASSIFIED means "the engine fails this record and nobody has said why
+    yet" -- a placeholder, not a verdict. Committing one lets a failure sit in
+    the tree indefinitely with nothing to show it was never triaged. This
+    reads the real, checked-in ``known_failures.json`` (not a fake) and
+    checks its reasons directly, so a regeneration that slipped one past
+    review is caught here rather than only by whoever next reads the diff.
+    """
+    known_failures = json.loads(
+        (CORPUS_DIR / "known_failures.json").read_text(encoding="utf-8")
+    )
+    assert regen_known_failures.UNCLASSIFIED not in known_failures
+
+
+def test_has_unclassified_without_permission_refuses_by_default():
+    """An UNCLASSIFIED group blocks a write unless explicitly allowed.
+
+    ``main`` used to write ``known_failures.json`` unconditionally and only
+    print a reminder when it left an UNCLASSIFIED group behind, so a
+    regeneration run without review committed an unreviewed failure exactly
+    as easily as a reviewed one. This pins the decision function ``main``
+    now consults before writing: with an UNCLASSIFIED group present it
+    refuses unless the caller passed permission, and it never refuses when
+    there is nothing unclassified to begin with.
+    """
+    has_unclassified = {"some other reason": ["ind_00001"],
+                        regen_known_failures.UNCLASSIFIED: ["ind_00002"]}
+    all_classified = {"some other reason": ["ind_00001"]}
+
+    assert regen_known_failures._has_unclassified_without_permission(
+        has_unclassified, allow_unclassified=False) is True
+    assert regen_known_failures._has_unclassified_without_permission(
+        has_unclassified, allow_unclassified=True) is False
+    assert regen_known_failures._has_unclassified_without_permission(
+        all_classified, allow_unclassified=False) is False
+    assert regen_known_failures._has_unclassified_without_permission(
+        all_classified, allow_unclassified=True) is False
+
+
+def test_allow_unclassified_flag_defaults_to_false():
+    assert regen_known_failures.parse_args([]).allow_unclassified is False
+    assert regen_known_failures.parse_args(["--allow-unclassified"]).allow_unclassified is True

@@ -17,10 +17,23 @@ The whole corpus is always used: the CI shard variables are stripped before the
 records are read, because a baseline regenerated from one shard silently drops
 every known failure outside it.  See ``load_records``.
 
+An UNCLASSIFIED entry is a placeholder, not a verdict -- it means a record fails
+today and nobody has said why yet.  Writing one to the checked-in file lets it
+sit there indefinitely with no human having looked at it, which is exactly the
+gap the "unclassified" reason exists to flag rather than hide.  So by default
+this refuses to write a baseline that would contain one: it exits non-zero and
+prints the offending record names instead of committing them silently.  Pass
+``--allow-unclassified`` to write anyway (the record still lands in the
+UNCLASSIFIED group, still printed as a reminder) when that is genuinely what is
+wanted -- for instance, capturing a fresh batch of failures before triaging them
+one by one.
+
 Usage (from the repo root, uses all cores):
 
     python tests/corpus/regen_known_failures.py
+    python tests/corpus/regen_known_failures.py --allow-unclassified
 """
+import argparse
 import json
 import os
 import sys
@@ -75,7 +88,29 @@ def _test_fails(record):
     return (record["name"], accepts != record["valid"])
 
 
-def main():
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--allow-unclassified", action="store_true",
+        help="write known_failures.json even though it would contain an "
+             "UNCLASSIFIED entry, instead of refusing. Without this, a "
+             "record that fails today with no reason recorded yet stops "
+             "the write so a human describes it first.")
+    return parser.parse_args(argv)
+
+
+def _has_unclassified_without_permission(grouped, allow_unclassified):
+    """True if *grouped* would commit an UNCLASSIFIED entry that nobody has
+    explicitly allowed. A record landing in this group is not a verdict --
+    it is a record whose failure nobody has looked at yet -- so writing it
+    to the checked-in baseline by default would let it sit there
+    indefinitely with nothing to say it was never triaged."""
+    return UNCLASSIFIED in grouped and not allow_unclassified
+
+
+def main(argv=None):
+    args = parse_args(argv)
+
     records = load_records()
     total = len(records)
     prior = _harness.load_known_failures()
@@ -103,6 +138,22 @@ def main():
     for name in sorted(failing):
         grouped.setdefault(prior.get(name, UNCLASSIFIED), []).append(name)
 
+    if _has_unclassified_without_permission(grouped, args.allow_unclassified):
+        print(
+            "\nrefusing to write %s: %d record(s) fail with no reason "
+            "recorded yet:" % (_harness.KNOWN_FAILURES, len(grouped[UNCLASSIFIED])),
+            file=sys.stderr,
+        )
+        for name in grouped[UNCLASSIFIED]:
+            print("  %s" % name, file=sys.stderr)
+        print(
+            "Investigate and describe each one under an existing or new "
+            "reason, or pass --allow-unclassified to write this baseline "
+            "with them left UNCLASSIFIED.",
+            file=sys.stderr,
+        )
+        return 1
+
     with open(_harness.KNOWN_FAILURES, "w") as handle:
         json.dump(grouped, handle, indent=2)
         handle.write("\n")
@@ -111,7 +162,8 @@ def main():
     if UNCLASSIFIED in grouped:
         print("  %d are UNCLASSIFIED -- give them a reason before committing"
               % len(grouped[UNCLASSIFIED]))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
