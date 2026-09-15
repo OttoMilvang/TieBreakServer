@@ -1715,13 +1715,55 @@ class trf2json(chessjson.chessjson):
         else:
             self.update_team_score(tournament)
 
+    def team_score_totals(self, tournament):
+        """The match- and game-point totals the results of a team tournament give.
+
+        Two totals per team, worked out from two different places. The match points are
+        the sum of what each of the team's matches was worth under the match score
+        system. The game points are the sum of the totals the team's players report in
+        columns 81-84 of their own 001 records.
+
+        A match in a round past the one the file has reached is left out, because it is
+        a pairing that has been announced and not played, unless it is a
+        pairing-allocated bye -- those points are the team's whether or not anybody
+        else has played the round.
+
+        This is the one place either total is computed. validate_team_scores() checks a
+        record 310 against it and update_team_score() publishes it for a record 013
+        file, so what a legacy file is published with is what a record 310 file would
+        have had to declare to agree with its own results.
+        """
+        matchpoints = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
+        for match in tournament["matchList"]:
+            if match["round"] > tournament["currentRound"] and self.get_result_res(match, "white") != "P":
+                continue
+            white = self.get_result_cid(match, "white")
+            black = self.get_result_cid(match, "black")
+
+            if white > 0:
+                matchpoints[white] += self.scores.get_score(
+                tournament, "match", self.get_result_res(match, "white")
+                )
+            if black > 0:
+                matchpoints[black] += self.scores.get_score(
+                tournament, "match", self.get_result_res(match, "black")
+                )
+
+        gamepoints = {
+            competitor["cid"]: sum(
+                (player["gamePoints"] for player in competitor["cplayers"]),
+                Decimal("0.0"),
+            )
+            for competitor in tournament["competitors"]
+        }
+        return matchpoints, gamepoints
+
     def validate_team_scores(self, tournament):
         """Check the match- and game-point totals declared by TRF26 record 310.
 
         Record 310 columns 55-60 and 62-67 carry a team's match points and its game
-        points -- its standing. The match points are the sum of what each of the team's
-        matches was worth; the game points are the sum of the totals the team's players
-        report in columns 81-84 of their own 001 records.
+        points -- its standing. team_score_totals() works out what the results give,
+        and this is the comparison.
 
         A disagreement is reported and not refused. A standing that differs from the
         results is the ordinary shape of a file carrying an arbiter's decision -- a team
@@ -1734,29 +1776,12 @@ class trf2json(chessjson.chessjson):
         The message names each team and both figures, because a reader and a file that
         disagree about a total is not something anybody can act on otherwise.
         """
-        calculated_match = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
-        for match in tournament["matchList"]:
-            if match["round"] > tournament["currentRound"] and self.get_result_res(match, "white") != "P":
-                continue
-            white = self.get_result_cid(match, "white")
-            black = self.get_result_cid(match, "black")
-
-            if white > 0:
-                calculated_match[white] += self.scores.get_score(
-                tournament, "match", self.get_result_res(match, "white")
-                )
-            if black > 0:
-                calculated_match[black] += self.scores.get_score(
-                tournament, "match", self.get_result_res(match, "black")
-                )
+        calculated_match, calculated_gamepoints = self.team_score_totals(tournament)
 
         problems = []
         for competitor in tournament["competitors"]:
             cid = competitor["cid"]
-            calculated_game = sum(
-                (player["gamePoints"] for player in competitor["cplayers"]),
-                Decimal("0.0"),
-            )
+            calculated_game = calculated_gamepoints[cid]
             if competitor["matchPoints"] != calculated_match[cid]:
                 problems.append(
                     "team " + str(cid) + " declares " + str(competitor["matchPoints"])
@@ -1797,8 +1822,34 @@ class trf2json(chessjson.chessjson):
             status["info"] = [message]
 
     def update_team_score(self, tournament):
+        """Give every team of a file that declares no standing the one its results give.
+
+        The older team record, 013, is a team name and a list of players and nothing
+        else: it has no score columns, so a team read from one keeps the zeros
+        parse_trf_team() starts it with, and nothing replaced them -- this function was
+        a loop over the competitors with "pass" in it. Every team of a legacy team file
+        was therefore published on 0.0 match points and 0.0 game points, a figure the
+        file never stated, and one a team that won every match shared with a team that
+        lost every match, with status 0 and no message either way.
+
+        Nothing inside the engine reads these fields -- the pairing and the tie-breaks
+        work the scores out for themselves from the match list and the game list -- so
+        this changes no pairing, no tie-break and no ranking. What was wrong is the
+        chessjson the reader hands out, and a program reading a team's standing from it
+        got a zero with nothing to say the number was missing rather than nil.
+
+        The totals come from team_score_totals(), which is what validate_team_scores()
+        checks a record 310 against, so the two team records report the same standing
+        for the same results.
+
+        This runs from prepare_team_section() after games2matches has built the match
+        list, which is what the match points are summed from.
+        """
+        matchpoints, gamepoints = self.team_score_totals(tournament)
         for competitor in tournament["competitors"]:
-            pass
+            cid = competitor["cid"]
+            competitor["matchPoints"] = matchpoints[cid]
+            competitor["gamePoints"] = gamepoints[cid]
 
     # Module test
 
