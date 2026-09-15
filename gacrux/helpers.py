@@ -58,7 +58,10 @@ def parse_date(date):
     if len(dateparts) == 3:
         if len(dateparts[0]) == 4:
             return date.replace(".", "-")
-        if len(dateparts) == 2:
+        # datetime, not dateparts: the time is the second half of the split on " ",
+        # and dateparts is already known to hold three fields here, so asking it for
+        # two could never be true and the time was dropped.
+        if len(datetime) == 2:
             return dateparts[2] + "-" + dateparts[1] + "-" + dateparts[0] + " " + datetime[1]
         return dateparts[2] + "-" + dateparts[1] + "-" + dateparts[0]
     dateparts = datetime[0].split("/")
