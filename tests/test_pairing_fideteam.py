@@ -1081,10 +1081,77 @@ def test_art_4_2_the_first_team_is_the_higher_primary_score():
     engine = tournament.engine(2)
     engine.compute_pairing(False)
     (four, two) = (engine.competitors[4], engine.competitors[2])
-    assert four["acc"] > two["acc"]
+    assert four["pts"] > two["pts"]
     assert four["tpn"] > two["tpn"]
     assert engine.first_team(four, two) is True
     assert engine.first_team(two, four) is False
+
+
+def test_art_4_2_1_the_first_team_is_the_standings_score_not_the_pairing_score():
+    """Art. 4.2.1 - "the first-team is the team with the higher primary score" - read
+    against C.04.7 art. 1.5, which defines the OTHER score an accelerated tournament
+    carries: "the pairing score of a participant (used to define scoregroups, sort them
+    internally, and sort boards per Article 3.6 of the General Handling Rules) is the sum
+    of their standings points and their assigned virtual points".
+
+    That sentence enumerates what the pairing score is for, and the colour allocation is
+    not on the list. Art. 4.2.1 asks for the primary score, which is the standings score:
+    the virtual points of an acceleration are not points the team scored.
+
+    The position makes the two disagree. Four teams; C.04.7 art. 1.4.2 gives teams 1 and 2
+    a virtual match win (2 MP) in rounds 1 to 3. Round 1 pairs 1-2 (pairing score 2 each)
+    and 3-4 (0 each); 1 v 2 is drawn and 3 beats 4. Going into round 2:
+
+        team   standings MP   virtual MP   pairing score
+          1         1              2             3
+          2         1              2             3
+          3         2              0             2
+          4         0              0             0
+
+    Teams 1 and 2 are the top scoregroup and have already met, so [C1] (art. 2.1.1) keeps
+    the bracket from pairing inside itself and art. 3.5 brings teams 3 and 4 up. Art.
+    3.6.2 then pairs 1-3 and 2-4 ("1 2 3 4" beats "1 2 4 3"). In the pair 1-3 the pairing
+    score names team 1 (3 > 2) and the standings score names team 3 (2 > 1): the two
+    disagree, which is the whole point of the position.
+
+    Art. 4.3 is then made to depend on that and nothing else. Both teams played round 1,
+    so 4.3.1 cannot fire. Neither has a type A preference after one match (colour
+    difference +1, and "the last two played matches" needs two), so 4.3.2, 4.3.3, 4.3.4
+    and 4.3.7 cannot fire. Both had White in round 1, so their colour differences are
+    equal (+1) and 4.3.5 cannot fire, and their colour sequences never differ, so 4.3.6
+    cannot fire either. Art. 4.3.8 is left: "alternate the colour of the first-team from
+    its last played round". The first-team had White, so the first-team takes Black - and
+    which team that is, is the whole question.
+    """
+    tournament = event(4, 5)
+    tournament.tournament["accelerated"] = {
+        "name": "Acc",
+        "values": [
+            {"matchPoints": decimal.Decimal("2.0"), "gamePoints": decimal.Decimal("2.0"),
+             "firstRound": 1, "lastRound": 3, "firstCompetitor": 1, "lastCompetitor": 2},
+        ],
+    }
+    tournament.match(1, 1, 2, ["W", "L"])       # drawn: one match point each
+    tournament.match(1, 3, 4, ["W", "W"])       # 3 beats 4: two match points
+    engine = tournament.engine(2)
+    roundpairing = engine.compute_pairing(False)
+    (one, three) = (engine.competitors[1], engine.competitors[3])
+    assert (one["pts"], one["acc"]) == (decimal.Decimal("1.0"), decimal.Decimal("3.0"))
+    assert (three["pts"], three["acc"]) == (decimal.Decimal("2.0"), decimal.Decimal("2.0"))
+    assert one["cop"] == "nc" and three["cop"] == "nc"
+    assert one["cod"] == three["cod"] == 1
+
+    # art. 4.2.1 on the standings score: team 3 is the first-team of the pair 1-3
+    assert engine.first_team(three, one) is True
+    assert engine.first_team(one, three) is False
+
+    rules = {
+        (pair["w"], pair["b"]): pair["colorrule"]
+        for bracket in roundpairing
+        for pair in bracket["pairs"]
+    }
+    # art. 4.3.8 - and it is 4.3.8 that decides, so the test proves which rule fired
+    assert rules == {(1, 3): "4.3.8", (2, 4): "4.3.8"}
 
 
 def test_art_4_2_2_the_secondary_score_and_the_rules_that_switch_it_off():

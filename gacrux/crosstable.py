@@ -29,6 +29,7 @@ COD = 6
 CSQ = 7
 FLT = 8
 TOP = 9
+PTX = 10
 
 class flt(Enum):
     DF1 = 1
@@ -91,7 +92,7 @@ class crosstable:
         tb = tiebreak(tournament, rnd - 1, None)
         if tournament["teamTournament"] and "primary" in tournament["scoreSystem"]:
             tb.set_primaryscore(tournament["scoreSystem"]["primary"])
-        tblist = ["PTS", "ACC", "ACC/X", "RFP", "NUM", "RIP", "COD", "CSQ", self.floatrule(), "TOP"]
+        tblist = ["PTS", "ACC", "ACC/X", "RFP", "NUM", "RIP", "COD", "CSQ", self.floatrule(), "TOP", "PTS/X"]
         for pos in range(0, len(tblist)):
             mytb = tb.parse_tiebreak(pos + 1, tblist[pos])
             tb.compute_single_tiebreak(mytb)
@@ -115,7 +116,13 @@ class crosstable:
             competitors[i] = {
                 "cid": i,
                 "rnk": cmps[i]["orgrank"] if i in cmps else i,
+                # pts / ptx - the standings scores: the primary score, and the other one
+                # ("/X" exchanges the two, so ptx is game points when match points are
+                # primary and the other way round). acc / acx - the same two scores plus
+                # the virtual points of an acceleration, which is the pairing score of
+                # C.04.7 art. 1.5.
                 "pts": tbval[PTS]["val"] if tbval else Decimal("0.0"),
+                "ptx": tbval[PTX]["val"] if tbval else Decimal("-1.0"),
                 "acc": tbval[ACC]["val"] if tbval else Decimal("-1.0"),
                 "acx": tbval[ACX]["val"] if tbval else Decimal("-1.0"),
                 "rfp": tbval[RFP]["val"] != "" if tbval else False,

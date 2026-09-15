@@ -539,12 +539,28 @@ class pairing_fideteam(pairing):
         else:
             (c["w"], c["b"], c["colorrule"]) = (colres["w"], colres["b"], colres["colorrule"])
 
+    """
+    first_team - art. 4.2
+
+    The scores compared here are the standings scores, and not the pairing score of
+    C.04.7 art. 1.5. That article enumerates what the pairing score is for - it is "used
+    to define scoregroups, sort them internally, and sort boards per Article 3.6 of the
+    General Handling Rules" - and the colour allocation is not on the list. Art. 4.2.1 and
+    4.2.2 ask for the primary and the secondary score, and the virtual points of an
+    acceleration are not points a team scored.
+
+    (The Dutch engine makes the same choice in the same place - its E.4 and E.5 rank the
+    two players by score level, which is built from the pairing score, and its update_board
+    orders the boards by it. That is C.04.3 art. 5, a different text, and it is left as it
+    is.)
+    """
+
     def first_team(self, a, b):
         # art. 4.2 - a is the first-team?
-        if a["acc"] != b["acc"]:
-            return a["acc"] > b["acc"]                     # 4.2.1 the higher primary score
-        if self.secondary and a["acx"] != b["acx"]:
-            return a["acx"] > b["acx"]                     # 4.2.2 the higher secondary score
+        if a["pts"] != b["pts"]:
+            return a["pts"] > b["pts"]                     # 4.2.1 the higher primary score
+        if self.secondary and a["ptx"] != b["ptx"]:
+            return a["ptx"] > b["ptx"]                     # 4.2.2 the higher secondary score
         return a["tpn"] < b["tpn"]                         # 4.2.3 the smaller TPN
 
     def color_allocation(self, a, b):
