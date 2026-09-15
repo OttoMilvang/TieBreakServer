@@ -94,6 +94,23 @@ class event:
     def player(self, team, board):
         return 100 * team + board
 
+    def ranks(self, ranks):
+        """The ranking order of the field, team by team. art. 1.1.2 - the TPN follows the
+        initial ranking order of the competition, and the TPN of art. 1.1.1 is then the
+        place of a team in THIS order.
+        """
+        for team, rank in enumerate(ranks, start=1):
+            self.tournament["competitors"][team - 1]["rank"] = rank
+
+    def absent(self, team):
+        """A team that is not ready for pairing (Article 2.5 of the General Handling
+        Rules for Swiss Tournaments: a team that has withdrawn or is not present).
+
+        The team keeps its place in the field and its TPN - art. 1.1.3, "once defined,
+        the TPN should not be modified" - it is simply left out of this round-pairing.
+        """
+        self.tournament["competitors"][team - 1]["present"] = False
+
     def points(self, result):
         return GAMESCORE[result]
 
@@ -202,6 +219,64 @@ def bye(pairs):
         if b == 0:
             return w
     return None
+
+
+# ---------------------------------------------------------------------------
+# Art. 1.1 - the Tournament Pairing Number
+# ---------------------------------------------------------------------------
+
+def test_art_1_1_1_the_tpn_is_the_place_in_the_field_not_a_count_of_the_present():
+    """Art. 1.1.1 - "each team must have a different TPN, from 1 to the number of teams" -
+    and art. 1.1.3 - "once defined, the TPN should not be modified ... unless the Chief
+    Arbiter decides otherwise".
+
+    Five teams, of which team 1 is absent this round. The TPN of team 3 is 3, because the
+    field has five teams and team 3 is the third of them. It is not 2, which is what a
+    running count over the teams that are ready for pairing would make it: art. 1.1.1
+    numbers the teams of the tournament, not the teams of the round, and art. 1.1.3 says
+    the number a team was given does not move when the field thins out.
+
+    Nothing but art. 1.1 is in play here. No round has been paired, so there is no colour
+    history, no score difference and no float to distract - the assertion reads the TPN
+    straight off the competitor structure that the seven articles which consult it (3.4.4,
+    3.5.3, 3.5.4, 3.6.1, 3.6.2, 4.2.3 and 4.3.1) all read.
+    """
+    tournament = event(5, 5)
+    tournament.absent(1)
+    engine = tournament.engine(1)
+    engine.compute_pairing(False)
+    competitors = engine.crosstable.competitors
+    assert competitors[3]["tpn"] == 3
+    assert [competitors[team]["tpn"] for team in range(1, 6)] == [1, 2, 3, 4, 5]
+
+
+def test_art_1_1_3_an_absent_team_does_not_shift_the_colours_of_the_others():
+    """Art. 1.1.1 and 1.1.3, seen through art. 4.3.1 - the TPN an absent team leaves
+    behind is not handed to the team after it.
+
+    Five teams, team 1 absent, so teams 2, 3, 4 and 5 play round 1. Every score is equal,
+    so the bracket in TPN order is 2, 3, 4, 5 and the identifiers of art. 3.6.2 are
+    "2 3 4 5" (the pairs 2-4 and 3-5) and "2 3 5 4" (the pairs 2-5 and 3-4); the
+    lexicographic minimum of art. 3.6.4 is the first, so the pairs are 2-4 and 3-5.
+
+    That is the same pairing whether the TPNs are 2,3,4,5 or the compacted 1,2,3,4 -
+    compaction preserves the order, and art. 3.5 and art. 3.6 read the TPN for its order
+    alone. Only art. 4.3.1 reads it for its VALUE: "if the first-team has an odd TPN, give
+    it the initial-colour; otherwise, give it the opposite colour". So this position
+    isolates art. 1.1 exactly - every other article that consults the TPN is neutralised
+    by giving them an order they agree on, and art. 4.3.1 alone is left to report which
+    numbers the teams actually hold.
+
+    With the initial-colour White (art. 4.1) and no match played, art. 4.2.3 makes the
+    first-team of each pair the smaller TPN. Team 2's TPN is 2, which is even, so it takes
+    the opposite of the initial-colour and plays Black. Team 3's TPN is 3, odd, so it
+    takes the initial-colour and plays White. Compacted to 1 and 2 the parities invert and
+    both colours come out reversed, which is what this asserts against.
+    """
+    tournament = event(5, 5)
+    tournament.absent(1)
+    tournament.tournament["topColor"] = "w"
+    assert tournament.pair(1) == [(4, 2), (3, 5)]
 
 
 # ---------------------------------------------------------------------------
