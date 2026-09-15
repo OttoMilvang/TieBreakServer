@@ -251,7 +251,12 @@ class pairing_fideteam(pairing):
             "downfloaters": [],        # C.04.6 knows no downfloaters
             "remaining": [],
             "quality": self.crosstable.compute_weight(pairs, None),
-            "bsne": {node["cid"]: i + 1 for i, node in enumerate(bracketnodes)},
+            # art. 3.6.1 - the position of a team in the bracket, the teams in TPN order,
+            # the same map crosstable_fideteam.update_bracket paired the bracket with.
+            "bsne": {
+                node["cid"]: i + 1
+                for i, node in enumerate(sorted(bracketnodes, key=lambda node: node["tpn"]))
+            },
             "pab": scorelevel == self.pablevel,
         }
         if not self.checkonly:

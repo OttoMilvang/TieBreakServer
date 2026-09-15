@@ -260,7 +260,12 @@ class crosstable_fideteam(crosstable):
         the bottom members of the identifier                          (art. 3.6.2)
 
     bsn is the position of a team in the bracket, the teams taken in TPN order. The team
-    with the smaller bsn in a pair is the top member of the pair (art. 3.6.1).
+    with the smaller bsn in a pair is the top member of the pair (art. 3.6.1). The map is
+    built here, out of the TPNs of the teams that were handed in, rather than read off the
+    order they arrive in: the callers order a bracket by score first (get_edges needs
+    that), and residents therefore precede upfloaters whatever their TPNs are, which is
+    not the order art. 3.6 reads a bracket in. Deriving bsn here leaves the two ends
+    nothing to disagree about.
 
     The identifier holds all the top members before the first bottom member, so a pairing
     that makes a low-TPN team a bottom member is worse than any pairing that does not,
@@ -273,7 +278,11 @@ class crosstable_fideteam(crosstable):
     """
 
     def update_bracket(self, scorelevel, nodes, edges):
-        self.bsn = bsn = {node["cid"]: i + 1 for i, node in enumerate(nodes)}
+        # art. 3.6.1 - the teams of the bracket, taken in TPN order
+        self.bsn = bsn = {
+            node["cid"]: i + 1
+            for i, node in enumerate(sorted(nodes, key=lambda node: node["tpn"]))
+        }
         self.B = B = len(nodes)
         base = B + 1
         self.weight = weight = {qd.name: 0 for qd in qdefs}
