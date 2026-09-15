@@ -182,8 +182,14 @@ def format_pair(c, pcmps, bsn, sno):
     a = c["w"]
     b = c["b"]
     sa = ("    " + str(pcmps[a][sno]))[-4:]
-    sb = (str(pcmps[b][sno]) + "   ")[0:4]
     ba = ("    " + str(bsn[pcmps[a]["cid"]]))[-4:] if pcmps[a]["cid"] in bsn else "  ?"
+    if b not in pcmps:
+        # The pairing-allocated bye: both engines write it as a pair against competitor
+        # 0, the dummy, which is not a competitor and is not in the bracket's own list.
+        # Printed with the opponent's side left blank, the way format_down prints a
+        # downfloater, rather than indexed for a name that is not there.
+        return sa + " - " + "    " + " (" + ba + " - " + "    " + ")"
+    sb = (str(pcmps[b][sno]) + "   ")[0:4]
     bb = ((str(bsn[pcmps[b]["cid"]]) + "    ")[:4]) if pcmps[b]["cid"] in bsn else "  ?"
     return sa + " - " + sb + " (" + ba + " - " + bb + ")"
 

@@ -421,7 +421,12 @@ class pairing_fideteam(pairing):
         upfloaters = []
         for edge in pairs:
             for cid in [edge["ca"], edge["cb"]]:
-                if self.competitors[cid]["scorelevel"] < scorelevel:
+                # cid 0 is the dummy the bye is paired against, not a team, so it is never
+                # an upfloater - art. 3.5.1 reads on teams. A file that declares a second
+                # pairing-allocated bye in one round leaves a second edge on the dummy,
+                # and without this test it reached pair_bracket's sort on "tpn", which
+                # assign_tpn gives to the teams only, and the checker died there.
+                if cid and self.competitors[cid]["scorelevel"] < scorelevel:
                     upfloaters.append(self.competitors[cid])
         return (upfloaters, pairs)
 
