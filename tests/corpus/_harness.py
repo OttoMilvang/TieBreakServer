@@ -66,8 +66,13 @@ def _drive(checker_cls, extra_argv):
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             try:
                 obj.common_main()
-            except SystemExit:
-                pass
+            except SystemExit as exc:
+                # A checker may call exit() for a command-line failure. Preserve a
+                # numeric exit status when it bypassed the normal result object;
+                # swallowing it would turn a broken corpus case into an apparent
+                # pass (or an uninformative None).
+                if exc.code not in (None, 0):
+                    return exc.code if isinstance(exc.code, int) else 510
             except Exception:
                 # common_main normally converts engine faults to a 510 status
                 # itself; this is only reached if something escapes that net.
