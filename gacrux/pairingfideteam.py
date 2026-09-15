@@ -514,20 +514,38 @@ class pairing_fideteam(pairing):
     example of the regulation - 2, 6, 8 with 3 points and 1, 3, 5 with 2.5, two
     upfloaters of 3 points and one of 2.5 - gives
         {2,6,1} < {2,6,3} < {2,6,5} < {2,8,1} < ... < {6,8,5}
+
+    The sets are produced one at a time, in that order, and never collected. Art. 3.5.5 is
+    a "first that applies" rule and its caller stops at the first set that complies, so
+    the sets after it are work nobody asked for: a bracket taking ten upfloaters out of a
+    scoregroup of twenty has 184 756 of them, each costing a matching to test.
+
+    The order is the lexicographic one because it is built that way. The levels are taken
+    in descending score, and within each level the candidates in ascending TPN, so the
+    outermost loop varies the slowest-moving part of the identifier and the innermost the
+    fastest - which is what a lexicographic order is.
     """
 
     def list_upfloaters(self, lower, profile):
         bylevel = {}
         for node in lower:
             bylevel.setdefault(node["scorelevel"], []).append(node)
-        sets = [[]]
-        for level in sorted(set(profile), reverse=True):          # 3.5.3 descending score
-            newsets = []
-            for chosen in combinations(bylevel[level], profile.count(level)):   # ascending TPN
-                for upfloaters in sets:
-                    newsets.append(upfloaters + list(chosen))
-            sets = newsets
-        return sorted(sets, key=lambda s: [node[self.rank] for node in s])      # 3.5.4
+        levels = sorted(set(profile), reverse=True)               # 3.5.3 descending score
+        candidates = [
+            sorted(bylevel[level], key=lambda node: node[self.rank])   # 3.5.3 ascending TPN
+            for level in levels
+        ]
+        counts = [profile.count(level) for level in levels]
+
+        def sets_from(level):                                     # 3.5.4
+            if level == len(levels):
+                yield []
+                return
+            for chosen in combinations(candidates[level], counts[level]):
+                for rest in sets_from(level + 1):
+                    yield list(chosen) + rest
+
+        return sets_from(0)
 
     """
     check_c6 - [C6] art. 2.3.3
