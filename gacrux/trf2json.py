@@ -1716,7 +1716,24 @@ class trf2json(chessjson.chessjson):
             self.update_team_score(tournament)
 
     def validate_team_scores(self, tournament):
-        """Check the match- and game-point totals declared by TRF26 record 310."""
+        """Check the match- and game-point totals declared by TRF26 record 310.
+
+        Record 310 columns 55-60 and 62-67 carry a team's match points and its game
+        points -- its standing. The match points are the sum of what each of the team's
+        matches was worth; the game points are the sum of the totals the team's players
+        report in columns 81-84 of their own 001 records.
+
+        A disagreement is reported and not refused. A standing that differs from the
+        results is the ordinary shape of a file carrying an arbiter's decision -- a team
+        docked for not appearing, a penalty, a fine -- and TRF-2026 has record 299,
+        Abnormal Assignment points, for exactly that. The declared standing is what the
+        arbiter published, so it is the one kept, and the recomputed figure is reported
+        beside it. Refusing would throw away a whole event, and every number in it, over
+        a file with nothing wrong with it.
+
+        The message names each team and both figures, because a reader and a file that
+        disagree about a total is not something anybody can act on otherwise.
+        """
         calculated_match = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
         for match in tournament["matchList"]:
             if match["round"] > tournament["currentRound"] and self.get_result_res(match, "white") != "P":
@@ -1733,25 +1750,51 @@ class trf2json(chessjson.chessjson):
                 tournament, "match", self.get_result_res(match, "black")
                 )
 
-        badteams = []
+        problems = []
         for competitor in tournament["competitors"]:
             cid = competitor["cid"]
             calculated_game = sum(
                 (player["gamePoints"] for player in competitor["cplayers"]),
                 Decimal("0.0"),
             )
-            if (
-                competitor["matchPoints"] != calculated_match[cid]
-                or competitor["gamePoints"] != calculated_game
-            ):
-                badteams.append(str(cid))
+            if competitor["matchPoints"] != calculated_match[cid]:
+                problems.append(
+                    "team " + str(cid) + " declares " + str(competitor["matchPoints"])
+                    + " match points, the matches give " + str(calculated_match[cid])
+                )
+            if competitor["gamePoints"] != calculated_game:
+                problems.append(
+                    "team " + str(cid) + " declares " + str(competitor["gamePoints"])
+                    + " game points, the 001 records of its players give "
+                    + str(calculated_game)
+                )
 
-        if badteams and False:
-            raise GacruxInputError(
-                "record 310 reports incorrect match or game points for team(s) "
-                + ", ".join(badteams)
+        if problems:
+            self.report_info(
+                "Record 310 disagrees with the results: " + "; ".join(problems)
+                + ". The declared standing is used; see record 299 for assignments that"
+                + " make the two differ on purpose"
             )
 
+    def report_info(self, message):
+        """Record a message that does not stop the file being read.
+
+        put_status() sets the status code and appends to "error", which is the fatal
+        channel: everything in it is a fault, and it is what a caller tests before it
+        uses the event. "info" is the other channel of the same status block --
+        put_status() writes it itself for the code 0 case, and jsonscheme declares it --
+        and it is where a remark about a file that is going to be read anyway belongs.
+        It is created here if nothing has made it, and kept a list either way, because
+        put_status() puts a bare string there and this puts a list.
+        """
+        status = self.chessjson["status"]
+        existing = status.get("info")
+        if isinstance(existing, list):
+            existing.append(message)
+        elif existing:
+            status["info"] = [existing, message]
+        else:
+            status["info"] = [message]
 
     def update_team_score(self, tournament):
         for competitor in tournament["competitors"]:
