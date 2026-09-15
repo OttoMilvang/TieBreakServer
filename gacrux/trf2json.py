@@ -1227,6 +1227,20 @@ class trf2json(chessjson.chessjson):
         return
 
     def parse_trf_pab(self, tournament, line):
+        if not tournament["teamTournament"]:
+            # TRF-2026 puts record 320 under "Teams" and says the bye section carries
+            # FPB, HPB and ZPB "for both individuals and teams (240); pairing-
+            # allocated-bye (320) just for teams". Its identifier fields are named
+            # "Team Pairing Number", so in a file with no team section there is
+            # nothing for them to name. Records 013 and 310 both set teamTournament
+            # and read_all_lines parses both before this record, so a team file
+            # reaches here with the flag already set whatever order its lines are in.
+            message = (
+                'Record 320 "' + line.rstrip() + '" is for team tournaments only'
+                + " (TRF-2026): this file has no 013 or 310 record declaring a team"
+            )
+            self.put_status(401, message)
+            raise GacruxInputError(message)
         if self.pabrecordline is not None:
             # TRF-2026: "Pairing-Allocated-Bye (PAB) (one record per tournament)". A
             # second one would silently replace the first's points in the score system
