@@ -192,13 +192,18 @@ class crosstable_fideteam(crosstable):
     """
     update_edge - the quality criteria of art. 2.3 that a single pair can carry
 
-    [C4] and [C5] (art. 2.3.1 and 2.3.2) are decided when the set of upfloaters is
-    chosen (art. 3.5), and [C6] (art. 2.3.3) is a property of that set as well, not of a
-    pair. They are computed here all the same, so that the quality vector of a bracket -
-    which pairingchecker prints and compares - reports them.
+    [C4] and [C5] (art. 2.3.1 and 2.3.2) are decided when the set of upfloaters is chosen
+    (art. 3.5), but they can be read off a pair all the same - the upfloaters a pair holds
+    and the score difference between its teams - and are computed here, so that the
+    quality vector of a bracket, which pairingchecker prints and compares, reports them.
+
+    [C6] (art. 2.3.3) cannot: it is a property of the whole set of upfloaters and of the
+    scoregroup the bracket leaves behind, so no pair carries any of it. It stays zero here
+    and pairing_fideteam.pair_bracket writes the bracket's value over it.
 
     In a bracket, a team of the top-scoregroup is a resident and every other team is an
-    upfloater (art. 1.3.2), so "b is an upfloater" is "b has a lower score level than a".
+    upfloater (art. 1.3.2), so a team is an upfloater when its score level is below the
+    score level of the bracket.
     """
 
     def update_edge(self, edge):
@@ -223,9 +228,14 @@ class crosstable_fideteam(crosstable):
             (a, b) = (b, a)
         psd = a["scorelevel"] - b["scorelevel"]
         lasttworounds = self.rnd > self.numrounds - 2
+        # [C4] art. 2.3.1 - "minimise the number of upfloaters". The criterion counts
+        # teams, so a pair is worth the number of ITS teams that are upfloaters: none, one
+        # or two. A team of the bracket is an upfloater when its score is below the score
+        # of the bracket (art. 1.3.2) - which is not the same test as "lower than the
+        # other team of the pair", and differs from it in a pair of two upfloaters.
+        q[QC4] = len([team for team in (a, b) if team["scorelevel"] < self.scorelevel])
         if psd > 0:
             # b is an upfloater, and art. 1.5 makes both teams of this pair floaters.
-            q[QC4] = 1                                  # [C4] art. 2.3.1
             q[QC5][maxpsd - psd] = 1                    # [C5] art. 2.3.2
             if not lasttworounds:
                 # [C7] art. 2.3.4 - an upfloater that was a floater in the previous round
