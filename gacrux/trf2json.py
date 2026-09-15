@@ -840,7 +840,9 @@ class trf2json(chessjson.chessjson):
         matchPoints = helpers.parse_float(line[54:60]) if ext else Decimal("0.0")
         gamePoints = helpers.parse_float(line[61:67]) if ext else Decimal("0.0")
         rank = helpers.parse_int(line[68:71]) if ext else 0
-        if ext and line[71:74].strip() != "":
+        # Columns 72-73 are the gap between the rank (69-71) and the first player id
+        # (74-77). Column 74 is the first digit of a four-figure id, so it is data.
+        if ext and line[71:73].strip() != "":
             self.put_status(467, "Team " + str(cid) + " has misaligned data, may be bad character encoding") 
         team = {"id": 0, "teamName": teamname, "players": []}
         teamid = self.append_team(team, 0)
