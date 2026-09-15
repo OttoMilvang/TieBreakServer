@@ -1020,6 +1020,12 @@ class trf2json(chessjson.chessjson):
 
     def parse_trf_initialcolor(self, tournament, line):
         tournament["topColor"] = line[4:].rstrip().upper()
+        # A record 152 is the file stating the drawing of lots of C.04.6 art. 4.1. Where
+        # there is no such record, prepare_tournament derives a value from the round that
+        # was played, and the two are not the same thing: a derived value is a reading of
+        # the results under one system's colour rules, so a system whose rules read them
+        # differently has to be able to tell it from a value the arbiter recorded.
+        tournament["topColorExplicit"] = True
 
     def parse_trf_gamescore(self, tournament, line):
         self.parse_trf_scoresystem(tournament, line, "game")

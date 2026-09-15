@@ -659,6 +659,84 @@ class pairing_fideteam(pairing):
         return npairs
 
     """
+    tpn_of_the_field - art. 1.1.1, "each team must have a different TPN, from 1 to the
+    number of teams"
+
+    The TPN of a team is its fixed place in the order supplied to the engine, absent teams
+    included. Art. 1.1.2 leaves the assignment to the rules of the competition, or
+    otherwise to the Chief Arbiter, and art. 1.1.3 keeps it unchanged once made, so the
+    number is held rather than derived from the standings. crosstable.list_edges writes
+    exactly these numbers onto the competitors; they are needed here before the crosstable
+    exists.
+    """
+
+    def tpn_of_the_field(self, tournament):
+        key = "rank" if self.rank == "rnk" else "cid"
+        order = sorted(tournament["competitors"], key=lambda team: team.get(key, 0))
+        return {team["cid"]: place for place, team in enumerate(order, start=1)}
+
+    """
+    get_topcolor - art. 4.1, the initial-colour
+
+    "The initial-colour is determined by drawing of lots before the pairing of the first
+    round." A file that records the draw states it and there is nothing to work out; a
+    file that does not has to have it read back out of the round that was played.
+
+    The reader derives a value for every file it reads, as the colour of the
+    lowest-numbered competitor of the earliest game, which is the rule of C.04.3. C.04.6
+    art. 4.3.1 stands in the way of that here: "when both teams have yet to play a match:
+    if the first-team has an odd TPN, give it the initial-colour; otherwise, give it the
+    opposite colour". A team's colour therefore shows the initial-colour when its TPN is
+    odd, and the negation of it when the TPN is even.
+
+    So a value the file itself states - a record 152, which is the drawing of lots of art.
+    4.1 - is taken as it stands, and a value the reader derived is recomputed here through
+    art. 4.3.1 rather than around it. topColorExplicit is what tells the two apart.
+
+    In round 1 every team's primary and secondary score is zero, so art. 4.2.1 and 4.2.2
+    cannot separate the two teams of a match and art. 4.2.3 makes the first-team the one
+    with the smaller TPN. A match that was not played gives no colour at all (art. 1.6.1)
+    and a pairing-allocated-bye has none to give (art. 1.4), so neither is a witness. When
+    round 1 holds no played match, nothing in the file witnesses the lot.
+    """
+
+    def get_topcolor(self, tournament, defcolor):
+        if tournament.get("topColorExplicit", False) and "topColor" in tournament:
+            return tournament["topColor"].lower()
+        tpn = self.tpn_of_the_field(tournament)
+        played = [
+            match
+            for match in tournament.get("matchList", [])
+            if match.get("round") == 1 and match.get("played", False)
+            and self.get_match_cid(match, "white") in tpn
+            and self.get_match_cid(match, "black") in tpn
+        ]
+        if len(played) == 0:
+            if "topColor" in tournament:
+                return tournament["topColor"].lower()
+            return self.draw_topcolor(defcolor)
+        # Every played match of round 1 witnesses the same lot. Take the one holding the
+        # smallest TPN, so that the answer does not depend on the order of the file.
+        match = min(
+            played,
+            key=lambda m: min(tpn[self.get_match_cid(m, "white")], tpn[self.get_match_cid(m, "black")]),
+        )
+        (white, black) = (self.get_match_cid(match, "white"), self.get_match_cid(match, "black"))
+        # art. 4.2.3 - the first-team of the match is the one with the smaller TPN
+        first = white if tpn[white] < tpn[black] else black
+        color = "w" if first == white else "b"
+        # art. 4.3.1 - an odd TPN was given the initial-colour, an even one its opposite
+        return color if tpn[first] % 2 == 1 else {"w": "b", "b": "w"}[color]
+
+    def get_match_cid(self, match, color):
+        """The competitor id of one side of a match record, as chessjson reads it: a side
+        is {"cid": .., "result": ..}, and a bye is None or a cid of 0."""
+        side = match.get(color, None)
+        if side is None:
+            return 0
+        return side.get("cid", 0)
+
+    """
     update_color / color_allocation - art. 4, the colour allocation rules
 
     4.1  the initial-colour is drawn by lot before the pairing of the first round. It is
