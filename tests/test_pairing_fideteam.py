@@ -60,7 +60,8 @@ REVERSE = {"W": "L", "D": "D", "L": "W"}
 class event:
     """A team tournament, built round by round."""
 
-    def __init__(self, numteams, numrounds, teamsize=2, typeb=False, primary=None, secondary=None, nocolor=False):
+    def __init__(self, numteams, numrounds, teamsize=2, typeb=False, primary=None, secondary=None, nocolor=False,
+                 topcolor="w"):
         pairingsystem = ["fideteam"] + (["typeb"] if typeb else []) + (["nocolor"] if nocolor else [])
         scoresystem = {"game": dict(GAMESCORE), "match": dict(MATCHSCORE)}
         if primary is not None:
@@ -77,7 +78,6 @@ class event:
             "currentRound": 0,
             "teamTournament": True,
             "teamSize": teamsize,
-            "topColor": "w",
             "pairingSystem": pairingsystem,
             "rankOrder": ["PTS"],
             "scoreSystem": scoresystem,
@@ -85,6 +85,11 @@ class event:
             "gameList": [],
             "matchList": [],
         }
+        if topcolor is not None:
+            # A record 152 states the drawing of lots of art. 4.1. topcolor=None is a file
+            # that does not, which the engine has to read back out of the round played.
+            self.tournament["topColor"] = topcolor
+            self.tournament["topColorExplicit"] = True
         for team in range(1, numteams + 1):
             self.tournament["competitors"].append(
                 {
@@ -1117,6 +1122,42 @@ def test_art_4_3_1_the_initial_colour_and_the_parity_of_the_tpn():
     assert tournament.pair(1) == [(1, 5), (6, 2), (3, 7), (8, 4)]
     tournament.tournament["topColor"] = "b"
     assert tournament.pair(1) == [(5, 1), (2, 6), (7, 3), (4, 8)]
+
+
+def test_art_4_1_the_drawn_initial_colour_is_recovered_through_art_4_3_1():
+    """Art. 4.1 - "the initial-colour is determined by drawing of lots before the pairing
+    of the first round" - read back out of a file that does not record the draw.
+
+    The initial-colour is not the colour of the lowest-numbered team of round 1. Art.
+    4.3.1 stands between the two: "if the first-team has an odd TPN, give it the
+    initial-colour; otherwise, give it the opposite colour". Only an ODD TPN shows the
+    drawn colour directly; an even one shows its negation.
+
+    Five teams, and no record 152 in the file. Team 1 takes a pairing-allocated-bye in
+    round 1, so the lowest-numbered MATCH is 2 v 3 - a bye has "no opponent, no colour"
+    (art. 1.4) and cannot carry the initial-colour at all, which is why the engine skips
+    it. That match was played with team 2 as the white team.
+
+    The chain, and nothing else, is in play. Round 1 is the only round, so every team's
+    primary and secondary score is zero and art. 4.2.1 and 4.2.2 cannot fire: art. 4.2.3
+    makes the first-team of the pair the smaller TPN, team 2. No team has played a match,
+    so of art. 4.3 only 4.3.1 can fire. Team 2's TPN is 2, which is even, so team 2 was
+    given the OPPOSITE of the initial-colour - it played White, so the lot fell on Black.
+    """
+    tournament = event(5, 5, topcolor=None)
+    tournament.pab(1, 1)
+    tournament.match(1, 2, 3, ["W", "L"])
+    tournament.match(1, 4, 5, ["W", "L"])
+    assert "topColor" not in tournament.tournament
+    assert tournament.engine(2).topcolor == "b"
+
+    # and the same file with the colours of the match the other way round recovers White:
+    # team 2 having Black is the even TPN taking the opposite of an initial White.
+    mirror = event(5, 5, topcolor=None)
+    mirror.pab(1, 1)
+    mirror.match(1, 3, 2, ["W", "L"])
+    mirror.match(1, 5, 4, ["W", "L"])
+    assert mirror.engine(2).topcolor == "w"
 
 
 def test_art_4_2_the_first_team_is_the_higher_primary_score():
