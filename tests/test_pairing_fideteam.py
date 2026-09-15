@@ -625,7 +625,9 @@ def test_art_3_5_4_the_sets_are_sorted_lexicographically():
     already sorted in the proper order."
 
     The order is the one the engine enumerates the sets in, and art. 3.5.5 takes the first
-    of them that qualifies - so it is the order that decides which set is chosen.
+    of them that qualifies - so it is the order that decides which set is chosen. The sets
+    are yielded one at a time rather than collected, so the order has to be the order they
+    come out in; listing them here is what checks that.
     """
     engine = event(8, 5).engine(2)
     engine.rank = "cid"
@@ -649,9 +651,9 @@ def test_art_3_5_3_a_set_is_sorted_by_descending_score_then_ascending_tpn():
     """
     engine = event(8, 5).engine(2)
     lower = [{"cid": cid, "rnk": cid, "scorelevel": 3 if cid in (2, 6, 8) else 2} for cid in (1, 2, 3, 5, 6, 8)]
-    sets = engine.list_upfloaters(lower, (3, 3, 2))
-    assert [node["cid"] for node in sets[0]] == [2, 6, 1]
-    assert [node["scorelevel"] for node in sets[0]] == [3, 3, 2]
+    first = next(iter(engine.list_upfloaters(lower, (3, 3, 2))))
+    assert [node["cid"] for node in first] == [2, 6, 1]
+    assert [node["scorelevel"] for node in first] == [3, 3, 2]
 
 
 def test_art_2_3_1_c4_minimise_the_number_of_upfloaters():
