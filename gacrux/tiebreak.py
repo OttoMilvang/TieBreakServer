@@ -665,9 +665,18 @@ class tiebreak:
                             self.addtbval(tbscore[prefix + "cod"], "val", pf)
                             pf = tbscore[prefix + "cod"]["val"]
                             colpref = other[ocol] + "bbbbwwww"
-                            # a competitor with the same color in every game reaches |pf| >= len(colpref),
-                            # which is outside the table. Saturate on the last entry in each direction.
-                            ncol = colpref[max(-len(colpref), min(pf, len(colpref) - 1))]
+                            # colpref is a map for a colour difference in [-4, +4] and for no
+                            # other index. Entry 0 is "alternate" (the opposite of the colour
+                            # just played); entries +1..+4 are the four "b" characters, for a
+                            # competitor due Black; entries -1..-4 are the four "w" characters
+                            # counted from the end (positions 8..5), for one due White. A
+                            # competitor with the same colour in every game runs |pf| past 4 and
+                            # off its own half of the table into the other one - pf = +5 indexes
+                            # position 5, the first "w", telling a competitor who has had nothing
+                            # but White to prefer White. Saturating on the length of the string
+                            # ([-9, +8]) lands in the opposite half too, so the clamp is to the
+                            # range the table actually covers.
+                            ncol = colpref[max(-4, min(pf, 4))]
                             ncol += str(abs(pf)) if ocol != pcol else "2"
     
                             csq += ocol
