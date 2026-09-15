@@ -190,6 +190,14 @@ class scoresystem:
         # return None
 
     def solve_scoresystem(self, equations):
+        """Return the score system that satisfies every equation, or nothing if none does.
+
+        Each solve_scoresystem_p() call searches a different set of values the
+        pairing-allocated bye may take, and returns nothing when no win/draw/loss triple
+        in its search space adds the reported results up to the reported totals. When all
+        six searches come back empty so does this, and the caller has to read that as
+        "the file does not describe a score system", not as a score system.
+        """
         res = False
         res = res or self.solve_scoresystem_p(equations, ["W"])
         res = res or self.solve_scoresystem_p(equations, ["D"])
@@ -247,6 +255,21 @@ class scoresystem:
                 badplayers = []
                 score = self.fill_default_scoresystem("game") if version == "TRF25" else self.solve_scoresystem(equations)
                 # print(version, score)
+                if not score:
+                    # No score system fits the reported points at all. That is the case
+                    # the GacruxInputError at the end of this function was written for, so
+                    # hand it there rather than carry the empty answer into the check loop
+                    # below - where "if elem in score" turned it into "TypeError: argument
+                    # of type 'NoneType' is not iterable", raised from inside the reader
+                    # and telling the user nothing they can act on. Since no score system
+                    # was found, no player's total is accounted for: every player who
+                    # reports a non-zero total is named, on the same terms as the
+                    # per-player check below, which skips a total of zero because any
+                    # system explains it.
+                    eqok = False
+                    badplayers = [str(eq["cid"]) for eq in equations
+                                  if eq["sum"] != Decimal("0.0")]
+                    continue
                 for lineno, eq in enumerate(equations):
                     if eq["sum"] == Decimal("0.0"):
                         continue
