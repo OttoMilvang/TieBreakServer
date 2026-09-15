@@ -66,6 +66,7 @@ def test_python_disagreement_counts_one_logical_failure(tmp_path):
     assert report["by_python"]["3.14"]["failed"] == 1
     assert "**❌ 1 failed / errored** — 1 cases" in rendered
 
+
 def test_same_outcome_different_message_across_shards_is_not_an_integrity_error(tmp_path):
     """A failure message differing by shard is not a shard disagreement.
 
@@ -106,7 +107,6 @@ def test_different_outcome_across_shards_is_still_an_integrity_error(tmp_path):
 
     assert len(report["parse_errors"]) == 1
     assert "conflicting duplicate result" in report["parse_errors"][0][1]
-
 
 
 def test_summary_escapes_untrusted_skip_reason(tmp_path):
@@ -213,3 +213,102 @@ def test_a_result_file_over_the_size_cap_is_refused(tmp_path, monkeypatch):
     assert report["file_count"] == 0
     assert len(report["parse_errors"]) == 1
     assert "over the 8-byte limit" in report["parse_errors"][0][1]
+
+
+def _capture(argv, capsys):
+    """Run the script's ``main`` the way the workflow does and return
+    ``(exit code, markdown)``."""
+    code = junit_summary.main(["junit_summary.py"] + argv)
+    return code, capsys.readouterr().out
+
+
+def test_missing_junit_shard_never_says_all_passed(tmp_path, capsys):
+    """A run whose shard artifacts are incomplete is never reported as a pass.
+
+    The workflow's matrix is two Python versions across eight corpus shards, so
+    sixteen JUnit files must arrive.  A ``conftest`` or import error that kills a
+    shard leaves its job red but produces no artifact at all, and the aggregate
+    over what *did* arrive is then entirely green.  Before ``--expect-files`` the
+    summary counted files, printed the count and never compared it to anything,
+    so fifteen green shards rendered "✅ All checks passed ... 15 shard result
+    file(s)" and exited 0 -- a passing gate over a red run.
+
+    This pins the comparison itself: with one of sixteen files absent, the
+    headline must not claim a pass, the report must say what is missing, and the
+    exit status must be non-zero so the summary job goes red with it.
+    """
+    passing = [("tests.test_example", "test_unit", "passed", "")]
+    written = 0
+    for python in ("3.11", "3.14"):
+        for shard in range(1, 9):
+            if (python, shard) == ("3.14", 8):
+                continue                      # the shard whose job died on import
+            _write_results(tmp_path / ("results-%s-%d.xml" % (python, shard)), passing)
+            written += 1
+    assert written == 15
+
+    code, rendered = _capture(["--expect-files", "16", str(tmp_path)], capsys)
+
+    assert code != 0
+    assert "All checks passed" not in rendered
+    assert "Incomplete" in rendered
+    assert "1 of 16" in rendered
+
+
+def test_duplicate_coordinate_replacing_missing_shard_is_incomplete(tmp_path, capsys):
+    """A duplicate filename coordinate cannot satisfy a different matrix cell.
+
+    Artifacts may be downloaded into nested directories, so two files with the
+    same basename can reach the summary. Counting sixteen files alone would
+    accept a duplicate 3.11/1 in place of the expected 3.14/8.
+    """
+    passing = [("tests.test_example", "test_unit", "passed", "")]
+    expected = [(python, str(shard)) for python in ("3.11", "3.14")
+                for shard in range(1, 9)]
+    for index, (python, shard) in enumerate(expected):
+        if (python, shard) == ("3.14", "8"):
+            python, shard = "3.11", "1"
+            path = tmp_path / "duplicate" / ("results-%s-%s.xml" % (python, shard))
+            path.parent.mkdir()
+        else:
+            path = tmp_path / ("results-%s-%s.xml" % (python, shard))
+        _write_results(path, passing)
+
+    argv = ["junit_summary.py", "--expect-files", "16"]
+    for python in ("3.11", "3.14"):
+        argv += ["--expect-python", python]
+    for shard in range(1, 9):
+        argv += ["--expect-shard", str(shard)]
+    argv.append(str(tmp_path))
+    code, rendered = _capture(argv[1:], capsys)
+
+    assert code != 0
+    assert "Duplicate shard coordinate" in rendered
+    assert "Missing expected shard coordinate `3.14`/`8`" in rendered
+    assert "All checks passed" not in rendered
+
+
+def test_malformed_only_junit_reports_parser_error(tmp_path, capsys):
+    """Nothing but unparseable XML is reported as a parser error, not as silence.
+
+    ``render`` used to return as soon as no case had been parsed, which put the
+    early return *before* the block that lists unparseable files: two corrupt
+    shard files produced the single line "No JUnit results were found to
+    summarise" -- naming neither file nor reason -- and ``main`` returned 0
+    regardless.  The whole diagnostic was dropped on the floor precisely when it
+    was the only thing left to report.
+
+    This pins that both corrupt files are named, that the parser's own message
+    survives into the report, and that the exit status is non-zero.
+    """
+    (tmp_path / "results-3.11-1.xml").write_text("<testsuite>", encoding="utf-8")
+    (tmp_path / "results-3.14-1.xml").write_text("not xml at all", encoding="utf-8")
+
+    code, rendered = _capture(["--expect-files", "2", str(tmp_path)], capsys)
+
+    assert code != 0
+    assert "results-3.11-1.xml" in rendered
+    assert "results-3.14-1.xml" in rendered
+    # The parser's own diagnostic, not just the file name.
+    assert "line 1" in rendered
+    assert "All checks passed" not in rendered

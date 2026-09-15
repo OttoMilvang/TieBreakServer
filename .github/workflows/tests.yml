@@ -17,6 +17,17 @@ concurrency:
 permissions:
   contents: read
 
+# How many JUnit result files the summary must find: one per matrix job, so the
+# two Python versions times the eight corpus shards declared below.  The summary
+# script compares this against the artifacts that actually arrived and refuses to
+# report a pass over an incomplete set, which is the one failure mode the matrix
+# jobs cannot see -- a job that dies before pytest writes its XML uploads nothing
+# and simply vanishes from the totals.  tests/test_junit_summary.py asserts this
+# number still equals the size of the matrix below, and that the fork-comment
+# workflow carries the same one, so the two cannot drift apart unnoticed.
+env:
+  EXPECTED_JUNIT_FILES: "16"
+
 jobs:
   test:
     # Shards are shown to people as 1-8; `index` remains zero-based because it
@@ -72,6 +83,10 @@ jobs:
         with:
           name: junit-${{ matrix.python-version }}-${{ matrix.shard.number }}
           path: junit/results-*.xml
+          # The default is to warn and upload nothing, which is exactly the
+          # silent shard the summary's file count exists to catch; fail here too,
+          # at the job that knows which shard it is.
+          if-no-files-found: error
           retention-days: 7
 
   summary:
@@ -94,14 +109,31 @@ jobs:
           pattern: junit-*
           merge-multiple: true
       - name: Write the run summary
+        # junit_summary.py exits non-zero when the results are incomplete -- a
+        # missing or unreadable shard file -- so the step deliberately keeps
+        # going long enough to publish the report that explains why, and only
+        # then re-raises the status.  Without that the diagnostic would be lost
+        # at the moment it is most needed.
         run: |
-          python3 .github/scripts/junit_summary.py junit > test-summary.md
+          set +e
+          python3 .github/scripts/junit_summary.py \
+            --expect-files "$EXPECTED_JUNIT_FILES" \
+            --expect-python 3.11 --expect-python 3.14 \
+            --expect-shard 1 --expect-shard 2 --expect-shard 3 --expect-shard 4 \
+            --expect-shard 5 --expect-shard 6 --expect-shard 7 --expect-shard 8 \
+            junit > test-summary.md
+          status=$?
           cat test-summary.md >> "$GITHUB_STEP_SUMMARY"
+          exit $status
       - name: Upload the run summary
+        # Publish the report even when the step above ended red, so the comment
+        # job below has something to post and the reader learns what is missing.
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: test-summary
           path: test-summary.md
+          if-no-files-found: error
           retention-days: 7
 
   comment:
