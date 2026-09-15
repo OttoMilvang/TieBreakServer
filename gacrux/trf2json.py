@@ -445,7 +445,16 @@ class trf2json(chessjson.chessjson):
                     countgames = [{} for i in range(tournament["currentRound"])]
                     teamsize = 0
                     for game in tournament["gameList"]:
-                        if game["played"] and self.get_result_cid(game, "white") > 0 and self.get_result_cid(game, "black") > 0:
+                        # Every board of the match, not only the boards that were played.
+                        # A board decided by forfeit has the two players paired at it and
+                        # named as each other's opponents; it is a board. Counting only
+                        # played ones measured an event whose every round held a forfeit
+                        # one board short, which numbered the last board of every match 0,
+                        # dropped it from the match, and left the team's game points and
+                        # the value of a pairing-allocated bye short with it. A bye is
+                        # still not a board: it has no opponent, which is what the two
+                        # tests below on white and black keep out.
+                        if self.get_result_cid(game, "white") > 0 and self.get_result_cid(game, "black") > 0:
                             rnd = game["round"] - 1
                             for col in ["white", "black"]:
                                 player = game[col]
