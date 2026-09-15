@@ -149,7 +149,17 @@ def collect(directory):
             previous = cases_by_python[python].get(case_id)
             if previous is None:
                 cases_by_python[python][case_id] = result
-            elif previous != result:
+            elif (previous["outcome"], previous["reason"]) != \
+                    (result["outcome"], result["reason"]):
+                # Every unit test in the matrix runs in all eight corpus
+                # shards, so this is the common case, not a rare one. Only the
+                # *outcome* (and, for a skip/xfail, its reason) says whether
+                # the shards agree about the test -- a failure message can
+                # differ harmlessly between shards (a line number, a captured
+                # timing, an object's repr address) without the runs actually
+                # disagreeing about what happened. Comparing the whole result,
+                # message included, turned every one of those into a false
+                # integrity error.
                 parse_errors.append((
                     path.name,
                     "conflicting duplicate result for %s under Python %s"
