@@ -161,6 +161,10 @@ class trf2json(chessjson.chessjson):
         self.forfeitedlist = []
         self.ooolist = []
         self.aatlist = []
+        # TRF-2026 allows record 320 once per tournament, and record 240 once per bye
+        # type per round; the parsers refuse a repeat rather than merge two of them.
+        self.pabrecordline = None
+        self.byerecordlines = {}
         self.o001 = {}
         self.pcompetitors = {}  # pointer to player section competitors
         self.bcompetitors = {}  # pointer to team competitors, index id 1st board player cid
@@ -1223,6 +1227,17 @@ class trf2json(chessjson.chessjson):
         return
 
     def parse_trf_pab(self, tournament, line):
+        if self.pabrecordline is not None:
+            # TRF-2026: "Pairing-Allocated-Bye (PAB) (one record per tournament)". A
+            # second one would silently replace the first's points in the score system
+            # and add its byes on top of the first's, and neither is what the file says.
+            message = (
+                "Record 320 may occur only once, one record per tournament (TRF-2026):"
+                + ' a second one was found after "' + self.pabrecordline.rstrip() + '"'
+            )
+            self.put_status(401, message)
+            raise GacruxInputError(message)
+        self.pabrecordline = line
         matchPoints = helpers.parse_float(line[4:8])
         gamePoints = helpers.parse_float(line[9:13])
         self.scores.add_unplayed("P", matchPoints, gamePoints)
@@ -1248,6 +1263,19 @@ class trf2json(chessjson.chessjson):
         bye = line[4].upper()
         score = trans[bye]
         rnd = helpers.parse_int(line[6:9])
+        if line[0:3] == "240":
+            # TRF-2026: "Half (HPB) or Full (FPB) Point-Bye (at most one record per
+            # type per round)". Everybody getting that bye in that round is listed on
+            # the one record, so a second one is a repeat or a contradiction.
+            if (bye, rnd) in self.byerecordlines:
+                message = (
+                    "Record 240 may occur at most once per type per round (TRF-2026):"
+                    + " a second record of type " + bye + " for round " + str(rnd)
+                    + ' was found after "' + self.byerecordlines[(bye, rnd)].rstrip() + '"'
+                )
+                self.put_status(401, message)
+                raise GacruxInputError(message)
+            self.byerecordlines[(bye, rnd)] = line
         for i in range(10 + idsize, len(line) + 1, idsize + 1):
             competitor = helpers.parse_int(line[i - idsize : i])
             if competitor > 0:

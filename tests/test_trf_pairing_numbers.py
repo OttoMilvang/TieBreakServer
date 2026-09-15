@@ -159,6 +159,44 @@ def test_320_naming_a_team_that_does_not_exist():
     assert "team 6" in str(excinfo.value)
 
 
+def test_a_second_record_320_is_refused():
+    """TRF-2026: record 320 is "one record per tournament".
+
+    The record carries the value of a pairing-allocated bye and one team per round, so
+    a second one is either a repeat or a contradiction, and the reader used to let the
+    second silently replace what the first had put into the score system and add its
+    byes on top of the first's. Neither reading is the file's, so the file is refused
+    and the message says which record and which rule.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(teams(["320  1.0  1.0 000 000 003", "320  1.0  1.0 000 000 003"]))
+
+    message = str(excinfo.value)
+    assert "320" in message
+    assert "one record per tournament" in message
+
+
+def test_a_second_record_240_of_the_same_type_and_round_is_refused():
+    """TRF-2026: record 240 is "at most one record per type per round".
+
+    Every team or player getting a half-point bye in round 3 is listed on the one "H"
+    record for round 3, so a second "H 003" record is a repeat or a contradiction, and
+    the reader used to append its byes to the first's without a word. A record of a
+    different type in the same round, or of the same type in another round, is what
+    the specification allows, and the control below keeps it readable.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(teams(["240 H 003    3", "240 H 003    4"]))
+
+    message = str(excinfo.value)
+    assert "240" in message
+    assert "per type per round" in message
+    assert "H" in message and "round 3" in message
+
+    # Control: a different type in the same round, and the same type in another round.
+    assert parse(teams(["240 H 003    3", "240 F 003    4"])).get_status() == 0
+
+
 def test_330_naming_a_team_that_does_not_exist():
     # Record 330, a forfeited match: the two teams scheduled to play it.
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
