@@ -14,6 +14,9 @@ held as its points.
 """
 import decimal
 
+import pytest
+
+from gacrux import gacruxexeptions
 from gacrux import trf2json
 from gacrux.scoresystem import scoresystem
 from gacrux.tiebreak import tiebreak
@@ -91,3 +94,59 @@ def test_match_acceleration_uses_the_match_score_system():
 
     assert system.get_result({}, "match", decimal.Decimal("2.0")) == "W"
     assert system.get_result({}, "match", decimal.Decimal("1.0")) == "D"
+
+
+def unsolvable_without_a_162_record():
+    """A file whose reported totals no score system can produce, and no 162 record to ask.
+
+    Two players, one round, and they drew with each other -- so each player's total is
+    exactly one draw, and the two totals must therefore be the same number. They are not:
+    player 1's 001 record claims 1.5 and player 2's claims 0.5. No value of D satisfies
+    both D == 1.5 and D == 0.5, so the search in solve_scoresystem() cannot succeed for
+    any of the win/draw/loss/PAB combinations it tries, whatever they are. That makes the
+    file unsolvable by construction rather than by exhausting the search space, which is
+    what lets this test state the outcome instead of guessing it.
+
+    There is no 162 record, so the reader has nothing to fall back on and must say so.
+    """
+    return ["012 Unsolvable score system", "042 2026-03-01", "XXR 1",
+            player_line(1, "One, Player", 2000, "1.5", [(2, "w", "=")]),
+            player_line(2, "Two, Player", 1900, "0.5", [(1, "b", "=")])]
+
+
+def test_unsolvable_score_system_reports_the_162_hint():
+    """An unsolvable score system must reach the user as the 162 hint, not as a TypeError.
+
+    solve_scoresystem() answers with nothing when no combination fits. update_gamescore()
+    then carried that into ``if elem in score``, which raised
+
+        TypeError: argument of type 'NoneType' is not iterable
+
+    from inside the reader -- so the GacruxInputError written for precisely this case was
+    unreachable, and the one thing a user can do about it was never said. The assertions
+    are on the actionable half of the message: which players do not add up, and that
+    record 162 is the way to declare the score system.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(unsolvable_without_a_162_record())
+
+    message = str(excinfo.value)
+    assert "162" in message
+    # Both players are named: neither total is reachable, so neither is the odd one out.
+    assert "player(s) 1, 2" in message
+    assert "up to the points they report" in message
+
+
+def test_a_solvable_score_system_without_a_162_record_still_parses():
+    """The control: the same shape of file, with totals a score system can produce.
+
+    Player 1 wins, player 2 loses, and the totals are the default 1 / 0. Nothing about
+    the unsolvable case may make an ordinary undeclared score system fail.
+    """
+    chessfile = parse(["012 Solvable score system", "042 2026-03-01", "XXR 1",
+                       player_line(1, "One, Player", 2000, "1.0", [(2, "w", "1")]),
+                       player_line(2, "Two, Player", 1900, "0.0", [(1, "b", "0")])])
+    assert chessfile.get_status() == 0
+    competitors = chessfile.get_tournament(1)["competitors"]
+    assert {c["cid"]: c["gamePoints"] for c in competitors} == {1: decimal.Decimal("1.0"),
+                                                               2: decimal.Decimal("0.0")}
