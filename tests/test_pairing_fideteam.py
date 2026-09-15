@@ -984,6 +984,71 @@ def test_art_3_6_2_top_and_bottom_members():
     assert pairs == [[1, 4], [2, 5], [3, 6]]
 
 
+def test_art_3_6_1_a_heterogeneous_bracket_is_read_in_tpn_order():
+    """Art. 3.6.1 - "the team with the smaller TPN is the top member of the pair" - and
+    art. 3.6.2, which builds the identifier of a pairing out of those positions.
+
+    The order the bracket is read in is the TPN order, and only the TPN order. The
+    residents of a heterogeneous bracket do not come first because they are residents:
+    art. 3.6 knows nothing about which team upfloated into the bracket, and an upfloater
+    with a small TPN is a top member ahead of a resident with a large one.
+
+    Ten teams, five rounds. Round 1: 5 v 9 is drawn, and 1, 3, 4 and 6 win their matches.
+    Going into round 2 the scoregroups are {1,3,4,6} on 2 MP, {5,9} on 1 MP and
+    {2,7,8,10} on 0. The 2 MP bracket pairs inside itself; teams 5 and 9 are the whole
+    1 MP scoregroup and have already met, so [C1] (art. 2.1.1) forbids the only pairing
+    the scoregroup has of its own and art. 3.5 brings up the lexicographically first legal
+    set of two upfloaters, {2, 7}. The bracket is therefore residents 5 and 9 with
+    upfloaters 2 and 7, and its only barred pair is 5-9.
+
+    Two pairings remain, and art. 3.6.2 separates them. Read in TPN order the bracket is
+    2, 5, 7, 9, giving the positions 2->1, 5->2, 7->3, 9->4, so
+
+        {2-9, 5-7}   identifier "2 5 9 7"
+        {2-5, 7-9}   identifier "2 7 5 9"
+
+    and "2 5 9 7" is the smaller, so art. 3.6.4 requires 2-9 and 5-7.
+
+    The engine expresses that order as the weight of a minimum weight matching (see
+    crosstable_fideteam.update_bracket): with B = 4 teams, base = B + 1 = 5 and
+    wtop = base**B = 625, a pair weighs 625 * 2**(B - bsn(bottom)) + bsn(bottom) *
+    base**(B - bsn(top)). No team has a colour preference after one match and no team
+    floated in round 1, so [C8], [C9] and [C10] are all zero and the weight is the
+    position alone. In TPN order:
+
+        2-9  625*2**0 + 4*5**3 = 625 + 500 = 1125     2-5  625*2**2 + 2*5**3 = 2750
+        5-7  625*2**1 + 3*5**2 = 1250 +  75 = 1325    7-9  625*2**0 + 4*5**1 =  645
+        {2-9, 5-7} = 2450                             {2-5, 7-9} = 3395
+
+    In the score order the residents come first - 5, 9, 2, 7, giving 5->1, 9->2, 2->3,
+    7->4 - and the same two candidates come out the other way round:
+
+        2-5  625*2**1 + 3*5**3 = 1250 + 375 = 1625    2-9  625*2**1 + 3*5**2 = 1325
+        7-9  625*2**0 + 4*5**2 =  625 + 100 =  725    5-7  625*2**0 + 4*5**3 = 1125
+        {2-5, 7-9} = 2350                             {2-9, 5-7} = 2450
+
+    which is 2-5 and 7-9: the pairing whose identifier "2 7 5 9" art. 3.6.4 rejects.
+
+    Nothing but art. 3.6 is in play. [C4] and [C5] (art. 2.3.1, 2.3.2) fixed the number of
+    upfloaters and their score before this choice is reached, and both candidates pair one
+    upfloater with each resident, so they are equal on both. [C7] and [C10] (art. 2.3.4,
+    2.3.7) count floaters of the previous round and there are none - round 1 paired equal
+    scores throughout. [C8] and [C9] (art. 2.3.5, 2.3.6) count unfulfilled colour
+    preferences and after a single match no team has a type A preference at all.
+    """
+    tournament = event(10, 5)
+    tournament.match(1, 5, 9, ["W", "L"])       # drawn: teams 5 and 9 have met
+    tournament.match(1, 1, 2, ["W", "W"])
+    tournament.match(1, 3, 7, ["W", "W"])
+    tournament.match(1, 4, 8, ["W", "W"])
+    tournament.match(1, 6, 10, ["W", "W"])
+    (engine, brackets) = tournament.brackets(2)
+    level = engine.competitors[5]["scorelevel"]
+    assert upfloaters(brackets, level) == [2, 7]
+    pairs = sorted(sorted(pair) for pair in tournament.pair(2))
+    assert pairs == [[1, 4], [2, 9], [3, 6], [5, 7], [8, 10]]
+
+
 # ---------------------------------------------------------------------------
 # Art. 4 - the colour allocation
 # ---------------------------------------------------------------------------
