@@ -2011,8 +2011,12 @@ class trf2json(chessjson.chessjson):
         if "accelerated" in tournament and "values" in tournament["accelerated"]:
             acc = tournament["accelerated"]["values"]
             for value in acc:
-                match = self.scores.score.get("match", {}).get(value["matchPoints"], 0.0)
-                game = self.scores.score.get("game", {}).get(value["gamePoints"], 0.0)
+                # matchPoints and gamePoints are the point values record 250 states,
+                # so they are written out as they stand. Looking them up in the score
+                # system keyed them by a result letter, found nothing and wrote the
+                # 0.0 default over every accelerated value.
+                match = value["matchPoints"]
+                game = value["gamePoints"]
                 line = "250 " + f"{match:>4.1f} " + f"{game:>4.1f} " + f"{value['firstRound']:>3} " + f"{value['lastRound']:>3} " + f"{value['firstCompetitor']:>4} " + f"{value['lastCompetitor']:>4}"
                 t250 += line + "\n"
         return t250
