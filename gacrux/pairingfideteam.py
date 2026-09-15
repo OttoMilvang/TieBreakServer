@@ -40,6 +40,106 @@ from gacrux.gacruxexeptions import GacruxInputError, GacruxInvariantError, Gacru
 from gacrux.pairing import pairing
 
 
+# The three colour models of art. 1.7: "Type A colour preferences are used unless the
+# rules of the team competition specify Type B, or no colour preferences at all."
+TYPE_A = "typea"          # art. 1.7.1, the default
+TYPE_B = "typeb"          # art. 1.7.2
+NO_COLOUR = "nocolor"     # art. 1.7, no colour preferences at all
+
+# The tokens a pairing system can carry to name one of them. "-m fideteam-typeb" writes
+# "typeb"; the record 192 table of trf2json writes "team_typeb".
+COLOUR_MODEL_TOKENS = {
+    "typea": TYPE_A, "team_typea": TYPE_A,
+    "typeb": TYPE_B, "team_typeb": TYPE_B,
+    "nocolor": NO_COLOUR, "team_nocolor": NO_COLOUR,
+}
+
+# The tokens of a record 192 team code that name one. The code vocabulary has only two:
+# there is no TYPEC to write, so no record 192 code states the third model of art. 1.7.
+# A FIDE_TEAM code without a TYPE token is mapped to a model by trf2json's record 192
+# table - which is where that reading belongs - and the table writes the token of
+# COLOUR_MODEL_TOKENS for it. It is not re-derived here.
+COLOUR_MODEL_CODES = {"TYPEA": TYPE_A, "TYPEB": TYPE_B}
+
+# The three states of art. 1.2. Art. 1.2.1 makes the rules of the competition state
+# "whether the other (secondary score) is used for colour allocation", which is a question
+# with two answers; art. 1.2.2 supplies a third state for the rules that do not answer it.
+SECONDARY_USED = "used"           # art. 1.2.1 - the competition states that it is used
+SECONDARY_UNUSED = "unused"       # art. 1.2.1 - the competition states that it is not
+SECONDARY_UNSTATED = "unstated"   # art. 1.2.2 - nothing was stated, so the default applies
+
+# The tokens that name a score in a pairing system: "-m fideteam-mp-gp" writes both.
+SCORE_TOKENS = ["mp", "gp", "match", "game"]
+
+
+def resolve_secondary_score(pairingsystem, scoresystem):
+    """art. 1.2 - whether the secondary score is used for the colour allocation of art.
+    4.2.2.
+
+    Art. 1.2.1 asks the rules of the competition two questions - which score is the
+    primary one, and whether the other one is used - and answering the first is not
+    answering the second. The three states are read like this:
+
+      * the command line names scores as tokens of the pairing system. Two of them
+        ("-m fideteam-mp-gp") state that the secondary score is used. One of them
+        ("-m fideteam-mp") names the primary score and says nothing about the other, so
+        it leaves whatever the file stated in place, and failing that art. 1.2.2.
+      * a record 192 code encodes both answers at once: FIDE_TEAM_TYPEA_MP_GP writes a
+        secondary score into the score system, and FIDE_TEAM_TYPEA_MP writes none - which
+        is the competition stating that the other score is not used. trf2json records
+        that second answer as scoreSystem["secondaryUsed"], separately from the scores
+        themselves, because commonmain overwrites "primary" from the -m option and the
+        score system alone can then no longer say which source named it. The recorded
+        answer is honoured whenever the command line named at most one score.
+      * a source that states neither leaves both unset, and art. 1.2.2 answers: "the
+        default is to use match points as the primary score and game points for colour
+        allocation".
+    """
+    scores = [arg for arg in pairingsystem if arg in SCORE_TOKENS]
+    if len(scores) > 1:
+        return SECONDARY_USED
+    if "secondaryUsed" in scoresystem:
+        return SECONDARY_USED if scoresystem["secondaryUsed"] else SECONDARY_UNUSED
+    if "secondary" in scoresystem:
+        return SECONDARY_USED
+    if len(scores) > 0:
+        return SECONDARY_UNSTATED
+    if "primary" in scoresystem:
+        return SECONDARY_UNUSED
+    return SECONDARY_UNSTATED
+
+
+def resolve_colour_model(pairingsystem, typeoftournament):
+    """art. 1.7 - which of the three colour models the rules of the competition state.
+
+    The rules reach the engine from two places, and this is the precedence between them:
+
+      1. a model named in the pairing system wins. Both ways of stating a model arrive
+         here - the -m option of the command line replaces the pairing system outright,
+         and trf2json's record 192 table writes the model into it as well - so a caller
+         that named a model has named it here, whichever route it took.
+      2. the record 192 code of the file is read only when the pairing system names no
+         model at all, which is what -m fideteam leaves behind. The code names two of the
+         three models and no more (see COLOUR_MODEL_CODES).
+      3. failing both, art. 1.7's own default: "type A colour preferences are used unless
+         the rules of the team competition specify Type B, or no colour preferences at
+         all".
+
+    One model answers both of the questions the crosstable asks - whether the preferences
+    are the type B ones, and whether there are preferences at all - so the two cannot come
+    out of different sources and leave a model half-applied.
+    """
+    for token in pairingsystem:
+        if token in COLOUR_MODEL_TOKENS:
+            return COLOUR_MODEL_TOKENS[token]
+    code = typeoftournament.upper().split("_")
+    if code[:2] == ["FIDE", "TEAM"]:
+        for token in code[2:]:
+            if token in COLOUR_MODEL_CODES:
+                return COLOUR_MODEL_CODES[token]
+    return TYPE_A
+
+
 class pairing_fideteam(pairing):
 
     FIDETEAM_RULES = {
@@ -57,18 +157,20 @@ class pairing_fideteam(pairing):
 
         # art. 1.7 - type A colour preferences, unless the rules of the competition ask
         # for type B, or for no colour preferences at all. Record 192 states it
-        # (FIDE_TEAM_TYPEB_MP_GP and friends), and so does -m fideteam-typeb.
-        self.typeb = "typeb" in pairingsystem or "team_typeb" in pairingsystem or "TYPEB" in typeoftournament
-        self.usecolor = "nocolor" not in pairingsystem
+        # (FIDE_TEAM_TYPEB_MP_GP and friends), and so does -m fideteam-typeb. The one
+        # model answers both of the questions the crosstable asks.
+        self.colourmodel = resolve_colour_model(pairingsystem, typeoftournament)
+        self.typeb = self.colourmodel == TYPE_B
+        self.usecolor = self.colourmodel != NO_COLOUR
 
         # art. 1.2 - the rules of the competition state which of match points and game
         # points is the primary score, and whether the other one is used for the colour
-        # allocation of art. 4.2.2. Record 192 encodes both: FIDE_TEAM_TYPEA_MP_GP names
-        # a secondary score, FIDE_TEAM_TYPEA_MP does not. Art. 1.2.2 - when nothing is
-        # said, match points are the score and game points are used for the colours.
+        # allocation of art. 4.2.2. Only a competition that stated the other score is NOT
+        # used switches art. 4.2.2 off; a competition that said nothing about it gets the
+        # art. 1.2.2 default, which uses it.
         # (The primary score itself is read by crosstable.compute_tiebreak.)
-        scores = [arg for arg in pairingsystem if arg in ["mp", "gp", "match", "game"]]
-        self.secondary = "secondary" in scoresystem or len(scores) > 1 or "primary" not in scoresystem
+        self.secondaryscore = resolve_secondary_score(pairingsystem, scoresystem)
+        self.secondary = self.secondaryscore != SECONDARY_UNUSED
 
         # C.04.7 art. 1.4.4 - the Baku acceleration cannot be used when game points are
         # the primary score.

@@ -910,16 +910,26 @@ class trf2json(chessjson.chessjson):
         self.parse_trf_info(tournament, "typeOfTournament", trfvalue)
         rec = self.code192[trfvalue] if trfvalue in self.code192 else {}
         tournament.update(rec)
+        # A code that names its scores answers both questions of C.04.6 art. 1.2.1 at
+        # once: which score is the primary one, and whether the other is used for colour
+        # allocation. "secondaryUsed" records the second answer on its own, because
+        # commonmain overwrites "primary" from a -m option and the engine could otherwise
+        # not tell a file that stated "not used" from a command line that named the
+        # primary score and stated nothing (pairing_fideteam.resolve_secondary_score).
         if "_MP_GP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "match"
             tournament["scoreSystem"]["secondary"] = "game"
+            tournament["scoreSystem"]["secondaryUsed"] = True
         elif "_GP_MP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "game"
             tournament["scoreSystem"]["secondary"] = "match"
+            tournament["scoreSystem"]["secondaryUsed"] = True
         elif "_MP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "match"
+            tournament["scoreSystem"]["secondaryUsed"] = False
         elif "_GP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "game"
+            tournament["scoreSystem"]["secondaryUsed"] = False
 
     def parse_timecontrol(self, tournament, line):
         trfvalue = line[4:]

@@ -21,7 +21,17 @@ from gacrux import chessjson
 from gacrux.crosstablefideteam import crosstable_fideteam
 from gacrux.drawresult import drawresult
 from gacrux.gacruxexeptions import GacruxNoLegalPairing
-from gacrux.pairingfideteam import pairing_fideteam
+from gacrux.pairingfideteam import (
+    NO_COLOUR,
+    SECONDARY_UNSTATED,
+    SECONDARY_UNUSED,
+    SECONDARY_USED,
+    TYPE_A,
+    TYPE_B,
+    pairing_fideteam,
+    resolve_colour_model,
+    resolve_secondary_score,
+)
 
 WIN = decimal.Decimal("1.0")
 DRAW = decimal.Decimal("0.5")
@@ -1169,8 +1179,8 @@ def test_art_4_2_2_the_secondary_score_and_the_rules_that_switch_it_off():
     engine.compute_pairing(False)
     (two, three) = (engine.competitors[2], engine.competitors[3])
     assert engine.secondary
-    assert two["acc"] == three["acc"]           # the same match points
-    assert three["acx"] > two["acx"]            # more game points
+    assert two["pts"] == three["pts"]           # the same match points
+    assert three["ptx"] > two["ptx"]            # more game points
     assert engine.first_team(three, two) is True
 
     noscondary = event(4, 5, primary="match")   # FIDE_TEAM_TYPEA_MP: no secondary score
@@ -1181,6 +1191,97 @@ def test_art_4_2_2_the_secondary_score_and_the_rules_that_switch_it_off():
     (two, three) = (engine.competitors[2], engine.competitors[3])
     assert not engine.secondary
     assert engine.first_team(two, three) is True    # art. 4.2.3: the smaller TPN
+
+
+def test_art_1_2_the_three_states_of_the_secondary_score():
+    """Art. 1.2.1 and 1.2.2 - the resolver itself, stated as the three states it can
+    return.
+
+    Art. 1.2.1 asks the rules of the competition "whether the other (secondary score) is
+    used for colour allocation", and art. 1.2.2 answers for the rules that do not: stated
+    and used, stated and not used, and unstated. Only the middle one switches art. 4.2.2
+    off, and a boolean that cannot tell the third state from the second switches it off
+    for tournaments whose rules never said so.
+    """
+    # -m fideteam-mp-gp names both scores: the competition stated that the other is used
+    assert resolve_secondary_score(["fideteam", "mp", "gp"], {"primary": "mp"}) == SECONDARY_USED
+    # a record 192 _MP_GP code writes both into the score system
+    assert resolve_secondary_score(["fideteam"], {"primary": "match", "secondary": "game"}) == SECONDARY_USED
+    # a record 192 _MP code writes one score and no other: the other is stated unused
+    assert resolve_secondary_score(["fideteam"], {"primary": "match"}) == SECONDARY_UNUSED
+    # -m fideteam-mp names the primary score only, which states nothing about the other
+    assert resolve_secondary_score(["fideteam", "mp"], {"primary": "mp"}) == SECONDARY_UNSTATED
+    # and a file that names no score at all leaves art. 1.2.2 to answer
+    assert resolve_secondary_score(["fideteam"], {}) == SECONDARY_UNSTATED
+
+
+def test_art_1_2_2_naming_the_primary_score_does_not_switch_the_secondary_off():
+    """Art. 1.2.1 - "the rules of the competition shall state which, between match points
+    and game points, is called primary score, AND WHETHER the other (secondary score) is
+    used for colour allocation" - and art. 1.2.2, which answers when they do not: "the
+    default is to use match points as the primary score and game points for colour
+    allocation".
+
+    The article asks two questions, and answering the first is not answering the second.
+    "-m fideteam-mp" names match points as the primary score on the command line; it says
+    nothing at all about game points, so art. 1.2.2 still supplies the answer and game
+    points are used for the colour allocation of art. 4.2.2.
+
+    That is the opposite case to a record 192 code, which encodes both decisions at once -
+    FIDE_TEAM_TYPEA_MP_GP writes a secondary score and FIDE_TEAM_TYPEA_MP deliberately
+    writes none - so there the absence of a secondary score IS the competition stating
+    that the other score is not used, and art. 4.2.2 must not fire. Both files reach the
+    engine with a primary score and no secondary one, and what tells them apart is which
+    source stated it.
+
+    Two teams equal on match points and unequal on game points. Art. 4.2.1 cannot separate
+    them, so art. 4.2.2 has the pair to itself: the first-team is team 3, with 2.0 game
+    points against team 2's 1.5. Art. 4.2.3 would say team 2, the smaller TPN, so the two
+    articles disagree and the assertion reports which one fired.
+    """
+    tournament = event(4, 5)
+    # -m fideteam-mp, as commonmain builds it: the method list becomes the pairing system,
+    # and the score token in it becomes the primary score.
+    tournament.tournament["pairingSystem"] = ["fideteam", "mp"]
+    tournament.tournament["scoreSystem"]["primary"] = "mp"
+    tournament.match(1, 2, 4, ["W", "D"])       # team 2: 1.5 game points, 2 match points
+    tournament.match(1, 3, 1, ["W", "W"])       # team 3: 2.0 game points, 2 match points
+    engine = tournament.engine(2)
+    engine.compute_pairing(False)
+    (two, three) = (engine.competitors[2], engine.competitors[3])
+    assert engine.secondary
+    assert two["pts"] == three["pts"]           # the same match points: 4.2.1 is silent
+    assert three["ptx"] > two["ptx"]            # more game points
+    assert two["tpn"] < three["tpn"]            # and 4.2.3 would have said the other team
+    assert engine.first_team(three, two) is True
+    assert engine.first_team(two, three) is False
+
+
+def test_art_1_7_the_three_colour_models_and_where_they_are_named():
+    """Art. 1.7 - "Type A colour preferences are used unless the rules of the team
+    competition specify Type B, or no colour preferences at all".
+
+    The model reaches the engine from two places - the pairing system, which both -m and
+    trf2json's record 192 table write into, and the record 192 code itself - and this is
+    the precedence between them. One model answers both of the questions the crosstable
+    asks, so the two cannot come out of different sources and leave a model half-applied.
+    """
+    # a model named in the pairing system wins, whichever spelling it arrived in
+    assert resolve_colour_model(["fideteam", "typeb"], "") == TYPE_B
+    assert resolve_colour_model(["fideteam", "team_typeb"], "") == TYPE_B
+    assert resolve_colour_model(["fideteam", "nocolor"], "") == NO_COLOUR
+    assert resolve_colour_model(["fideteam", "typea"], "") == TYPE_A
+    # and it wins over the code of the file, which is what -m is for
+    assert resolve_colour_model(["fideteam", "typea"], "FIDE_TEAM_TYPEB_MP_GP") == TYPE_A
+    # the code is read when the pairing system names no model, as -m fideteam leaves it
+    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEB_MP_GP") == TYPE_B
+    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEA_MP") == TYPE_A
+    # no record 192 code states the third model: there is no TYPEC token to write, so a
+    # code with no TYPE token falls to the art. 1.7 default here, and the record 192
+    # table of trf2json is what maps such a code to "nocolor".
+    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_MP_GP") == TYPE_A
+    # failing both, art. 1.7's own default
+    assert resolve_colour_model(["fideteam"], "") == TYPE_A
 
 
 def test_art_4_3_2_grant_the_only_preference():
