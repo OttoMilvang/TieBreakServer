@@ -36,6 +36,20 @@ version* -- so the split the corpus already encodes in each record's name is
 visible at a glance.  This script only reports; the matrix jobs are what gate the
 pull request, so it always exits 0 (an aggregation hiccup must not turn a green
 run red).
+
+Everything read out of a JUnit artifact -- case ids, failure messages, skip
+reasons, file names -- is attacker-controlled on a fork pull request, because the
+fork's own copy of the workflow produces the artifacts.  The rendered Markdown is
+posted as a comment by a privileged job, so every such string is neutralised on
+the way into the report, by one of two mechanisms depending on where it lands.
+Free text that sits directly in the prose -- failure/error messages, skip and
+xfail reasons -- is HTML-entity- and Markdown-metacharacter-escaped by
+``_escape``, so it can neither close a tag nor forge Markdown structure of its
+own. Identifiers -- case ids, Python versions, shard numbers, file names -- are
+instead rendered through ``_code``, an inert Markdown code span: its content is
+never HTML-escaped, but a code span cannot itself open a tag, and collapsing
+its internal whitespace keeps a blank line in the artifact from ending the
+span early and letting whatever follows resume as ordinary, unfenced Markdown.
 """
 import collections
 import re
@@ -56,6 +70,43 @@ _INDIVIDUAL = "Individual pairing (corpus)"
 _TEAM = "Team pairing (corpus)"
 _UNIT = "Unit & regression tests"
 _GROUP_ORDER = (_INDIVIDUAL, _TEAM, _UNIT)
+
+
+# Markdown characters that carry structure in the report: emphasis, code spans,
+# links, table cells and the backslash that escapes them.  A JUnit artifact is
+# untrusted input (see the module docstring), so these are neutralised in every
+# string that comes out of one.
+_MARKDOWN_SPECIAL = re.compile(r"([\\`*_\[\]|~])")
+
+
+def _escape(text):
+    """Render *text* from an artifact as inert Markdown.
+
+    ``<``, ``>`` and ``&`` become entities, so no tag can be opened or closed --
+    a reason ending ``</details><img src=x>`` can neither escape the disclosure
+    block it sits in nor load anything.  The structural Markdown characters are
+    then backslash-escaped, so ``**ALL GREEN**`` prints its asterisks instead of
+    forging a bold verdict and ``[click](http://evil)`` prints as the text it is
+    rather than becoming a link.  Both survive legibly: the reader still sees
+    what the artifact said, and none of it is markup any more.
+    """
+    text = (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return _MARKDOWN_SPECIAL.sub(r"\\\1", text)
+
+
+def _code(text):
+    """*text* from an artifact as an inert Markdown code span.
+
+    A code span renders its contents literally -- HTML included -- so the only
+    way out of one is a backtick of its own, which is what is replaced here.
+    A code span also cannot survive a blank line: CommonMark ends the
+    enclosing paragraph there, and everything beyond -- a forged heading, raw
+    HTML -- resumes as ordinary Markdown outside the backticks. Collapsing
+    whitespace closes that: a run of newlines from an artifact can no longer
+    open a blank line inside the span.
+    """
+    text = " ".join((text or "").split())
+    return "`%s`" % text.replace("`", "'")
 
 
 def _blank():
@@ -82,9 +133,39 @@ def _outcome_of(testcase):
     return "passed"
 
 
+# A fork's own workflow writes these files, so they are untrusted input to a job that
+# holds pull-requests: write. ElementTree already refuses external entities, which is the
+# half of the problem that reads files off the runner; the other half is an internal DTD
+# subset, where a few hundred bytes of nested entity definitions expand to gigabytes and
+# take the job down with them ("billion laughs"). JUnit XML has no use for a doctype at
+# all, so the whole construct is refused rather than bounded, and the file is capped
+# before it is read: a real 8-shard run writes a few hundred KB.
+MAX_JUNIT_BYTES = 32 * 1024 * 1024
+
+
+def _parse_junit(path):
+    """Parse one JUnit file, refusing the shapes a hostile fork could send."""
+    size = path.stat().st_size
+    if size > MAX_JUNIT_BYTES:
+        raise ValueError(
+            "file is %d bytes, over the %d-byte limit" % (size, MAX_JUNIT_BYTES)
+        )
+    data = path.read_bytes()
+    head = data[:4096].lstrip()
+    if b"<!DOCTYPE" in head or b"<!ENTITY" in data:
+        raise ValueError("file carries a doctype or entity definition, which JUnit XML does not use")
+    return ET.fromstring(data)
+
+
 def _case_id(testcase):
-    classname = testcase.get("classname", "")
-    name = testcase.get("name", "?")
+    """The test id shown to the reader, always rendered through ``_code``.
+
+    Whitespace is collapsed here too, not just in ``_code``, so a case id
+    built from the classname and name concatenation cannot reintroduce a
+    blank line between the two halves.
+    """
+    classname = " ".join((testcase.get("classname", "") or "").split())
+    name = " ".join((testcase.get("name", "?") or "").split())
     return "%s::%s" % (classname, name) if classname else name
 
 
@@ -124,8 +205,8 @@ def collect(directory):
         python = name_match.group("python") if name_match else "unknown"
         pythons.add(python)
         try:
-            root = ET.parse(path).getroot()
-        except ET.ParseError as exc:
+            root = _parse_junit(path)
+        except (ET.ParseError, ValueError) as exc:
             parse_errors.append((path.name, str(exc)))
             continue
         file_count += 1
@@ -234,7 +315,10 @@ def _reasons_block(title, note, reasons):
         return []
     lines = ["### %s" % title, "", "_%s_" % note, ""]
     for reason, count in reasons.most_common():
-        lines.append("- **%s×** %s" % (format(count, ","), reason))
+        # The reason comes out of a JUnit artifact, so it is escaped here rather
+        # than in collect(): the counters stay keyed on what the marker actually
+        # said, and only the rendered line is made inert.
+        lines.append("- **%s×** %s" % (format(count, ","), _escape(reason)))
     lines.append("")
     return lines
 
@@ -284,7 +368,7 @@ def render(report):
     # By Python version -- the matrix's other axis.
     out.append("### By Python version")
     out.append("")
-    rows = [_row("Python %s" % python, by_python[python])
+    rows = [_row("Python %s" % _escape(python), by_python[python])
             for python in sorted(by_python)]
     out.extend(_table("Python", rows))
     out.append("")
@@ -312,8 +396,9 @@ def render(report):
                    % len(failures))
         out.append("")
         for python, case_id, message in failures[:100]:
-            suffix = " — %s" % message if message else ""
-            out.append("- `%s` _(py%s)_%s" % (case_id, python, suffix))
+            suffix = " — %s" % _escape(message) if message else ""
+            out.append("- %s _(py%s)_%s"
+                       % (_code(case_id), _escape(python), suffix))
         if len(failures) > 100:
             out.append("- … and %d more" % (len(failures) - 100))
         out.append("")
@@ -325,7 +410,7 @@ def render(report):
                    "be parsed</summary>" % len(parse_errors))
         out.append("")
         for filename, message in parse_errors:
-            out.append("- `%s` — %s" % (filename, message))
+            out.append("- %s — %s" % (_code(filename), _escape(message)))
         out.append("")
         out.append("</details>")
         out.append("")
