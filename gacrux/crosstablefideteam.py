@@ -83,6 +83,37 @@ class crosstable_fideteam(crosstable):
         return qdefs.IW.value
 
     """
+    assign_tpn - art. 1.1, the tournament pairing number
+
+    art. 1.1.1 - "each team must have a different TPN, from 1 to the number of teams".
+    art. 1.1.2 - "the rules of the team competition shall describe how to assign a TPN to
+    each team. Otherwise, it is a decision of the Chief Arbiter", with the note that this
+    "overrides Articles 2.1 to 2.3 of the General Handling Rules for Swiss Tournaments".
+    art. 1.1.3 - "once defined, the TPN should not be modified (except as stated in
+    Articles 2.4 and 2.5 of the General Handling Rules for Swiss Tournaments), unless the
+    Chief Arbiter decides otherwise".
+
+    So C.04.6 does not derive the number from the standings: it is assigned once, outside
+    these rules, and then held. What states that assignment here is the fixed order the
+    engine is given - the declared start numbers, or the original ranking when the caller
+    selects that - and neither changes from round to round. Each team therefore keeps its
+    place in that order, rather than taking the running count over the teams ready to be
+    paired that the base class keeps for the individual systems: a team that is absent must
+    keep its own number and must not hand it down to the team behind it. Seven articles
+    read the number back - 3.4.4, 3.5.3, 3.5.4, 3.6.1, 3.6.2, 4.2.3 and 4.3.1 - and 4.3.1
+    reads its parity, so one absent team would otherwise reverse the colours of every team
+    below it.
+
+    In a field where every team is present the two numberings are the same value, which is
+    why only an absence ever tells them apart.
+    """
+
+    def assign_tpn(self, competitors, size):
+        rr = sorted(competitors, key=lambda s: (s[self.rank]))
+        for i in range(1, size):
+            rr[i]["tpn"] = i
+
+    """
     color_preference - art. 1.7
 
     cop is the colour, then the strength:

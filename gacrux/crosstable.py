@@ -143,13 +143,7 @@ class crosstable:
             competitors[i]["scorelevel"] = score2level[competitors[i]["acc"]] if competitors[i]["rfp"] else 0
         competitors[size]["scorelevel"] = -1
 
-        # update tpn, give tps to players that have been paired at least once.
-        tpn = 0
-        rr = sorted(competitors, key=lambda s: (s[self.rank]))
-        for i in range(1, size):
-            if rr[i]["rfp"] or rr[i]["rip"]:
-                tpn += 1
-                rr[i]["tpn"] = tpn
+        self.assign_tpn(competitors, size)
 
 
 
@@ -218,7 +212,40 @@ class crosstable:
 
     def update_crosstable(self, scorelevel, nodes, edges, pablevel, update_maxpsd=True):
         pass
-            
+
+    """
+    assign_tpn - the tournament pairing number of every competitor
+
+    Here it is a running count over the competitors that are ready to be paired or have
+    been paired before, so only a competitor who has never yet been paired and is absent
+    this round hands its number down to the ones behind it; a withdrawn competitor keeps
+    its number. That is the numbering the individual systems of this engine have always
+    used, and the corpus records their pairings under it.
+
+    C.04.6 requires the other reading for teams - art. 1.1.1 "each team must have a
+    different TPN, from 1 to the number of teams" and art. 1.1.3 "once defined, the TPN
+    should not be modified" - so crosstable_fideteam overrides this with each team's fixed
+    place in the order the engine is given.
+
+    The two differ only when somebody is absent: in a full field a running count and a
+    fixed place are the same value, which is why only an absence ever tells them apart.
+
+    Whether the individual systems should follow C.04.6 here is an open question and not
+    one this change answers. C.04.3 art. 1.1 does point at the same article 2 of the
+    General Handling Rules, and the Dutch colour rules E.4 and E.5 read the number the same
+    way art. 4.3.1 does - but moving it changes the colours of many individual records of
+    the corpus, so it needs its own evidence and its own change, rather than being decided
+    as a side effect of the team system.
+    """
+
+    def assign_tpn(self, competitors, size):
+        tpn = 0
+        rr = sorted(competitors, key=lambda s: (s[self.rank]))
+        for i in range(1, size):
+            if rr[i]["rfp"] or rr[i]["rip"]:
+                tpn += 1
+                rr[i]["tpn"] = tpn
+
     def update_canmeet(self, edge, a, b, bhasmet):
         played = bhasmet.count(a["cid"]) if bhasmet is not None else 0
         ca = a["cid"]
