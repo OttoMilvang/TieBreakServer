@@ -605,6 +605,12 @@ class pairing_fideteam(pairing):
     General Handling Rules is left to the rules of the competition. The matches are
     ordered the way the Dutch engine orders its games - by the higher score of the pair,
     then by the sum of the scores, then by the lower TPN - and the bye comes last.
+
+    The scores are the pairing scores, which is what C.04.7 art. 1.5 asks for: the pairing
+    score is "used to define scoregroups, sort them internally, and sort boards per
+    Article 3.6 of the General Handling Rules". The tie-break is the TPN of art. 1.1.1 -
+    the place of the team in the field - and not the competitor id of the file, which is a
+    different number as soon as the field is paired on its rank order.
     """
 
     def update_board(self, roundpairing):
@@ -614,13 +620,15 @@ class pairing_fideteam(pairing):
             for pair in bracket["pairs"]:
                 (w, b) = (pair["w"], pair["b"])
                 (ws, bs) = (cmp[w]["acc"], cmp[b]["acc"])
+                # art. 1.4 - the bye has no opponent, so it has one TPN and not two
+                tpns = [cmp[team]["tpn"] for team in (w, b) if team > 0]
                 pairs.append(
                     {
                         "pair": pair,
                         "ipab": w == 0 or b == 0,
                         "maxs": max(ws, bs),
                         "sums": ws + bs,
-                        "rank": w if w < b else b,
+                        "rank": min(tpns),
                     }
                 )
         board = 0
