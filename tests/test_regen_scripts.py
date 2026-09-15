@@ -11,7 +11,9 @@ Nothing here runs the script's ``main``.  The corpus is faked, the engine is
 faked, and every write goes to a temporary path; the checked-in file is only
 ever read.
 """
+import gzip
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -44,3 +46,65 @@ def test_harness_treats_nonzero_system_exit_as_failure():
             raise SystemExit(2)
 
     assert _harness._drive(ExitsNonzero, []) == 2
+
+
+def _fake_corpus(tmp_path, count, skips=None):
+    """A corpus of *count* trivial records, in the real file's format."""
+    path = tmp_path / "corpus.jsonl.gz"
+    with gzip.open(path, "wt", encoding="utf-8") as handle:
+        for index in range(count):
+            handle.write(json.dumps({
+                "name": "ind_%05d" % index,
+                "category": "individual",
+                "valid": True,
+                "skip": bool(skips and index in skips),
+                "trf": "012 fake\n",
+            }) + "\n")
+    return path
+
+
+def test_known_failure_regeneration_ignores_the_ci_shard_variables(tmp_path,
+                                                                   monkeypatch):
+    """The regenerator reads the whole corpus even inside a sharded environment.
+
+    ``_harness.load_corpus`` honours ``TIEBREAK_CORPUS_SHARDS`` and
+    ``TIEBREAK_CORPUS_SHARD``, which is right for the test suite -- that is how
+    CI splits the corpus across eight runners.  The regenerator called the same
+    loader, so running it in any shell where those variables were still set
+    rewrote the entire checked-in ``known_failures.json`` from one eighth of the
+    records.  Every known failure outside that eighth silently disappeared from
+    the file, and the test suite then reported the records as unexpected passes
+    or, worse, stopped marking real failures at all.  Nothing about the result
+    looked wrong; the file is a list of names with no declared length.
+
+    This pins the separation directly: with the variables set to a 1-of-8 split,
+    the loader used by the test suite returns an eighth, and the regenerator's
+    own loader returns all of it.
+    """
+    monkeypatch.setattr(_harness, "CORPUS_GZ", _fake_corpus(tmp_path, 16))
+    monkeypatch.setenv("TIEBREAK_CORPUS_SHARDS", "8")
+    monkeypatch.setenv("TIEBREAK_CORPUS_SHARD", "3")
+
+    # What the test suite sees under those variables: one shard.
+    assert len(_harness.load_corpus(full=True)) == 2
+
+    records = regen_known_failures.load_records()
+
+    assert len(records) == 16
+    assert [record["name"] for record in records] == \
+        ["ind_%05d" % index for index in range(16)]
+
+
+def test_known_failure_regeneration_skips_records_marked_skip(tmp_path, monkeypatch):
+    """Records the corpus marks ``skip`` stay out of the regenerated baseline.
+
+    The loader is new; this keeps the filter that was in ``main`` from being lost
+    with the move, since a skipped record is not run by the test either and must
+    not be listed as a known failure.
+    """
+    monkeypatch.setattr(_harness, "CORPUS_GZ", _fake_corpus(tmp_path, 3, skips={1}))
+    monkeypatch.delenv("TIEBREAK_CORPUS_SHARDS", raising=False)
+    monkeypatch.delenv("TIEBREAK_CORPUS_SHARD", raising=False)
+
+    assert [record["name"] for record in regen_known_failures.load_records()] == \
+        ["ind_00000", "ind_00002"]

@@ -13,6 +13,10 @@ fails but was not listed before is added under an "unclassified" reason for a
 human to describe.  Run this after changing the engine, review the diff, and
 commit it.
 
+The whole corpus is always used: the CI shard variables are stripped before the
+records are read, because a baseline regenerated from one shard silently drops
+every known failure outside it.  See ``load_records``.
+
 Usage (from the repo root, uses all cores):
 
     python tests/corpus/regen_known_failures.py
@@ -29,6 +33,34 @@ import _harness  # noqa: E402
 UNCLASSIFIED = ("unclassified -- the engine fails this record but no reason has been "
                 "recorded yet; investigate and describe the bug here")
 
+# The variables CI uses to split the corpus across runners.  _harness.load_corpus
+# honours them, which is right for the test suite and wrong here.
+SHARD_VARS = ("TIEBREAK_CORPUS_SHARDS", "TIEBREAK_CORPUS_SHARD")
+
+
+def load_records():
+    """Every non-skipped corpus record, whatever the environment says.
+
+    ``_harness.load_corpus`` splits the corpus when TIEBREAK_CORPUS_SHARDS and
+    TIEBREAK_CORPUS_SHARD are set, which is how the eight CI runners divide the
+    work.  This script rewrites the *whole* of known_failures.json, so reading a
+    shard would not produce a partial baseline -- it would produce a complete-
+    looking one with seven eighths of the failures missing, and nothing in the
+    file's shape to show it.  Anyone regenerating in a shell where the variables
+    are still exported, or inside a container that inherits the CI environment,
+    would commit that.
+
+    So the variables are removed from the environment for the rest of the run,
+    and their removal is announced rather than done silently.
+    """
+    ignored = [name for name in SHARD_VARS if name in os.environ]
+    for name in ignored:
+        del os.environ[name]
+    if ignored:
+        print("ignoring %s: this rewrites the whole baseline, so it always reads "
+              "the whole corpus" % " and ".join(ignored), flush=True)
+    return [r for r in _harness.load_corpus(full=True) if not r.get("skip")]
+
 
 def _test_fails(record):
     """Mirror the assertions in test_corpus.test_corpus_record."""
@@ -44,7 +76,7 @@ def _test_fails(record):
 
 
 def main():
-    records = [r for r in _harness.load_corpus(full=True) if not r.get("skip")]
+    records = load_records()
     total = len(records)
     prior = _harness.load_known_failures()
     print("checking %d non-skipped records ..." % total, flush=True)
