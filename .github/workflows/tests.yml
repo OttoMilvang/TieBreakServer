@@ -3,10 +3,20 @@ name: tests
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  # A pull request only runs this workflow against the merge of its branch
+  # into main at the time it was opened or last synchronised; nothing re-runs
+  # it against the actual post-merge tree. Without this, a merge that only
+  # conflicts semantically -- both branches green individually, red together
+  # -- reaches main with the whole corpus never having run against it.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: tests-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  # Branch names are only unique within a repository. Include the PR head
+  # repository so same-named branches in two forks cannot cancel each other's
+  # runs or share a concurrency group.
+  group: tests-${{ github.event_name }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref }}
   # Cancel a superseded pull-request run when new commits arrive, but leave a
   # manually dispatched run alone so it is never cut short.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

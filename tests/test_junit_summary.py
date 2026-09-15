@@ -404,3 +404,25 @@ def test_both_workflows_pass_the_expectation_to_the_summary_script():
             "%s does not pass the expected shard coordinates" % workflow
 
 
+def test_test_workflow_concurrency_separates_same_named_fork_branches():
+    text = (WORKFLOWS / "tests.yml").read_text(encoding="utf-8")
+    assert "github.event.pull_request.head.repo.full_name" in text
+    assert "github.repository" in text
+
+
+def test_tests_workflow_runs_on_push_to_main():
+    """The whole corpus also runs against what actually lands on ``main``.
+
+    A pull request is checked against the merge of its own branch into
+    ``main`` as of when it was opened or last synchronised, not re-run against
+    the tree main ends up with after the merge. Two branches that are each
+    green on their own can still conflict semantically once combined, and
+    without a trigger on ``push`` to ``main`` that combination never runs the
+    suite at all until the next unrelated pull request happens to pick it up.
+    """
+    text = (WORKFLOWS / "tests.yml").read_text(encoding="utf-8")
+    on_block = text.split("\nconcurrency:", 1)[0]
+    assert re.search(r"^\s*push:\s*$", on_block, re.M), \
+        "tests.yml has no push trigger"
+    assert re.search(r"^\s*branches:\s*\[main\]\s*$", on_block, re.M), \
+        "tests.yml's push trigger is not scoped to main"
