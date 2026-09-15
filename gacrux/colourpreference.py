@@ -36,8 +36,9 @@ Pair that player, a topscorer so that [C3] does not keep the two apart, against 
 sequence is a bye, White, Black, White - colour difference +1, a strong preference for
 Black by art. 1.7.2 - and the two readings of 1.7 hand Black to different players.
 
-THE DECISION: a player's colour preference is the first definition in art. 1.7 that fits
-them, so the Black-Black-White-White player has an absolute preference and takes Black.
+This module takes a player's colour preference to be the first definition in art. 1.7
+that fits them, so the Black-Black-White-White player has an absolute preference and
+takes Black.
 
 The article carries the reading itself. It defines the three strengths in a fixed order
 and gives no rule for choosing between them, which leaves the order they are written in as

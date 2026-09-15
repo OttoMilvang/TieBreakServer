@@ -185,9 +185,18 @@ class crosstable_dutch(crosstable):
             canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
             for col in ["w", "b"]:
                 col2 = col + "2"
+                # C.04.3 art. 2.1.3 [C3]: two players holding an ABSOLUTE
+                # same-colour preference (art. 1.7.1, cop == col2) may not be
+                # paired together. A merely STRONG preference (art. 1.7.2)
+                # does not carry this restriction, however large the other
+                # player's own colour difference is -- there used to be a
+                # second test here, "a['cod'] * b['cod'] >= 4", that forbade
+                # a pairing whenever one side's |cod| was 4 or worse even if
+                # the other side's preference was only strong. That treated a
+                # strong preference as if it were absolute and had no article
+                # behind it; it could delete the one legal edge a bracket
+                # needed; see tests/test_strong_preference_may_meet_absolute.py.
                 if a["cop"] == col2 and b["cop"] == col2 and (not a["top"]) and (not b["top"]):
-                    canmeet = False
-                if a["cod"] * b["cod"] >= 4 and (not a["top"]) and (not b["top"]):
                     canmeet = False
         # score diff
         return canmeet
