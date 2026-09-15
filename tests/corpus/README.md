@@ -115,3 +115,15 @@ python3 tests/corpus/regen_known_failures.py
 
 Review and classify every new disagreement rather than treating regeneration as
 an automatic re-baseline.
+
+The file currently lists 260 of the 6000 fixtures, in seven groups:
+
+| n | group |
+|---|---|
+| 45 | a score reaches `rating.ComputeDeltaR` as text, and the tie-break checker faults |
+| 27 | a record 299 adjustment is written under `mpoints`/`gpoints` and read under `points`, and the tie-break checker faults |
+| 29 | a record 299 naming a competitor in round `000` is refused, status 419 |
+| 25 | a record 299 in a team file naming a player start number is refused, status 502 |
+| 66 | the prescribed pairing and the declared standings are both refused |
+| 37 | the prescribed pairing is refused |
+| 31 | the declared standings are refused |
