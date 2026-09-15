@@ -183,6 +183,13 @@ class pairing_fideteam(pairing):
                     + " score (see C.04.7 art. 1.4.4)"
                 )
 
+        # [C1] art. 2.1.1 - "two participants shall not play against each other more than
+        # once". The criterion is absolute and the team system has no double-round
+        # variant, so the maxMeets dial of the base class - which -K and a "double" in the
+        # method list turn up for the Dutch engine - is pinned here. A round that then has
+        # no legal pairing reports itself through GacruxNoLegalPairing (art. 3.3.3).
+        self.nummeets = 1
+
         # art. 2.3.4 [C7] and art. 2.3.7 [C10] do not apply in the last two rounds.
         self.lasttworounds = rnd > self.numrounds - 2
 
