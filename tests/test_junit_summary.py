@@ -312,3 +312,95 @@ def test_malformed_only_junit_reports_parser_error(tmp_path, capsys):
     # The parser's own diagnostic, not just the file name.
     assert "line 1" in rendered
     assert "All checks passed" not in rendered
+WORKFLOWS = Path(__file__).parents[1] / ".github" / "workflows"
+
+_PYTHONS_RE = re.compile(r"^\s*python-version:\s*\[(?P<items>[^\]]*)\]\s*$", re.M)
+_SHARD_RE = re.compile(r"^\s*- \{number:\s*\d+,\s*index:\s*\d+\}\s*$", re.M)
+_EXPECTED_RE = re.compile(r'^\s*EXPECTED_JUNIT_FILES:\s*"(?P<count>\d+)"\s*$', re.M)
+
+
+def _expected_junit_files(workflow):
+    found = _EXPECTED_RE.findall((WORKFLOWS / workflow).read_text(encoding="utf-8"))
+    assert len(found) == 1, \
+        "%s should declare EXPECTED_JUNIT_FILES exactly once, found %d" \
+        % (workflow, len(found))
+    return int(found[0])
+
+
+def _matrix_pythons(tests_yml_text):
+    """The ``python-version`` matrix axis in ``tests.yml``'s own text."""
+    pythons = _PYTHONS_RE.search(tests_yml_text)
+    assert pythons, "could not find the python-version matrix axis in tests.yml"
+    return [item.strip().strip('"').strip("'")
+            for item in pythons.group("items").split(",") if item.strip()]
+
+
+def _expected_python_flags():
+    """The ``--expect-python`` invocation the matrix in ``tests.yml`` implies.
+
+    ``test-summary-comment.yml`` runs from the default branch on a
+    ``workflow_run`` trigger, so it has no matrix of its own to read at run
+    time -- it can only hardcode the same flags ``tests.yml`` passes. Deriving
+    the expectation from the matrix, rather than spelling the versions out
+    here too, means a third Python version added to the matrix and forgotten
+    in one of the two workflows fails this test instead of two files agreeing
+    with each other by coincidence.
+    """
+    tests_yml = (WORKFLOWS / "tests.yml").read_text(encoding="utf-8")
+    versions = _matrix_pythons(tests_yml)
+    return " ".join("--expect-python %s" % version for version in versions)
+
+
+def test_expected_shard_count_matches_the_workflow_matrix():
+    """The shard-count expectation is the size of the matrix, in both workflows.
+
+    ``--expect-files`` is only as good as the number handed to it: set too low it
+    lets a missing shard through, set too high it reddens every run.  The number
+    lives in the workflow rather than in the script so the matrix and the
+    expectation sit in one file, but nothing in YAML ties them together -- adding
+    a ninth shard or a third Python version would leave the expectation at 16 and
+    quietly restore the hole this whole check exists to close.
+
+    So the coupling is asserted here instead: the declared expectation must equal
+    the number of Python versions times the number of shards in ``tests.yml``, and
+    the fork-comment workflow -- which runs from the default branch and cannot
+    read ``tests.yml``'s matrix at run time -- must carry the same number.
+    """
+    tests_yml = (WORKFLOWS / "tests.yml").read_text(encoding="utf-8")
+
+    python_count = len(_matrix_pythons(tests_yml))
+    shard_count = len(_SHARD_RE.findall(tests_yml))
+    assert python_count >= 1 and shard_count >= 1, \
+        "matrix axes parsed as %d python(s) x %d shard(s)" % (python_count, shard_count)
+
+    assert _expected_junit_files("tests.yml") == python_count * shard_count
+    assert _expected_junit_files("test-summary-comment.yml") == \
+        _expected_junit_files("tests.yml")
+
+
+def test_both_workflows_pass_the_expectation_to_the_summary_script():
+    """Neither workflow may run the summary without telling it what to expect.
+
+    Without ``--expect-files`` the script has nothing to compare the arriving
+    artifacts against and says so in its output, but a silently weakened gate is
+    what this whole item is about, so the flag is pinned here as part of the
+    invocation rather than left to review.
+
+    The expected ``--expect-python`` flags are derived from ``tests.yml``'s own
+    matrix rather than spelled out as literal version numbers here: a matrix
+    change that both workflows forgot to follow should fail this test, not
+    agree with a hardcoded expectation that never noticed either.
+    """
+    expected_python_flags = _expected_python_flags()
+    for workflow in ("tests.yml", "test-summary-comment.yml"):
+        text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+        assert "junit_summary.py" in text, "%s no longer runs the summary" % workflow
+        assert '--expect-files "$EXPECTED_JUNIT_FILES"' in text, \
+            "%s runs junit_summary.py without --expect-files" % workflow
+        assert expected_python_flags in text, \
+            "%s does not pass the expected Python coordinates (%s)" \
+            % (workflow, expected_python_flags)
+        assert "--expect-shard 1" in text and "--expect-shard 8" in text, \
+            "%s does not pass the expected shard coordinates" % workflow
+
+

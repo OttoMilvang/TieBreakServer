@@ -1,32 +1,120 @@
 name: test summary comment
 
+# The `tests` workflow comments on pull requests from branches in this
+# repository itself.  It cannot comment on a pull request from a fork: a
+# `pull_request` run of a fork's code gets a read-only token, by design.  This
+# workflow closes that gap.  It is triggered by `workflow_run`, so it runs from
+# the trusted default branch with a writable token, after the unprivileged test
+# run has finished, and it reads that run's artifacts.
+#
+# Everything it reads out of those artifacts is attacker-controlled: on a fork
+# pull request the `junit-*` artifacts are produced by the *fork's* copy of
+# `tests.yml`, so their contents are whatever the pull request's author wants
+# them to be.  Three things follow, and all three are load-bearing:
+#
+#   * the summary script is checked out from the default branch, never from the
+#     head of the pull request, so the code that reads the artifacts is ours;
+#   * that script neutralises every string it takes out of an artifact before
+#     the comment is posted -- free text (failure messages, skip/xfail reasons)
+#     is HTML- and Markdown-escaped, and identifiers (case ids, Python
+#     versions, shard numbers, file names) are rendered as whitespace-collapsed
+#     Markdown code spans -- so nothing in one can close an HTML tag, break out
+#     of its span or forge a verdict in the comment (see
+#     `.github/scripts/junit_summary.py` and the tests that pin both); and
+#   * the comment leads with GitHub's own conclusion for the run, taken from the
+#     trusted `workflow_run` payload rather than from anything the fork wrote,
+#     so a fabricated "all green" table cannot stand unchallenged next to it.
+#
+# Nothing here checks out, builds or executes the pull request's code.
+
 on:
   workflow_run:
     workflows: [tests]
     types: [completed]
 
-# This workflow runs from the trusted default branch after an unprivileged test
-# run.  It may read that run's artifacts and write only a pull-request comment.
-permissions:
-  actions: read
-  contents: read
-  pull-requests: write
+# Deny by default; the single job below asks for exactly what it needs.
+permissions: {}
+
+# Must equal EXPECTED_JUNIT_FILES in tests.yml, which is in turn the size of that
+# workflow's matrix.  tests/test_junit_summary.py asserts all three agree.
+env:
+  EXPECTED_JUNIT_FILES: "16"
 
 jobs:
   comment:
     name: Post fork test summary
     # Same-repository pull requests are commented on directly by tests.yml.
     # Cancelled runs may not have a complete set of JUnit artifacts.
+    #
+    # This deliberately does *not* test `workflow_run.pull_requests`: GitHub
+    # populates that array only for runs whose head branch is in this
+    # repository, so requiring both it and a fork head made the job's condition
+    # self-contradictory and it never ran once.  A fork pull request therefore
+    # got no summary at all, from either workflow.  The number is resolved from
+    # the head commit below instead.
     if: >-
       ${{
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion != 'cancelled' &&
-        github.event.workflow_run.head_repository.full_name != github.repository &&
-        github.event.workflow_run.pull_requests[0]
+        github.event.workflow_run.head_repository.full_name != github.repository
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      # Read the finished run's artifacts, read the repository's own summary
+      # script, and write the one pull-request comment.  Nothing else: this job
+      # holds a writable token while handling untrusted input, so its scope is
+      # the smallest set that can still post the comment.
+      actions: read
+      contents: read
+      pull-requests: write
     steps:
+      - name: Resolve the pull request this run belongs to
+        id: pr
+        uses: actions/github-script@v8
+        with:
+          result-encoding: string
+          script: |
+            const run = context.payload.workflow_run;
+            // `workflow_run.pull_requests` is empty for a run from a fork, which
+            // is the only case this workflow handles, so the pull request is
+            // looked up from the run's head commit instead -- the pattern
+            // GitHub's own workflow_run documentation gives for this situation.
+            const {data: associated} =
+              await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: run.head_sha,
+              });
+            const base = `${context.repo.owner}/${context.repo.repo}`;
+            let match = associated.find(pull =>
+              pull.state === 'open' &&
+              pull.head.sha === run.head_sha &&
+              pull.base.repo.full_name === base
+            );
+            if (!match) {
+              // The association index can lag for a fork's commits; fall back to
+              // the open pull requests opened from that head branch and match on
+              // the same commit, so a stale run still cannot land on the wrong
+              // pull request.
+              const pulls = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                head: `${run.head_repository.owner.login}:${run.head_branch}`,
+                per_page: 100,
+              });
+              match = pulls.find(pull => pull.head.sha === run.head_sha);
+            }
+            if (!match) {
+              core.notice(
+                `No open pull request has ${run.head_sha} at its head; ` +
+                'nothing to comment on.'
+              );
+              return '';
+            }
+            core.info(`Reporting run ${run.id} on pull request #${match.number}`);
+            return String(match.number);
       - name: Check out the trusted summary script
         uses: actions/checkout@v7
         with:
@@ -41,20 +129,49 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build the test summary
+        id: summary
+        # The script exits non-zero when the results are incomplete. That must
+        # not stop the comment: an incomplete result set is exactly what the
+        # pull request needs to be told about. The status is carried to the last
+        # step instead, so the report is posted first and the job still ends red.
         run: |
+          set +e
           python3 .github/scripts/junit_summary.py \
+            --expect-files "$EXPECTED_JUNIT_FILES" \
+            --expect-python 3.11 --expect-python 3.14 \
+            --expect-shard 1 --expect-shard 2 --expect-shard 3 --expect-shard 4 \
+            --expect-shard 5 --expect-shard 6 --expect-shard 7 --expect-shard 8 \
             "${{ runner.temp }}/junit" > test-summary.md
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
           cat test-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Create or update the pull-request comment
+        if: ${{ steps.pr.outputs.result != '' }}
         uses: actions/github-script@v8
         env:
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          PR_NUMBER: ${{ steps.pr.outputs.result }}
         with:
           script: |
             const fs = require('fs');
+            const run = context.payload.workflow_run;
             const marker = '<!-- tiebreakserver-test-summary -->';
-            const report = fs.readFileSync('test-summary.md', 'utf8');
-            const body = `${marker}\n${report}`;
+            // GitHub's cap on a comment body is 65536 characters; leave room for
+            // the marker and the header so an oversized artifact cannot make the
+            // API call fail instead of reporting.
+            const LIMIT = 60000;
+            let report = fs.readFileSync('test-summary.md', 'utf8');
+            if (report.length > LIMIT) {
+              report = report.slice(0, LIMIT) + '\n\n_… report truncated._\n';
+            }
+            // The one line here that GitHub vouches for. Everything below it was
+            // generated from artifacts the pull request's own workflow run
+            // produced, and is escaped but not otherwise trustworthy.
+            const icon = run.conclusion === 'success' ? '✅' : '❌';
+            const header =
+              `${icon} GitHub reports the [test run](${run.html_url}) as ` +
+              `**${run.conclusion}** (commit \`${run.head_sha}\`).\n\n` +
+              '_The report below is rendered from that run\'s own artifacts._\n';
+            const body = `${marker}\n${header}\n${report}`;
             const issue_number = Number(process.env.PR_NUMBER);
             if (!Number.isInteger(issue_number)) {
               throw new Error(`Invalid pull-request number: ${process.env.PR_NUMBER}`);
@@ -86,3 +203,9 @@ jobs:
                 body,
               });
             }
+      - name: Fail if the run's results were incomplete
+        if: ${{ steps.summary.outputs.status != '0' }}
+        run: |
+          echo "::error::The test run reported an incomplete set of results;" \
+               "see the summary above."
+          exit 1
