@@ -9,7 +9,8 @@ C.07 tie-break calculations.
 ```
 tests/corpus/
   corpus.jsonl.gz            gzip-compressed JSON Lines fixture data
-  known_failures.json        active expected failures, grouped by reason
+  known_failures.json        baseline expected failures, grouped by reason
+  known_failure_overlays/    feature-owned expectation deltas
   _harness.py                corpus loader and in-process checker driver
   test_corpus.py             pytest entry point
   regen_known_failures.py    expectation regeneration tool
@@ -105,25 +106,21 @@ shard index. Once every runner finishes, CI posts or updates one pull-request
 comment with the combined results; the same report remains available on the
 workflow run's summary page.
 
-Fixtures listed in `known_failures.json` run under strict `xfail` markers. A
+Fixtures in the composed known-failure data run under strict `xfail` markers. A
 fixed disagreement therefore becomes an XPASS and fails the suite until its
-expectation is removed. After an engine change, regenerate the file with:
+expectation is removed. `known_failures.json` is the common baseline. Each
+optional feature owns a separate JSON overlay with `remove` names and `add`
+groups, so independent changes never regenerate or rewrite a shared snapshot.
+Overlays are applied in filename order; each operation names a fixture, making
+the effective set deterministic and reviewable.
+
+Feature-specific rationale lives beside the overlays in
+`known_failure_overlays/*.md`. Aggregate counts are intentionally not copied
+into this README; derive the current totals from the composed data:
 
 ```bash
-python3 tests/corpus/regen_known_failures.py
+PYTHONPATH=tests/corpus python3 -c 'import _harness; print(len(_harness.load_known_failures()))'
 ```
 
-Review and classify every new disagreement rather than treating regeneration as
-an automatic re-baseline.
-
-The file currently lists 260 of the 6000 fixtures, in seven groups:
-
-| n | group |
-|---|---|
-| 45 | a score reaches `rating.ComputeDeltaR` as text, and the tie-break checker faults |
-| 27 | a record 299 adjustment is written under `mpoints`/`gpoints` and read under `points`, and the tie-break checker faults |
-| 29 | a record 299 naming a competitor in round `000` is refused, status 419 |
-| 25 | a record 299 in a team file naming a player start number is refused, status 502 |
-| 66 | the prescribed pairing and the declared standings are both refused |
-| 37 | the prescribed pairing is refused |
-| 31 | the declared standings are refused |
+Regeneration refuses unclassified failures by default. Review and classify every
+new disagreement rather than treating regeneration as an automatic re-baseline.

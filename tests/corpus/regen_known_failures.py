@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Regenerate known_failures.json against the current engine.
+"""Regenerate one known-failure layer against the current engine.
 
 Runs every non-skipped corpus record through the same check the test applies and
 records the ones that fail -- the tournaments whose combined pairing/standings
@@ -28,10 +28,15 @@ UNCLASSIFIED group, still printed as a reminder) when that is genuinely what is
 wanted -- for instance, capturing a fresh batch of failures before triaging them
 one by one.
 
+Choose the common baseline only when no feature overlays exist, or name the
+feature overlay that owns the engine change. An overlay is a minimal delta
+against every other layer, so regeneration never rewrites another feature's
+expectations.
+
 Usage (from the repo root, uses all cores):
 
-    python tests/corpus/regen_known_failures.py
-    python tests/corpus/regen_known_failures.py --allow-unclassified
+    python tests/corpus/regen_known_failures.py --baseline
+    python tests/corpus/regen_known_failures.py --overlay 02-tiebreak
 """
 import argparse
 import json
@@ -90,6 +95,11 @@ def _test_fails(record):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument("--baseline", action="store_true",
+                        help="rewrite the common baseline (only with no overlays present)")
+    target.add_argument("--overlay", metavar="NAME",
+                        help="rewrite known_failure_overlays/NAME.json")
     parser.add_argument(
         "--allow-unclassified", action="store_true",
         help="write known_failures.json even though it would contain an "
@@ -110,6 +120,14 @@ def _has_unclassified_without_permission(grouped, allow_unclassified):
 
 def main(argv=None):
     args = parse_args(argv)
+    baseline = args.baseline or args.overlay is None
+
+    overlay_paths = sorted(_harness.KNOWN_FAILURE_OVERLAYS.glob("*.json")) \
+        if _harness.KNOWN_FAILURE_OVERLAYS.exists() else []
+    if baseline and overlay_paths:
+        print("refusing to rewrite the baseline while feature overlays exist; "
+              "regenerate the owning --overlay instead", file=sys.stderr)
+        return 2
 
     records = load_records()
     total = len(records)
@@ -134,14 +152,31 @@ def main(argv=None):
                       % (done, total, 100 * done / total, rate, el, eta), flush=True)
                 last = now
 
-    grouped = {}
+    desired = {}
     for name in sorted(failing):
-        grouped.setdefault(prior.get(name, UNCLASSIFIED), []).append(name)
+        desired[name] = prior.get(name, UNCLASSIFIED)
+
+    if baseline:
+        grouped = {}
+        for name, reason in desired.items():
+            grouped.setdefault(reason, []).append(name)
+        output = _harness.KNOWN_FAILURES
+        payload = grouped
+    else:
+        without_target = _harness.load_known_failures(exclude_overlays=(args.overlay,))
+        remove = sorted(name for name, reason in without_target.items()
+                        if desired.get(name) != reason)
+        grouped = {}
+        for name, reason in desired.items():
+            if without_target.get(name) != reason:
+                grouped.setdefault(reason, []).append(name)
+        output = _harness.KNOWN_FAILURE_OVERLAYS / (args.overlay + ".json")
+        payload = {"remove": remove, "add": grouped}
 
     if _has_unclassified_without_permission(grouped, args.allow_unclassified):
         print(
             "\nrefusing to write %s: %d record(s) fail with no reason "
-            "recorded yet:" % (_harness.KNOWN_FAILURES, len(grouped[UNCLASSIFIED])),
+            "recorded yet:" % (output, len(grouped[UNCLASSIFIED])),
             file=sys.stderr,
         )
         for name in grouped[UNCLASSIFIED]:
@@ -154,11 +189,12 @@ def main(argv=None):
         )
         return 1
 
-    with open(_harness.KNOWN_FAILURES, "w") as handle:
-        json.dump(grouped, handle, indent=2)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with open(output, "w") as handle:
+        json.dump(payload, handle, indent=2)
         handle.write("\n")
     print("\nwrote %s\n  %d known failures across %d reason group(s)"
-          % (_harness.KNOWN_FAILURES, len(failing), len(grouped)))
+          % (output, len(failing), len(set(desired.values()))))
     if UNCLASSIFIED in grouped:
         print("  %d are UNCLASSIFIED -- give them a reason before committing"
               % len(grouped[UNCLASSIFIED]))
