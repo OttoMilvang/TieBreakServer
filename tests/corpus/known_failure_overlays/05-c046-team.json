@@ -1,0 +1,29 @@
+{
+  "remove": [
+    "ind_00190", "ind_00753", "ind_00800", "ind_00917", "ind_01033",
+    "ind_01046", "ind_01090", "ind_01250", "ind_01272", "ind_01412",
+    "ind_01521", "ind_01563", "ind_01587", "ind_01678", "ind_01808",
+    "ind_02063", "ind_02488", "ind_02535", "ind_02719", "ind_02842",
+    "ind_02916", "ind_03033", "ind_03049", "ind_03264", "ind_04023",
+    "ind_04082", "ind_04088", "team_0001", "team_0038", "team_0052",
+    "team_0053", "team_0064", "team_0074", "team_0118", "team_0127",
+    "team_0144", "team_0151", "team_0152", "team_0156", "team_0178",
+    "team_0189", "team_0213", "team_0217", "team_0224",
+    "team_0297", "team_0305", "team_0314", "team_0338", "team_0347",
+    "team_0355", "team_0364", "team_0389", "team_0398", "team_0430",
+    "team_0438", "team_0440", "team_0461", "team_0462", "team_0478",
+    "team_0493", "team_0495",
+    "team_0503", "team_0516", "team_0521", "team_0522", "team_0538",
+    "team_0545", "team_0558", "team_0564", "team_0570", "team_0583",
+    "team_0592", "team_0611", "team_0613", "team_0615", "team_0627",
+    "team_0629", "team_0642", "team_0673", "team_0675", "team_0676"
+  ],
+  "add": {
+    "the engine refuses both the prescribed pairing and the declared standings": [
+      "team_0038", "team_0052", "team_0189", "team_0224", "team_0398",
+      "team_0438", "team_0461", "team_0516", "team_0521", "team_0545",
+      "team_0583", "team_0592", "team_0611", "team_0613"
+    ],
+    "the engine refuses the declared standings": ["team_0564"]
+  }
+}
