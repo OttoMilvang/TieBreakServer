@@ -155,8 +155,8 @@ def _read_failure_groups(path):
 
 def load_known_failures(exclude_overlays=()):
     """Return {record name: reason} for records the current engine is known to
-    get wrong.  Stored grouped by reason in known_failures.json so a follow-up
-    fix flips a marker by editing that file alone, with no change here."""
+    get wrong. The common baseline is grouped by reason in
+    known_failures.json; optional features add independently owned overlays."""
     name_to_reason = _read_failure_groups(KNOWN_FAILURES) if KNOWN_FAILURES.exists() else {}
     excluded = set(exclude_overlays)
     if not KNOWN_FAILURE_OVERLAYS.exists():

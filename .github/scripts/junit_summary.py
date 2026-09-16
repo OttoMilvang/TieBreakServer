@@ -488,7 +488,8 @@ def render(report, expected_files=None, expected_coordinates=None):
     out.extend(_reasons_block(
         "⚠️ Known-fail — why these `xfail`",
         "Records the engine is expected to get wrong today; tracked in "
-        "`tests/corpus/known_failures.json`. A fix turns each into an XPASS, "
+        "`tests/corpus/known_failures.json` and feature overlays under "
+        "`tests/corpus/known_failure_overlays/`. A fix turns each into an XPASS, "
         "which fails the strict marker and is the signal to drop it.",
         report["xfail_reasons"]))
     out.extend(_reasons_block(
