@@ -576,7 +576,13 @@ class pairingchecker(commonmain):
         if chessfile.get_status() == 0:
             if params["check"]:
                 ok = all([rndpairing["check"] for rndpairing in chessfile.result["roundpairing"]])
-                ok = ok or (self.dopairing > 0 ^ self. doanalysis > 0)
+                # -a computes the declared pairing and -p the engine's own, so exactly one
+                # of them asks for one side of the comparison and leaves the other empty.
+                # There is then no difference to find, and the verdict is suppressed rather
+                # than reported as a mismatch. write_text_file decides whether to print its
+                # "Check:" line from the same test, written the same way, in the opposite
+                # sense.
+                ok = ok or ((self.dopairing > 0) != (self.doanalysis > 0))
                 chessfile.result["check"] = ok
                 self.resultjson["status"]["code"] = 0 if ok else 1
             else: 
