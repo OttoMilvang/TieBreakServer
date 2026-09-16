@@ -287,7 +287,10 @@ class trf2json(chessjson.chessjson):
                         # says so. Do not turn that into a status code and a return: the
                         # return leaves all_lines unset, and parse_file then reads it.
                         raise
-                    except:
+                    except Exception:
+                        # Exception, not a bare except: KeyboardInterrupt and SystemExit
+                        # are not errors in the file, and a user who interrupts a long
+                        # read must get the interrupt, not "Error in trf-file, line N".
                         if verbose:
                             raise
                         self.put_status(401, "Error in trf-file, line " + str(lineno) + ", " + line)
@@ -1767,7 +1770,7 @@ class trf2json(chessjson.chessjson):
             try:
                 all_lines += func(tournament, record["id"])
                 # all_lines += self.output_line(tournament, record["id"])
-            except:
+            except Exception:
                 if verbose:
                     raise
                 self.put_status(401, "Error writing trf-file, line " + trfid)

@@ -336,7 +336,10 @@ class commonmain:
         params = self.params
         try:
             func()
-        except:
+        except Exception:
+            # Exception, and not a bare except: KeyboardInterrupt and SystemExit are not
+            # "an exception nobody foresaw" in a stage of the run, they are the user or
+            # the interpreter stopping it, and they have to get out.
             if errcode == 500 or params["verbose"] > 0:
                 raise
             if errcode < 500:
