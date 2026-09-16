@@ -133,3 +133,25 @@ def test_299_for_all_rounds_of_a_named_competitor_is_read():
             "teams": [3],
         }
     ]
+
+
+def status(lines):
+    # The code a program reading the file is handed, rather than an exception: a 299
+    # whose fields do not combine into a shape the reader accepts is reported, not raised.
+    chessfile = trf2json.trf2json()
+    chessfile.parse_file("\n".join(lines), 0)
+    return chessfile.chessjson["status"]["code"]
+
+
+def test_299_with_a_type_for_all_rounds_of_a_named_competitor_is_refused():
+    """A type with round 000 and a named competitor is refused with 419.
+
+    The three combinations above are each read. This one is not, and the bounds are
+    what this pins: the same type with a round is read, and the same type with no
+    competitor is read, so it is the combination and not the type that is refused.
+    """
+    assert status(two_rounds([abnormal_line("H", "", " 0.5", 0, [3])])) == 419
+    assert status(two_rounds([abnormal_line("+", "", " 1.0", 0, [3])])) == 419
+
+    assert status(two_rounds([abnormal_line("H", "", " 0.5", 2, [3])])) == 0
+    assert status(two_rounds([abnormal_line("H", "", " 0.5", 0, [])])) == 0
