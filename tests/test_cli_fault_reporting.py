@@ -209,3 +209,86 @@ def test_an_engine_invariant_violation_is_still_a_program_error(tmp_path, monkey
 
     assert status(checker) == 510
     assert "Program error" in messages(checker)
+
+
+# ---------------------------------------------------------------------------------
+# 3.3 -- the individual engine reports an incompletable round, it does not return nothing
+# ---------------------------------------------------------------------------------
+
+
+def individual_line(startno, points, games):
+    line = "001 "
+    line += "%4d " % startno                     # start number
+    line += "m    "                              # sex + title
+    line += "%-33s " % ("Player %d, One" % startno)
+    line += "%4d " % (2400 - 10 * startno)       # rating
+    line += "NOR "                               # federation
+    line += "%11d " % 0                          # fide id
+    line += "1990/01/01 "                        # birth date
+    line += "%4s " % points                      # points
+    line += "%4d  " % startno                    # rank
+    return line + "  ".join("%4d %s %s" % game for game in games)
+
+
+def three_leaders_who_have_met_every_lower_player():
+    """Eight players, five rounds played, and a sixth round that cannot be completed.
+
+    Players 1, 2 and 3 have each beaten every one of players 4 to 8, so in round six each
+    of them can only meet one of the other two -- three players, one pair, one left over.
+    The field is even, so C.04.3 art. 1.9.1 allows no pairing-allocated bye, and the lower
+    five, who have met only some of each other, cannot absorb the third leader either:
+    the round-pairing cannot be completed on any reading of art. 1.9.
+    """
+    lower = [4, 5, 6, 7, 8]
+    games = {startno: [] for startno in range(1, 9)}
+    points = {startno: 0.0 for startno in range(1, 9)}
+    for rnd in range(5):
+        pairs = []
+        used = set()
+        for offset, leader in enumerate((1, 2, 3)):
+            opponent = lower[(rnd + offset) % 5]
+            pairs.append((leader, opponent))
+            used.add(opponent)
+        rest = [startno for startno in lower if startno not in used]
+        pairs.append((rest[0], rest[1]))
+        for index, (a, b) in enumerate(pairs):
+            # Colours alternate so no colour preference decides anything here.
+            (ca, cb) = ("w", "b") if (rnd + index) % 2 == 0 else ("b", "w")
+            if a <= 3:
+                (ra, rb) = ("1", "0")
+                points[a] += 1
+            else:
+                (ra, rb) = ("=", "=")
+                points[a] += 0.5
+                points[b] += 0.5
+            games[a].append((b, ca, ra))
+            games[b].append((a, cb, rb))
+    lines = ["012 Three leaders who have met every lower player", "042 2026-03-01", "XXR 7"]
+    for startno in range(1, 9):
+        lines.append(individual_line(startno, "%.1f" % points[startno], games[startno]))
+    return "\n".join(lines) + "\n"
+
+
+def test_art_1_9_3_an_incompletable_dutch_round_is_reported_not_returned_empty(tmp_path):
+    """`-p` on a Dutch round that cannot be completed must say so, not report no pairs.
+
+    C.04.3 art. 1.9.1 says the round-pairing is complete only when every player but at
+    most one has been paired, and art. 1.9.3 hands an incompletable round to the Chief
+    Arbiter. The individual engine has three exits for that state: the top score bracket
+    with no edge at all, the last bracket that cannot be paired -- both already raise
+    ``GacruxNoLegalPairing`` -- and a top-bracket remainder that a maximum matching cannot
+    complete, which returned an empty round-pairing instead. The command line then
+    reported status 0 with ``pairs: []``: a successful-looking pairing of nobody.
+
+    The status has to be 505, the code for an unhandled incompletable round, and the
+    message has to cite the article that says whose decision this now is.
+    """
+    path = write(tmp_path, three_leaders_who_have_met_every_lower_player(), "eight.trf")
+
+    (checker, output) = run(path, ["-p"])
+
+    assert status(checker) == 505, "an incompletable round is not a pairing of nobody"
+    assert "1.9.3" in messages(checker)
+    assert "2 competitors" in messages(checker)
+    assert reported_pairs(checker) == []
+    assert "505" in output
