@@ -181,8 +181,18 @@ class pairing:
 
         t0 = time.time()
         self.hamilton = self.compute_hamilton(nodes, edges)
-        if self.hamilton[levels - 1].get("rem_unpaired", 0) != 0:
-            return []
+        unpaired = self.hamilton[levels - 1].get("rem_unpaired", 0)
+        if unpaired != 0:
+            # The Hamilton table for the whole field says a maximum matching leaves
+            # competitors over, so no round-pairing can be complete (C.04.3 art. 1.9.1).
+            # That is a state of the tournament and the arbiter's decision (art. 1.9.3),
+            # not an empty round: returning [] here reported a successful pairing of
+            # nobody. find_weighted_pab records the shortfall as a negative count.
+            raise GacruxNoLegalPairing(
+                "the round-pairing cannot be completed: %d competitors would remain "
+                "unpaired whatever the rest of the field does, and C.04.3 art. 1.9.3 "
+                "leaves what to do to the Chief Arbiter" % abs(unpaired)
+            )
         t1 = time.time()
         if self.verbose > 1:
             print("Init Hamilton:", f"{t1 - t0:3f} s")
