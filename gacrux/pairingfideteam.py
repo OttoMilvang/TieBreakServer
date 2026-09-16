@@ -190,11 +190,16 @@ class pairing_fideteam(pairing):
         # no legal pairing reports itself through GacruxNoLegalPairing (art. 3.3.3).
         self.nummeets = 1
 
-        # art. 2.3.4 [C7] and art. 2.3.7 [C10] do not apply in the last two rounds.
+        # art. 2.3.4 [C7] and art. 2.3.7 [C10] do not apply in the last two rounds. The
+        # flag is decided here, once, and handed to the crosstable with the colour model:
+        # count_c7 and crosstable_fideteam.update_edge read it and neither works it out
+        # again.
         self.lasttworounds = rnd > self.numrounds - 2
 
     def get_crosstable(self, experimental, checkonly, verbose):
-        return crosstable_fideteam(experimental, checkonly, verbose, self.typeb, self.usecolor)
+        return crosstable_fideteam(
+            experimental, checkonly, verbose, self.typeb, self.usecolor, self.lasttworounds
+        )
 
     def qdefs_enum(self):
         return qdefs

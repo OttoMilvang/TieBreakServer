@@ -61,10 +61,15 @@ NOPAB = ["pab", "+", "F"]
 class crosstable_fideteam(crosstable):
 
     # constructor function
-    def __init__(self, experimental, checkonly, verbose, typeb=False, usecolor=True):
+    def __init__(self, experimental, checkonly, verbose, typeb=False, usecolor=True,
+                 lasttworounds=False):
         super().__init__(experimental, checkonly, verbose)
         self.typeb = typeb
         self.usecolor = usecolor
+        # art. 2.3.4 [C7] and art. 2.3.7 [C10] - "with the exception of the last two
+        # rounds". Decided once by pairing_fideteam and not recomputed here, so the
+        # diagnostic and the pairing cannot disagree about which rounds they apply to.
+        self.lasttworounds = lasttworounds
         self.maxpsd = 0
         self.pablevel = -1
 
@@ -227,7 +232,6 @@ class crosstable_fideteam(crosstable):
         if a["scorelevel"] < b["scorelevel"]:
             (a, b) = (b, a)
         psd = a["scorelevel"] - b["scorelevel"]
-        lasttworounds = self.rnd > self.numrounds - 2
         # [C4] art. 2.3.1 - "minimise the number of upfloaters". The criterion counts
         # teams, so a pair is worth the number of ITS teams that are upfloaters: none, one
         # or two. A team of the bracket is an upfloater when its score is below the score
@@ -237,7 +241,7 @@ class crosstable_fideteam(crosstable):
         if psd > 0:
             # b is an upfloater, and art. 1.5 makes both teams of this pair floaters.
             q[QC5][maxpsd - psd] = 1                    # [C5] art. 2.3.2
-            if not lasttworounds:
+            if not self.lasttworounds:
                 # [C7] art. 2.3.4 - an upfloater that was a floater in the previous round
                 q[QC7] = 1 if b["flt"] else 0
                 # [C10] art. 2.3.7 - an upfloater's opponent that was one

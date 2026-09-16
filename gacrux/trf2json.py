@@ -193,6 +193,10 @@ class trf2json(chessjson.chessjson):
                 "tournamentInfo": {},
                 "ratingList": "TRF",
                 "numRounds": 0,
+                # Record 142 is the only TRF field that states the scheduled length.
+                # A later player record may reveal that rounds were played, but that
+                # inferred lower bound cannot answer which round is the last one.
+                "numRoundsExplicit": False,
                 "currentRound": 0,
                 "teamTournament": False,
                 "rankOrder": ["PTS"],
@@ -823,7 +827,7 @@ class trf2json(chessjson.chessjson):
                     lastplayed = currentround
                     if self.get_result_cid(game, "white") > 0 and self.get_result_cid(game, "black") > 0 and currentround > lastpaired:
                         lastpaired = currentround
-        if lastplayed > tournament["numRounds"]:
+        if lastplayed > tournament["numRounds"] and not tournament.get("numRoundsExplicit", False):
             tournament["numRounds"] = lastplayed
         if lastpaired > tournament["currentRound"]:
             tournament["currentRound"] = lastpaired
@@ -1017,6 +1021,7 @@ class trf2json(chessjson.chessjson):
 
     def parse_trf_numbrounds(self, tournament, line):
         tournament["numRounds"] = helpers.parse_int(line[4:].rstrip())
+        tournament["numRoundsExplicit"] = True
 
     def parse_trf_initialcolor(self, tournament, line):
         tournament["topColor"] = line[4:].rstrip().upper()
