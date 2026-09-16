@@ -349,9 +349,18 @@ class pairing_fideteam(pairing):
         if self.checkonly:
             (upfloaters, pairs) = self.analyse_bracket(scorelevel, nodes, edges)
         else:
-            (upfloaters, pairs, c6) = self.select_upfloaters(scorelevel, residents, nodes, edges)
+            (upfloaters, pairs) = self.select_upfloaters(scorelevel, residents, nodes, edges)
 
         bracketnodes = self.sort_nodes(residents + upfloaters)
+        # [C6] art. 2.3.3 is a property of the bracket's set of upfloaters and not of any
+        # one pair, so it does not fall out of compute_weight the way the other criteria
+        # do and has to be asked for here. It is asked for on both paths, from the same
+        # function and the same decomposition: pairingchecker reads the first criterion on
+        # which the two sides differ as the reason their pairings differ, and a criterion
+        # that only one side measures would report a difference on every bracket.
+        cids = [node["cid"] for node in bracketnodes]
+        (restnodes, restedges) = self.remove_nodes(nodes, edges, cids)
+        c6 = self.check_c6(scorelevel, restnodes, restedges)
         bracket = {
             "scorelevel": scorelevel,
             "competitors": [node["cid"] for node in bracketnodes],
@@ -366,10 +375,13 @@ class pairing_fideteam(pairing):
                 node["cid"]: i + 1
                 for i, node in enumerate(sorted(bracketnodes, key=lambda node: node["tpn"]))
             },
-            "pab": scorelevel == self.pablevel,
+            # art. 1.4 and art. 3.3.2 - the pairing-allocated-bye is assigned before the
+            # brackets are paired and is a bracket of its own (find_pab), so no scoregroup
+            # bracket is ever the bye - not even the one the byed team came from, which
+            # pairs the teams that are left in it like any other.
+            "pab": False,
         }
-        if not self.checkonly:
-            bracket["quality"][QC6] = 0 if c6 else 1
+        bracket["quality"][QC6] = 0 if c6 else 1
 
         for pair in pairs:
             self.update_color(pair)
@@ -461,12 +473,12 @@ class pairing_fideteam(pairing):
                     c7 = self.count_c7(upfloaters)
                     key = (0 if c6 else 1, c7, index)
                     if best is None or key < best[0]:
-                        best = (key, upfloaters, pairs, c6)
+                        best = (key, upfloaters, pairs)
                     if key[0] == 0 and key[1] == 0:
                         break                             # art. 3.5.5, the first such set
                 if best is not None:
-                    (key, upfloaters, pairs, c6) = best
-                    return (upfloaters, pairs, c6)
+                    (key, upfloaters, pairs) = best
+                    return (upfloaters, pairs)
         # art. 3.3.3 - if it is impossible to complete a round-pairing, the Chief Arbiter
         # shall decide what to do.
         raise GacruxNoLegalPairing(
