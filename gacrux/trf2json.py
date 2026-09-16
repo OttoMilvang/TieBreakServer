@@ -718,7 +718,11 @@ class trf2json(chessjson.chessjson):
                     competitor = self.check_competitor(tournament, "299", team)
                     if "adjust" not in plist[competitor]:
                         plist[competitor]["adjust"] = []
-                    plist[competitor]["adjust"].append({"cid": competitor, "round": rnd % 999, "mpoints": mp, "gpoints": gp, "pairing": pairing})
+                    # Filed under the point-type names this tournament uses, the
+                    # same way the game above is written. A team keeps match and
+                    # game points apart; an individual has one point type, so the
+                    # points field of columns 14-17 is the one that lands.
+                    plist[competitor]["adjust"].append({"cid": competitor, "round": rnd % 999, mpoints: mp, gpoints: gp, "pairing": pairing})
             else:
                 self.put_status(419, f"Error in 299 Abnormal, Att = {att['att']}, round = {rnd}, player/team {att['teams']}")
                 return

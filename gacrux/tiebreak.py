@@ -171,7 +171,12 @@ class tiebreak:
         if declared_primary is not None:
             self.set_primaryscore(declared_primary)
         self.accelerated = tournament["accelerated"] if "accelerated" in tournament else None
-        self.rating = {"W": Decimal("1.0"), "D": Decimal("0.5"), "L": "Z", "Z": Decimal("0.0"), "A": "Z", "U": "Z"}
+        # Every result a game can carry has to resolve to a number here: get_score
+        # returns a letter it cannot look up, and the caller subtracts it. The
+        # unplayed results all score as Z, which is what A and U already did --
+        # F, H and P are the three record 299 can write that were missing.
+        self.rating = {"W": Decimal("1.0"), "D": Decimal("0.5"), "L": "Z", "Z": Decimal("0.0"),
+                       "A": "Z", "U": "Z", "F": "Z", "H": "Z", "P": "Z"}
 
         if self.isteam:
             self.scoresystem = tournament["scoreSystem"]
