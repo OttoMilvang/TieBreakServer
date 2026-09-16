@@ -1809,17 +1809,12 @@ class trf2json(chessjson.chessjson):
         uses the event. "info" is the other channel of the same status block --
         put_status() writes it itself for the code 0 case, and jsonscheme declares it --
         and it is where a remark about a file that is going to be read anyway belongs.
-        It is created here if nothing has made it, and kept a list either way, because
-        put_status() puts a bare string there and this puts a list.
+        It is created here if nothing has made it. Multiple remarks are separated by
+        newlines so the value remains the string declared by the public JSON schema.
         """
         status = self.chessjson["status"]
         existing = status.get("info")
-        if isinstance(existing, list):
-            existing.append(message)
-        elif existing:
-            status["info"] = [existing, message]
-        else:
-            status["info"] = [message]
+        status["info"] = existing + "\n" + message if existing else message
 
     def update_team_score(self, tournament):
         """Give every team of a file that declares no standing the one its results give.

@@ -361,7 +361,8 @@ def test_the_same_team_file_without_362_is_refused():
     """
     chessfile = parse(four_teams([], matchpoints=("3.0", "3.0", "0.0", "6.0")))
 
-    message = "; ".join(chessfile.chessjson["status"]["info"])
+    message = chessfile.chessjson["status"]["info"]
+    assert isinstance(message, str)
     assert "310" in message                                # the record that disagrees
     assert "team 1 declares 3.0 match points" in message   # what the file said
     assert "the matches give 2.0" in message               # what 2 / 1 / 0 makes of it

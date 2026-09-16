@@ -118,7 +118,8 @@ def test_a_declared_standing_that_disagrees_is_reported():
     """
     chessfile = parse(team_file({1: ("1.0", "2.5"), 3: ("0.0", "1.5")}))
 
-    message = "; ".join(chessfile.chessjson["status"]["info"])
+    message = chessfile.chessjson["status"]["info"]
+    assert isinstance(message, str)
     assert "310" in message                                   # the record it is about
     assert "team 1 declares 1.0 match points" in message      # declared
     assert "the matches give 2.0" in message                  # recomputed
@@ -140,6 +141,17 @@ def test_a_disagreement_does_not_refuse_the_event():
     assert chessfile.get_status() == 0
     assert not chessfile.chessjson["status"]["error"]
     assert chessfile.chessjson["status"]["info"]
+
+
+def test_multiple_information_messages_remain_schema_strings():
+    chessfile = trf2json.trf2json()
+
+    chessfile.report_info("first observation")
+    chessfile.report_info("second observation")
+
+    assert chessfile.chessjson["status"]["info"] == (
+        "first observation\nsecond observation"
+    )
 
 
 def test_the_declared_standing_is_the_one_kept():
