@@ -150,6 +150,20 @@ def test_240_in_a_team_tournament_does_not_accept_a_player_number():
     assert "1 - 4" in message
 
 
+def test_299_in_a_team_tournament_does_not_accept_a_player_number():
+    # Record 299 carries the same "(Team) Pairing Number" field as 240, 300, 320 and
+    # 330, so in a team event it names a team. 6 is a player here and no team, and a
+    # number read against the players would hand the adjustment to a team the event
+    # does not have.
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(teams(["299 H         0.5  002    6"]))
+
+    message = str(excinfo.value)
+    assert "299" in message
+    assert "team 6" in message
+    assert "1 - 4" in message
+
+
 def test_320_naming_a_team_that_does_not_exist():
     # Record 320, the pairing-allocated bye: the team getting the PAB in each round.
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
