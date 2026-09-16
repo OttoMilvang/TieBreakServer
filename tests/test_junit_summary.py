@@ -404,7 +404,7 @@ def test_both_workflows_pass_the_expectation_to_the_summary_script():
             "%s does not pass the expected shard coordinates" % workflow
 
 
-def test_test_workflow_concurrency_separates_same_named_fork_branches():
+def test_workflow_concurrency_separates_same_named_fork_branches():
     text = (WORKFLOWS / "tests.yml").read_text(encoding="utf-8")
     assert "github.event.pull_request.head.repo.full_name" in text
     assert "github.repository" in text

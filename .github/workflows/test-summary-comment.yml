@@ -48,10 +48,9 @@ jobs:
     #
     # This deliberately does *not* test `workflow_run.pull_requests`: GitHub
     # populates that array only for runs whose head branch is in this
-    # repository, so requiring both it and a fork head made the job's condition
-    # self-contradictory and it never ran once.  A fork pull request therefore
-    # got no summary at all, from either workflow.  The number is resolved from
-    # the head commit below instead.
+    # repository, so requiring both it and a fork head cannot be satisfied at
+    # the same time, and a fork pull request got no summary from either
+    # workflow.  The number is resolved from the head commit below instead.
     if: >-
       ${{
         github.event.workflow_run.event == 'pull_request' &&
