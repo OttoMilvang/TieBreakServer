@@ -53,13 +53,17 @@ def test_corpus_record(record):
     assert tiebreak_status != 510, \
         "tie-break checker faulted (status 510) on %s" % record["name"]
 
-    # Every team record must reach the newly implemented team method. An invalid
-    # individual record may already use status 510 as its rejection verdict, which is
-    # existing corpus behavior and outside the team feature.
+    # No record may fault the pairing checker either, whatever its category. Status 510 is
+    # "Program error", and now that do_command gives each condition of gacruxexeptions.py
+    # its own code -- a round that cannot be paired and a malformed tournament are no
+    # longer routed through 510 -- the only thing that still reports 510 is a defect of
+    # the engine, so a correct rejection can never be one. This assertion used to be
+    # guarded to team records, which made a crash and a correct rejection the same
+    # observation over the individual records the corpus expects to be invalid: exactly
+    # the inputs it exists to test.
     pairing_status = _harness.pairing_status(trf)
-    if record["category"] == "team":
-        assert pairing_status != 510, \
-            "team pairing checker faulted or selected no implemented method on %s" % record["name"]
+    assert pairing_status != 510, \
+        "pairing checker faulted (status 510) on %s" % record["name"]
 
     # Validity is an identity verdict over both the prescribed pairing and the
     # standings produced by the fixture's declared tie-breaks.
