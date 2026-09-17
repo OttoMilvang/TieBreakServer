@@ -979,7 +979,10 @@ class tiebreak:
                 substr = tb["ede"]["functions"][0:swap]
                 pos = swap - (len(substr) - substr.count(func))
                 if func == "C":
-                    weights = [i for i in range(1, self.teamsize + 1)]
+                    # Board Count is the exceptional lower-is-better board criterion.
+                    # The direct-encounter helper ranks larger scores first, so compare
+                    # the negated weighted total here.
+                    weights = [-i for i in range(1, self.teamsize + 1)]
                 elif func == "T":
                     weights = [1 if i == pos else 0 for i in range(self.teamsize )]
                 elif func == "B":
@@ -993,7 +996,9 @@ class tiebreak:
                             tscore += weights[game["board"]-1] * game["points"]
                         rst["tpoints"] = tscore
                 # breakpoint()
-                self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, "tpoints", scorename, scoretype, prefix)
+                changes += self.compute_basic_direct_encounter(
+                    tb, cmps, rounds, subro, loopcount, "tpoints", scorename, scoretype, prefix
+                )
 
         
         tb["ede"]["changes"] += changes
