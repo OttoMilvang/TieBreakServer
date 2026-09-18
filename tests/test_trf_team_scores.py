@@ -20,6 +20,9 @@ contradicted its own results was read with status 0 and not one word about it.
 """
 from decimal import Decimal
 
+import pytest
+
+from gacrux import gacruxexeptions
 from gacrux import trf2json
 
 # Four teams of two players, two rounds played, a third round declared but not played.
@@ -243,3 +246,44 @@ def test_a_bye_announced_for_a_future_round_agrees_with_record_310():
     assert chessfile.get_status() == 0
     assert "info" not in chessfile.chessjson["status"]
 
+
+def test_a_disagreement_names_the_rounds_counted_and_both_figures():
+    """Team 1 declares 5.0 match points for three wins, team 2 2.0 game points for 1.0.
+
+    The remark says which rounds were counted, and the figure for team 1 is 6.0, with
+    the forfeited round in it.
+    """
+    chessfile = parse(two_teams(3, ["5.0", "0.0"], ["5.0", "2.0"]))
+
+    assert chessfile.get_status() == 0
+    message = chessfile.chessjson["status"]["info"]
+    assert "310" in message
+    assert "rounds 1 - 3" in message
+    assert "team 1 declares 5.0 match points" in message
+    assert "the matches give 6.0" in message
+    assert "team 2 declares 2.0 game points" in message
+    assert "give 1.0" in message
+
+
+def test_a_match_naming_a_team_record_310_does_not_declare_is_a_typed_error():
+    """The totals are kept by the team numbers record 310 declares.
+
+    Every record naming a team is checked as it is read, so a match can only name an
+    undeclared team if something built the match list by hand; that used to be a bare
+    KeyError from inside the reader.
+    """
+    chessfile = parse(two_teams(2, ["4.0", "0.0"], ["3.0", "1.0"]))
+    tournament = chessfile.get_tournament(1)
+    tournament["matchList"].append({
+        "id": 0, "round": 2, "played": True,
+        "white": {"cid": 9, "result": "W"}, "black": {"cid": 1, "result": "L"},
+    })
+
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        chessfile.validate_team_scores(tournament)
+
+    message = str(excinfo.value)
+    assert "team 9" in message
+    assert "310" in message
+    assert "round 2" in message
+    assert "1 - 2" in message

@@ -1802,7 +1802,7 @@ class trf2json(chessjson.chessjson):
         else:
             self.update_team_score(tournament)
 
-    def team_score_totals(self, tournament):
+    def team_score_totals(self, tournament, record):
         """The match- and game-point totals the results of a team tournament give.
 
         Two totals per team, worked out from two different places. The match points are
@@ -1822,14 +1822,32 @@ class trf2json(chessjson.chessjson):
         record 310 against it and update_team_score() publishes it for a record 013
         file, so what a legacy file is published with is what a record 310 file would
         have had to declare to agree with its own results.
+
+        `record` is the team record the teams were read from, "310" or "013", for the
+        message. The rounds counted are returned too, for the same reason.
         """
         matchpoints = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
         recorded = {game["round"] for game in tournament["gameList"]}
+        counted = set()
         for match in tournament["matchList"]:
             if match["round"] not in recorded and self.get_result_cid(match, "black") <= 0:
                 continue
+            counted.add(match["round"])
             white = self.get_result_cid(match, "white")
             black = self.get_result_cid(match, "black")
+            for cid in [white, black]:
+                if cid > 0 and cid not in matchpoints:
+                    # Every record naming a team is checked as it is read, so this is
+                    # the last place a number that names nobody can arrive.
+                    numbers = sorted(matchpoints.keys())
+                    message = (
+                        "A match in round " + str(match["round"]) + " is played by team "
+                        + str(cid) + ", which record " + record + " does not declare: the"
+                        + " tournament has " + str(len(numbers)) + " teams"
+                        + (" (" + str(numbers[0]) + " - " + str(numbers[-1]) + ")" if numbers else "")
+                    )
+                    self.put_status(401, message)
+                    raise GacruxInputError(message)
 
             if white > 0:
                 matchpoints[white] += self.scores.get_score(
@@ -1847,7 +1865,7 @@ class trf2json(chessjson.chessjson):
             )
             for competitor in tournament["competitors"]
         }
-        return matchpoints, gamepoints
+        return matchpoints, gamepoints, counted
 
     def validate_team_scores(self, tournament):
         """Check the match- and game-point totals declared by TRF26 record 310.
@@ -1864,10 +1882,11 @@ class trf2json(chessjson.chessjson):
         beside it. Refusing would throw away a whole event, and every number in it, over
         a file with nothing wrong with it.
 
-        The message names each team and both figures, because a reader and a file that
-        disagree about a total is not something anybody can act on otherwise.
+        The message names each team, both figures and the rounds counted, because a
+        reader and a file that disagree about a total is not something anybody can act
+        on otherwise.
         """
-        calculated_match, calculated_gamepoints = self.team_score_totals(tournament)
+        calculated_match, calculated_gamepoints, counted = self.team_score_totals(tournament, "310")
 
         problems = []
         for competitor in tournament["competitors"]:
@@ -1887,10 +1906,21 @@ class trf2json(chessjson.chessjson):
 
         if problems:
             self.report_info(
-                "Record 310 disagrees with the results: " + "; ".join(problems)
+                "Record 310 disagrees with the results of " + self.describe_rounds(counted)
+                + ": " + "; ".join(problems)
                 + ". The declared standing is used; see record 299 for assignments that"
                 + " make the two differ on purpose"
             )
+
+    def describe_rounds(self, rounds):
+        rounds = sorted(rounds)
+        if len(rounds) == 0:
+            return "no round"
+        if len(rounds) == 1:
+            return "round " + str(rounds[0])
+        if rounds == list(range(rounds[0], rounds[-1] + 1)):
+            return "rounds " + str(rounds[0]) + " - " + str(rounds[-1])
+        return "rounds " + ", ".join(str(rnd) for rnd in rounds)
 
     def report_info(self, message):
         """Record a message that does not stop the file being read.
@@ -1931,7 +1961,7 @@ class trf2json(chessjson.chessjson):
         This runs from prepare_team_section() after games2matches has built the match
         list, which is what the match points are summed from.
         """
-        matchpoints, gamepoints = self.team_score_totals(tournament)
+        matchpoints, gamepoints, _counted = self.team_score_totals(tournament, "013")
         for competitor in tournament["competitors"]:
             cid = competitor["cid"]
             competitor["matchPoints"] = matchpoints[cid]
