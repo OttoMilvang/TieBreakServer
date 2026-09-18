@@ -324,3 +324,18 @@ def test_a_bye_whose_game_points_are_only_in_record_320_agrees_with_record_310()
     chessfile = parse(lines)
     assert chessfile.get_status() == 0
     assert "info" not in chessfile.chessjson["status"]
+
+
+def test_a_correct_record_310_still_reads():
+    """Two team files whose record 310 totals are the ones their results give.
+
+    The second names no bye for round 3 in record 320, which is a 000 in that
+    round's field.
+    """
+    for lines in [
+        two_teams(2, ["4.0", "0.0"], ["3.0", "1.0"]),
+        three_teams_with_an_announced_bye(["3.0", "1.0", "2.0"], ["2.5", "2.5", "3.0"], [3, 2, 0]),
+    ]:
+        chessfile = parse(lines)
+        assert chessfile.get_status() == 0
+        assert "info" not in chessfile.chessjson["status"]
