@@ -18,8 +18,8 @@ large one (|cod| = 4) satisfies just as well as two absolute preferences would
 absolute, which art. 1.7.2 does not say, and could delete the only legal edge
 a bracket had.
 
-The fixture below is real tournament data (87 players, round 11) reduced to
-the point where this specific pair of colour differences is what decides the
+The fixture below has 87 players and round 11 to pair, a position where
+this specific pair of colour differences is what decides the
 round: players 83 (cod -1, strong White preference) and 84 (cod -4, absolute
 White preference) must be allowed to meet, because 83's preference is not
 absolute. With the extra test in place the engine pairs 73-83 and downfloats
