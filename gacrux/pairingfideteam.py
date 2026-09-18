@@ -163,6 +163,38 @@ class pairing_fideteam(pairing):
         self.typeb = self.colourmodel == TYPE_B
         self.usecolor = self.colourmodel != NO_COLOUR
 
+        # Art. 2.3.4 [C7] and art. 2.3.7 [C10] apply "with the exception of the last two
+        # rounds", and art. 1.7.2 decides three type B preferences on whether this is the
+        # last round. Only record 142 (or -N) says how long the event is; without it
+        # trf2json takes the last round played, so every round asked for looks like one of
+        # the last two. Such a round is refused, for every colour model.
+        if not tournament.get("numRoundsExplicit", True) and rnd > self.numrounds - 2:
+            raise GacruxInputError(
+                "round " + str(rnd) + " of a team tournament whose length is not declared:"
+                + " the file has no record 142, so the " + str(self.numrounds) + " round(s)"
+                + " it accounts for are the rounds already played, and nothing says whether"
+                + " round " + str(rnd) + " is one of the last two. Arts. 2.3.4 [C7] and"
+                + " 2.3.7 [C10] of C.04.6 are switched off in the last two rounds and cannot"
+                + " be evaluated without that"
+                + (
+                    "; nor can art. 1.7.2, which decides three of its five type B colour"
+                    + " preferences on whether the round is the last one"
+                    if self.typeb else ""
+                )
+                + ". Give the scheduled number of rounds in a record 142, or with -N"
+            )
+        # A declared count shorter than the round being paired leaves the type B question
+        # open in the same way.
+        if self.typeb and rnd > self.numrounds:
+            raise GacruxInputError(
+                "this is a type B team tournament and round " + str(rnd) + " is being"
+                + " paired, but the file accounts for only " + str(self.numrounds)
+                + " round(s), so there is no way to tell whether this is the last one."
+                + " Art. 1.7.2 of C.04.6 decides three of its five colour preferences on"
+                + " that. Give the scheduled number of rounds in a record 142, or with -N,"
+                + " and check it is not shorter than the round being paired"
+            )
+
         # art. 1.2 - the rules of the competition state which of match points and game
         # points is the primary score, and whether the other one is used for the colour
         # allocation of art. 4.2.2. Only a competition that stated the other score is NOT
