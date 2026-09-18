@@ -97,3 +97,22 @@ def test_a_record_240_still_reaches_the_individual_bye_list():
     assert byelist[0]["score"] == "D"
     assert byelist[0]["round"] == 1
     assert byelist[0]["competitor"] == 2
+
+
+def test_a_record_240_that_contradicts_a_game_played_as_black_is_reported():
+    """Player 1 is Black in round 1 against player 5 and won.
+
+    A record 240 giving player 1 a half-point bye in that round contradicts
+    the game. It was only compared with the White side of each game, so the
+    game was missed, a second round-1 entry was added for player 1 and the
+    score went from 1.5 to 1.0.
+    """
+    chessfile = read(["240 H   1    1"])
+
+    status = chessfile.chessjson["status"]
+    assert status["code"] == 405
+    assert any("competitor 1" in message for message in status["error"])
+    tournament = chessfile.get_tournament(1)
+    roundone = [game for game in tournament["gameList"] if game["round"] == 1
+                and 1 in (chessfile.get_result_cid(game, "white"), chessfile.get_result_cid(game, "black"))]
+    assert len(roundone) == 1
