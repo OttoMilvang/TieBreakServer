@@ -20,7 +20,7 @@ import pytest
 from gacrux import chessjson
 from gacrux.crosstablefideteam import crosstable_fideteam
 from gacrux.drawresult import drawresult
-from gacrux.gacruxexeptions import GacruxNoLegalPairing
+from gacrux.gacruxexeptions import GacruxInputError, GacruxNoLegalPairing
 from gacrux.pairingfideteam import (
     NO_COLOUR,
     SECONDARY_UNSTATED,
@@ -763,6 +763,36 @@ def test_art_2_3_4_c7_does_not_apply_in_the_last_two_rounds():
     assert engine.competitors[2]["flt"] != 0
     top = engine.competitors[1]["scorelevel"]
     assert upfloaters(brackets, top) == [2]
+
+
+def test_art_2_3_4_c7_cannot_be_evaluated_without_a_round_count():
+    """[C7] art. 2.3.4 and [C10] art. 2.3.7 are defined by "the last two rounds", and a
+    file that does not declare its round count cannot say which those are.
+
+    The same position with the count only inferred: two rounds played, no record 142, so
+    trf2json leaves numRounds at 2 and marks it as not explicit. Pairing round 3 on that
+    would switch [C7] off and upfloat team 2, the previous-round floater. The round is
+    refused instead, naming the record, the flag and the article.
+    """
+    tournament = c7_tournament(2)
+    tournament.tournament["numRoundsExplicit"] = False
+    with pytest.raises(GacruxInputError) as excinfo:
+        tournament.engine(3)
+    message = str(excinfo.value)
+    assert "142" in message
+    assert "2.3.4" in message
+    assert "-N" in message
+
+
+def test_art_2_3_4_c7_applies_when_record_142_says_the_event_continues():
+    """The control: the same two rounds under a declared six, so round 3 is not one of the
+    last two and [C7] keeps team 2 out of the bracket."""
+    tournament = c7_tournament(6)
+    tournament.tournament["numRoundsExplicit"] = True
+    (engine, brackets) = tournament.brackets(3)
+    assert not engine.lasttworounds
+    top = engine.competitors[1]["scorelevel"]
+    assert upfloaters(brackets, top) == [3]
 
 
 def test_art_2_3_7_c10_minimise_the_upfloaters_opponents_that_floated():
