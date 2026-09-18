@@ -12,10 +12,11 @@ board (art. 1.6.1), which is what "white" and "black" mean in a match record.
 """
 import copy
 import decimal
+import os
 
 import pytest
 
-from gacrux import chessjson
+from gacrux import chessjson, trf2json
 from gacrux.crosstablefideteam import crosstable_fideteam
 from gacrux.drawresult import drawresult
 from gacrux.gacruxexeptions import GacruxInputError, GacruxNoLegalPairing
@@ -461,6 +462,33 @@ def test_art_2_1_1_c1_two_teams_shall_not_meet_twice():
     assert sorted(sorted(pair) for pair in pairs) == [[1, 3], [2, 4]]
 
 
+def test_art_2_1_1_c1_is_absolute_and_allows_one_meeting():
+    """[C1] art. 2.1.1: "two participants shall not play against each other more than
+    once".
+
+    The pairing class reads a maxMeets limit, which the -K option and a "double" in the
+    method list raise, so that a double round-robin run through the Swiss engine may
+    pair the same two players twice. C.04.6 has no such variant: art. 2.1.1 is an
+    absolute criterion of a Swiss team tournament, and the number it allows is one.
+
+    Two teams, two rounds, and the file asks for two meetings. They played each other in
+    round 1, so [C1] leaves round 2 with no legal pairing at all, and art. 3.3.3 hands
+    that to the Chief Arbiter - which is what the engine reports. What it must not do is
+    pair the rematch.
+
+    The position is the smallest one there is: with two teams there is no scoregroup to
+    choose from, no upfloater to select and no bye to assign ([C2] art. 2.1.2 never comes
+    up, the field being even), so [C1] is the only criterion that can decide anything.
+    """
+    tournament = event(2, 2)
+    tournament.tournament["maxMeets"] = 2       # -K 2, or a "double" in the method list
+    tournament.match(1, 1, 2, ["W", "L"])
+    engine = tournament.engine(2)
+    assert engine.nummeets == 1
+    with pytest.raises(GacruxNoLegalPairing):
+        engine.compute_pairing(False)
+
+
 def test_art_2_1_2_c2_no_second_pairing_allocated_bye():
     """[C2] art. 2.1.2 - a team that has already received the bye shall not receive it again.
 
@@ -571,6 +599,34 @@ def test_art_2_1_2_c2_check_mode_names_a_second_bye():
 # Art. 3.4 - the pairing-allocated-bye
 # ---------------------------------------------------------------------------
 
+def test_art_1_4_only_one_bracket_is_the_pairing_allocated_bye():
+    """Art. 1.4 - "should the number of teams to be paired be odd, ONE team is not paired.
+    This team receives a pairing-allocated-bye" - and art. 3.3.2, which makes assigning it
+    step 1 of the round-pairing, ahead of the brackets.
+
+    The bye is therefore a bracket of its own, holding the one team art. 3.4 chose, and it
+    is the only bracket of the round that is the bye. The scoregroup the byed team came
+    from is a bracket like any other: it pairs the teams that are left in it, and it does
+    not hold the bye.
+
+    Five teams in round 1. Every team has the same score, so the byed team's scoregroup is
+    also the scoregroup being paired - the one position in which "the bracket of the byed
+    team's score" and "the bracket that is the bye" can be confused with each other. Art.
+    3.4 gives the bye to team 5 (art. 3.4.2 and 3.4.3 tie, art. 3.4.4 takes the largest
+    TPN) and the remaining four teams are paired in their own bracket.
+    """
+    tournament = event(5, 5)
+    (engine, brackets) = tournament.brackets(1)
+    byebrackets = [bracket for bracket in brackets if bracket["pab"]]
+    assert len(byebrackets) == 1
+    assert byebrackets[0]["competitors"] == [5]
+    assert [(pair["w"], pair["b"]) for pair in byebrackets[0]["pairs"]] == [(5, 0)]
+    # and the scoregroup bracket that the byed team came from is an ordinary bracket
+    level = engine.competitors[5]["scorelevel"]
+    assert quality(brackets, level, "QC8") == 0
+    assert upfloaters(brackets, level) == []
+
+
 def test_art_3_4_2_the_bye_goes_to_the_lowest_score():
     """Art. 3.4.2 - the bye goes to the team with the lowest score."""
     tournament = event(5, 3)
@@ -581,6 +637,45 @@ def test_art_3_4_2_the_bye_goes_to_the_lowest_score():
     # 2 and 3 have 0 points, 5 has 1 (the bye), 1 and 4 have 2. The bye may not go to 5
     # again ([C2]), so it goes to a team on 0 points - the largest TPN of them, 3.
     assert bye(pairs) == 3
+
+
+def test_art_3_4_2_the_bye_is_chosen_on_the_pairing_score_under_baku():
+    """Art. 3.4.2 - "has the lowest score" - is read on the pairing score of C.04.7 art.
+    1.5, the standings points plus the virtual points of the acceleration.
+
+    The bye is the first step of the pairing process (art. 3.3.2 step 1), taken on the
+    same scoregroups the rest of the process then pairs, and those are formed on the
+    pairing score (art. 1.3.1, C.04.7 art. 1.5). Every other bare "score" of C.04.6 is
+    read that way here - the floaters of art. 1.5 and the potential upfloaters of art.
+    3.5.1 - and the Dutch engine assigns its bye on the same score
+    (crosstable_dutch.compute_pab_weight). Nothing in art. 3.4 singles the bye out.
+
+    Baku gives team 1 two virtual match points, so its pairing score is 2 while its
+    standings score is 0; teams 2 to 5 took a half-point bye in round 1 and have 1 point
+    on both counts. On the standings score team 1 would be lowest and take the bye; on
+    the pairing score it is highest, and the bye goes to the largest TPN among the four
+    teams on 1 point (art. 3.4.4), team 5.
+    """
+    tournament = event(5, 3)
+    tournament.tournament["accelerated"] = {
+        "name": "BAKU2016",
+        "values": [{
+            "matchPoints": decimal.Decimal("2.0"),
+            "gamePoints": decimal.Decimal("1.0"),
+            "firstRound": 1,
+            "lastRound": 3,
+            "firstCompetitor": 1, "lastCompetitor": 1,
+        }],
+    }
+    for team in range(2, 6):
+        tournament.halfpointbye(1, team)
+
+    engine = tournament.engine(2)
+    roundpairing = engine.compute_pairing(False)
+    pairs = [(pair["w"], pair["b"]) for bracket in roundpairing for pair in bracket["pairs"]]
+    assert engine.competitors[1]["pts"] < engine.competitors[2]["pts"]              # standings
+    assert engine.competitors[1]["scorelevel"] > engine.competitors[2]["scorelevel"]  # pairing
+    assert bye(pairs) == 5
 
 
 def test_art_3_4_3_the_bye_goes_to_the_most_matches_played():
@@ -720,6 +815,57 @@ def test_art_2_3_1_c4_minimise_the_number_of_upfloaters():
     assert engine.competitors[floated[0]]["acc"] == decimal.Decimal("1.0")
 
 
+def test_art_2_3_1_c4_counts_the_upfloaters_and_not_the_pairs_that_hold_them():
+    """[C4] art. 2.3.1 - "minimise the number of upfloaters".
+
+    The criterion counts teams. A pair of a resident and an upfloater holds one upfloater;
+    a pair of two upfloaters holds two, not one, and a pair of two residents holds none.
+    Art. 1.3.2 says which is which: a bracket is "resident teams from the same scoregroup
+    and (possibly) upfloaters from lower scoregroups", so a team of the bracket is an
+    upfloater exactly when its score is below the score of the bracket - which is a
+    property of the team and the bracket, and not of the two teams of a pair compared with
+    each other.
+
+    The position is the one of test_art_3_6_1_a_heterogeneous_bracket_is_read_in_tpn_order:
+    the bracket at the 1 MP scoregroup has the residents 5 and 9 and the upfloaters 2 and
+    7, both of which come from the 0 MP scoregroup, so the two upfloaters have the same
+    score as each other and a different one from the bracket.
+
+    The pair 2-7 is one of the pairs of that bracket - art. 3.6 weighed it as a candidate,
+    and rejected it because 5 and 9 have met and cannot take the other half of that
+    pairing. It holds two of the bracket's upfloaters and is worth 2 to [C4]. Comparing
+    the two teams with each other instead makes it worth 0, because they are level with
+    one another; comparing two upfloaters of DIFFERENT scores that way makes it worth 1.
+    Neither is the number of upfloaters in the pair.
+
+    Nothing else is being measured. [C5] (art. 2.3.2) is about the score differences of
+    the pairs and is read off the same edge without being asserted on here; [C7] and [C10]
+    (art. 2.3.4, 2.3.7) are zero throughout, because round 1 paired equal scores and left
+    no floaters; and [C8] and [C9] (art. 2.3.5, 2.3.6) are zero because no team has a type
+    A colour preference after a single match.
+    """
+    tournament = event(10, 5)
+    tournament.match(1, 5, 9, ["W", "L"])       # drawn: teams 5 and 9 have met
+    tournament.match(1, 1, 2, ["W", "W"])
+    tournament.match(1, 3, 7, ["W", "W"])
+    tournament.match(1, 4, 8, ["W", "W"])
+    tournament.match(1, 6, 10, ["W", "W"])
+    (engine, brackets) = tournament.brackets(2)
+    level = engine.competitors[5]["scorelevel"]
+    assert upfloaters(brackets, level) == [2, 7]
+    assert engine.competitors[2]["scorelevel"] == engine.competitors[7]["scorelevel"] < level
+
+    # the bracket as it was paired: one upfloater in each of its two pairs
+    assert quality(brackets, level, "QC4") == 2
+    assert engine.opponents[2][9]["quality"]["QC4"] == 1
+    assert engine.opponents[5][7]["quality"]["QC4"] == 1
+    # and the candidate pair that holds both of them, weighed in the same bracket
+    assert engine.opponents[2][7]["quality"]["QC4"] == 2
+    # (the pair 5-9 is not weighed at all: [C1] removed it from the bracket. A pair of two
+    # residents that IS weighed - 1 and 3, in the 2 MP bracket above - holds none.)
+    assert engine.opponents[1][3]["quality"]["QC4"] == 0
+
+
 def test_art_2_3_2_c5_maximise_the_scores_of_the_upfloaters():
     """[C5] art. 2.3.2 - "maximise the scores (taken in ascending order) of the upfloaters".
 
@@ -742,6 +888,44 @@ def test_art_2_3_2_c5_maximise_the_scores_of_the_upfloaters():
     assert len(floated) == 1
     # the upfloater comes from the scoregroup right below the top one
     assert engine.competitors[floated[0]]["scorelevel"] == top - 1
+
+
+def test_art_2_3_3_c6_has_nothing_to_ask_when_the_bye_emptied_the_following_scoregroup():
+    """[C6] art. 2.3.3 - "unless all the teams in the following scoregroup became or are
+    upfloaters (thus this scoregroup is now empty)".
+
+    The carve-out names upfloaters, but a scoregroup can also be emptied by the bye: art.
+    1.4 says the byed team "is not paired", so it is no longer among the teams [C6] asks to
+    be paired, and a scoregroup with nobody left in it has no bracket in which [C1], [C3]
+    and [C4] could be complied with. The criterion then has nothing to ask and passes -
+    see check_c6.
+
+    Seven teams before round 4: 1 and 2 on 6 match points, 4 on 4, 7 on 2, and 3, 5 and 6
+    on 1 with a bye each ([C2]). The bye goes to team 7, the lowest score that may take it,
+    and the scoregroup below team 4's is then empty. Team 4's bracket takes one upfloater
+    from the scoregroup below that and reports [C6] as complied with.
+    """
+    tournament = event(7, 5)
+    tournament.pab(1, 5)
+    tournament.match(1, 7, 6, ["W", "W"])
+    tournament.match(1, 1, 3, ["W", "W"])
+    tournament.match(1, 2, 4, ["W", "W"])
+    tournament.pab(2, 6)
+    tournament.match(2, 1, 7, ["W", "W"])
+    tournament.match(2, 2, 3, ["W", "W"])
+    tournament.match(2, 4, 5, ["W", "W"])
+    tournament.pab(3, 3)
+    tournament.match(3, 1, 5, ["W", "W"])
+    tournament.match(3, 2, 6, ["W", "W"])
+    tournament.match(3, 4, 7, ["W", "W"])
+    (engine, brackets) = tournament.brackets(4)
+    pairs = [(pair["w"], pair["b"]) for bracket in brackets for pair in bracket["pairs"]]
+    assert bye(pairs) == 7
+    level = engine.competitors[4]["scorelevel"]
+    # the scoregroup right below team 4's holds the byed team and nobody else
+    assert [team for team in range(1, 8) if engine.competitors[team]["scorelevel"] == level - 1] == [7]
+    assert upfloaters(brackets, level) == [3]
+    assert quality(brackets, level, "QC6") == 0
 
 
 def c7_tournament(numrounds):
@@ -935,11 +1119,13 @@ def test_art_2_3_5_c8_minimise_the_unfulfilled_colour_preferences():
     """[C8] art. 2.3.5 - minimise the number of teams whose colour preference is not
     fulfilled.
 
-    Four teams on 2 match points. 1 and 2 have played White twice (a preference for Black
+    Four teams on 4 match points. 1 and 2 have played White twice (a preference for Black
     under both types), 3 and 4 have played Black twice (a preference for White). Pairing
     1-2 and 3-4 would leave two preferences unfulfilled; pairing 1 and 2 against 3 and 4
-    leaves none, and [C8] says so - even though the identifier of art. 3.6.2 prefers
-    1-2 / 3-4 (identifier "1 3 2 4" against "1 2 3 4"). [C8] comes first (art. 3.6.4).
+    leaves none, and [C8] says so. The identifier of art. 3.6.2 asks for the same pairing
+    here - "1 2 3 4" for 1-3 2-4 against "1 3 2 4" for 1-2 3-4 - so this position pins
+    what [C8] counts, not that it comes first (art. 3.6.4); simple_preferences below is
+    the position in which [C8] overrides the identifier.
     """
     tournament = event(8, 6)
     tournament.match(1, 1, 5, ["W", "W"])       # 1 white
@@ -1091,6 +1277,70 @@ def test_art_1_7_type_a_and_type_b_pair_the_same_position_differently():
     assert rejected["QC8"] == 2
 
 
+def simple_preferences(nocolor):
+    """Eight teams again, and 1 to 4 have won every match without meeting each other: a
+    bracket of four before round 3.
+
+    1 and 3 played Black twice and 2 and 4 played White twice, so art. 1.7.1 gives 1 and 3
+    a preference for White and 2 and 4 a preference for Black - simple preferences, the
+    ones type A has. With "colour preferences ... not to be used at all" (art. 1.7) the
+    same four teams have none.
+    """
+    tournament = event(8, 6, nocolor=nocolor)
+    tournament.match(1, 5, 1, ["L", "L"])       # 1 Black, and wins
+    tournament.match(1, 2, 6, ["W", "W"])       # 2 White
+    tournament.match(1, 7, 3, ["L", "L"])       # 3 Black
+    tournament.match(1, 4, 8, ["W", "W"])       # 4 White
+    tournament.match(2, 6, 1, ["L", "L"])       # 1 Black again -> cd -2 -> White
+    tournament.match(2, 2, 5, ["W", "W"])       # 2 White again -> cd +2 -> Black
+    tournament.match(2, 8, 3, ["L", "L"])       # 3 Black again -> cd -2 -> White
+    tournament.match(2, 4, 7, ["W", "W"])       # 4 White again -> cd +2 -> Black
+    return tournament
+
+
+def test_art_1_7_no_colour_preferences_pair_the_position_differently_from_type_a():
+    """Art. 1.7 - "or colour preferences are not to be used at all", in the pairing.
+
+    The bracket is 1, 2, 3, 4. Under type A, 1 and 3 want White and 2 and 4 want Black, so
+    1-3 2-4 leaves two teams unserved and costs [C8] = 2 while 1-4 2-3 costs nothing: art.
+    2.3.5 rejects the pairing that the identifier of art. 3.6.2 would otherwise have taken
+    first, and the bracket is paired 1-4 2-3.
+
+    With no colour preferences at all, nobody wants anything, [C8] costs nothing whatever
+    the pairing is, and the identifier decides alone: 1-3 2-4, the identifier "1 2 3 4"
+    against "1 2 4 3".
+    """
+    (enginea, bracketsa) = simple_preferences(nocolor=False).brackets(3)
+    (enginen, bracketsn) = simple_preferences(nocolor=True).brackets(3)
+    assert [enginea.competitors[team]["cop"] for team in (1, 2, 3, 4)] == ["w2", "b2", "w2", "b2"]
+    assert [enginen.competitors[team]["cop"] for team in (1, 2, 3, 4)] == ["nc", "nc", "nc", "nc"]
+    assert sorted(sorted(pair) for pair in bracket_pairs(bracketsa, {1, 2, 3, 4})) == [[1, 4], [2, 3]]
+    assert sorted(sorted(pair) for pair in bracket_pairs(bracketsn, {1, 2, 3, 4})) == [[1, 3], [2, 4]]
+
+
+def test_art_2_3_5_c8_is_inert_when_colour_preferences_are_not_used():
+    """[C8] art. 2.3.5 - "minimise the number of teams whose colour preference is not
+    fulfilled" has nothing to minimise when art. 1.7 asks for no colour preferences.
+
+    In the position of simple_preferences the criterion is what separates the candidate
+    pairings under type A: 1-3 2-4 costs 2 and the other two cost nothing. Without colour
+    preferences every candidate costs 0, so [C8] can no longer reject anything, and the
+    pairing that type A refuses is the one the bracket is given.
+    """
+    (enginea, _) = simple_preferences(nocolor=False).brackets(3)
+    (enginen, bracketsn) = simple_preferences(nocolor=True).brackets(3)
+    candidates = [[(1, 3), (2, 4)], [(1, 4), (2, 3)], [(1, 2), (3, 4)]]
+
+    def weight(engine, candidate):
+        edges = [engine.opponents[a][b] for (a, b) in candidate]
+        return engine.crosstable.compute_weight(edges, None)["QC8"]
+
+    assert [weight(enginea, candidate) for candidate in candidates] == [2, 0, 0]
+    assert [weight(enginen, candidate) for candidate in candidates] == [0, 0, 0]
+    top = enginen.competitors[1]["scorelevel"]
+    assert quality(bracketsn, top, "QC8") == 0
+
+
 # ---------------------------------------------------------------------------
 # Art. 3.6 - the pairing of a bracket
 # ---------------------------------------------------------------------------
@@ -1185,6 +1435,93 @@ def test_art_3_6_1_a_heterogeneous_bracket_is_read_in_tpn_order():
     assert upfloaters(brackets, level) == [2, 7]
     pairs = sorted(sorted(pair) for pair in tournament.pair(2))
     assert pairs == [[1, 4], [2, 9], [3, 6], [5, 7], [8, 10]]
+
+
+def test_art_3_6_2_picks_the_smallest_identifier_a_played_history_still_allows():
+    """Art. 3.6.2 - the smallest identifier that the played history still allows.
+
+    art. 3.6.1 - "for each pair, the smaller-TPN player is the top member, the larger-TPN
+    player is the bottom member". art. 3.6.2 - "a pairing is identified by the TPNs of the
+    top members (ascending), followed by the TPNs of the corresponding bottom members",
+    and the pairing chosen is the one with the lexicographically smallest identifier.
+
+    Eight teams, round 3. The bracket holds the residents 3, 4 and 5 and the single
+    upfloater 1. Three pairings of it exist, and their identifiers are:
+
+        {1-4, 3-5}  ->  1 3 4 5     the smallest, and barred: 1 and 4 met in round 2
+        {1-5, 3-4}  ->  1 3 5 4     the smallest that art. 2.1.1 [C1] still allows
+        {1-3, 4-5}  ->  1 4 3 5
+
+    So the answer is 1-5 and 3-4. 1 and 4 have met and nothing else in the bracket has,
+    and everything that could decide the bracket on some other ground is held level, so
+    art. 3.6.2 is the only article left to choose:
+
+      * [C1] (art. 2.1.1) bars exactly one of the three pairings.
+      * [C4] and [C5] (art. 2.3.1, 2.3.2) are equal across the two surviving pairings:
+        each pairs the one upfloater with one resident and the other two residents
+        together, so each has one upfloater and the same score differences.
+      * [C7] and [C10] (art. 2.3.4, 2.3.7) are zero: round 2 paired equal scores in every
+        bracket, so no team of this bracket floated in the previous round.
+      * [C8] and [C9] (art. 2.3.5, 2.3.6) are zero: this is type A, and after two matches
+        every team here has a colour difference of zero with alternating colours, so no
+        team carries a colour preference to fulfil or to leave unfulfilled.
+
+    Number the bracket in score order instead of TPN order and this returns 1-3 and 4-5.
+    """
+    tournament = event(8, 5)
+
+    # Round 1 - four winners on 2 MP (1, 3, 4, 5) and four losers on 0 MP.
+    tournament.match(1, 1, 7, ["W", "W"])
+    tournament.match(1, 3, 6, ["W", "W"])
+    tournament.match(1, 4, 2, ["W", "W"])
+    tournament.match(1, 5, 8, ["W", "W"])
+
+    # Round 2 - team 1 meets team 4 and loses, which is the prohibition the bracket then
+    # has to pair around. Teams 3 and 5 win and stay level with 4; the colours alternate
+    # for every team, so no type A preference survives into round 3.
+    tournament.match(2, 4, 1, ["W", "W"])
+    tournament.match(2, 6, 3, ["L", "L"])
+    tournament.match(2, 7, 5, ["L", "L"])
+    tournament.match(2, 2, 8, ["W", "W"])
+
+    pairs = tournament.pair(3)
+    bracket = sorted(
+        tuple(sorted(pair)) for pair in pairs if set(pair) <= {1, 3, 4, 5}
+    )
+
+    assert bracket == [(1, 5), (3, 4)]
+
+
+def test_the_barred_pairing_is_the_one_with_the_smallest_identifier():
+    """The premise of the test above: [C1] is what removes 1-4, not the identifier order.
+
+    Without this, the test above would still pass if the engine rejected 1-4 for some
+    other reason. Art. 2.1.1 [C1] - "two teams shall not play against each other more than
+    once" - is absolute, so {1-4, 3-5} is unavailable however small its identifier is.
+
+    Removing the round 2 meeting of 1 and 4, and nothing else, must therefore change the
+    answer to that pairing - it is then the smallest identifier available.
+    """
+    tournament = event(8, 5)
+
+    tournament.match(1, 1, 7, ["W", "W"])
+    tournament.match(1, 3, 6, ["W", "W"])
+    tournament.match(1, 4, 2, ["W", "W"])
+    tournament.match(1, 5, 8, ["W", "W"])
+
+    # Team 1 loses to team 2 instead of to team 4, so it arrives in the same bracket with
+    # the same score and the same colour history, and 1-4 is now an available pair.
+    tournament.match(2, 2, 1, ["W", "W"])
+    tournament.match(2, 6, 3, ["L", "L"])
+    tournament.match(2, 7, 5, ["L", "L"])
+    tournament.match(2, 4, 8, ["W", "W"])
+
+    pairs = tournament.pair(3)
+    bracket = sorted(
+        tuple(sorted(pair)) for pair in pairs if set(pair) <= {1, 3, 4, 5}
+    )
+
+    assert bracket == [(1, 4), (3, 5)]
 
 
 # ---------------------------------------------------------------------------
@@ -1456,6 +1793,42 @@ def test_art_1_2_2_naming_the_primary_score_does_not_switch_the_secondary_off():
     assert engine.first_team(two, three) is False
 
 
+def test_art_1_2_1_a_command_line_primary_keeps_the_files_secondary_answer():
+    """Art. 1.2.1 - a record 192 code answers both questions at once, and naming the
+    primary score on the command line must not throw the file's answer to the second one
+    away.
+
+    FIDE_TEAM_TYPEA_MP states that game points are not used for colour allocation, and
+    trf2json records that answer as scoreSystem["secondaryUsed"]. "-m fideteam-mp" then
+    names match points as the primary score - the same score the file named - and says
+    nothing about the other, so the file's answer stands: art. 4.2.2 stays off. Only a
+    command line that names both scores ("-m fideteam-mp-gp") states that the secondary
+    score is used and overrides the file.
+
+    The two teams are the ones of the test above: equal on match points, unequal on game
+    points, so art. 4.2.2 would make team 3 the first-team and art. 4.2.3 makes it team 2.
+    """
+    # the resolver itself
+    assert resolve_secondary_score(["fideteam", "mp"], {"primary": "mp", "secondaryUsed": False}) == SECONDARY_UNUSED
+    assert resolve_secondary_score(["fideteam", "mp"], {"primary": "mp", "secondaryUsed": True}) == SECONDARY_USED
+    assert resolve_secondary_score(["fideteam", "mp", "gp"], {"primary": "mp", "secondaryUsed": False}) == SECONDARY_USED
+    # and the engine, on the tournament commonmain builds from a FIDE_TEAM_TYPEA_MP file
+    # read with -m fideteam-mp
+    tournament = event(4, 5, primary="match")
+    tournament.tournament["scoreSystem"]["secondaryUsed"] = False
+    tournament.tournament["pairingSystem"] = ["fideteam", "mp"]
+    tournament.tournament["scoreSystem"]["primary"] = "mp"
+    tournament.match(1, 2, 4, ["W", "D"])       # team 2: 1.5 game points, 2 match points
+    tournament.match(1, 3, 1, ["W", "W"])       # team 3: 2.0 game points, 2 match points
+    engine = tournament.engine(2)
+    engine.compute_pairing(False)
+    assert engine.secondaryscore == SECONDARY_UNUSED
+    assert not engine.secondary
+    (two, three) = (engine.competitors[2], engine.competitors[3])
+    assert three["ptx"] > two["ptx"]
+    assert engine.first_team(two, three) is True
+
+
 def test_art_1_7_the_three_colour_models_and_where_they_are_named():
     """Art. 1.7 - "Type A colour preferences are used unless the rules of the team
     competition specify Type B, or no colour preferences at all".
@@ -1493,6 +1866,64 @@ def test_art_4_3_2_grant_the_only_preference():
     rules = tournament.colorrules(3)
     # team 1 (Black, type A "b2") meets team 4 (no preference): art. 4.3.2
     assert (4, 1) in rules and rules[(4, 1)] == "4.3.2"
+
+
+NOCOLOR_FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "fideteam_nocolor.trf")
+
+
+def nocolor_file():
+    """fixtures/fideteam_nocolor.trf, a nine-team event whose record 192 code asks for no
+    colour preferences."""
+    reader = trf2json.trf2json()
+    with open(NOCOLOR_FIXTURE, encoding="utf-8") as handle:
+        reader.parse_file(handle.read(), 0)
+    return reader.get_tournament(1)
+
+
+def nocolor_file_pairs(rnd, pairingsystem=None):
+    """The engine for one round of that file, optionally forced onto another colour model,
+    and its pairing as (white team, black team, the art. 4.3 rule)."""
+    tournament = nocolor_file()
+    if pairingsystem is not None:
+        tournament["pairingSystem"] = pairingsystem
+    engine = pairing_fideteam(tournament, rnd, {"experimental": [], "verbose": 0, "rank": False, "top_color": "w"})
+    roundpairing = engine.compute_pairing(False)
+    return (engine, sorted(
+        (pair["w"], pair["b"], pair["colorrule"])
+        for bracket in roundpairing
+        for pair in bracket["pairs"]
+    ))
+
+
+def test_art_4_3_2_cannot_grant_a_preference_that_does_not_exist():
+    """Art. 4.3.2 - "if only one team has a colour preference, grant it" - against art.
+    4.3.5 - "give White to the team with the lower colour difference".
+
+    Round 6, the match between teams 2 and 3. Team 3 has played w,w,b,b: its colour
+    difference is 0 and its last two played matches were Black, so art. 1.7.1 gives it a
+    simple preference for White. Team 2 has played b,w,b,b,w: its colour difference is -1
+    and its last two are not both Black, so under type A it has no preference. Art. 4.3.2
+    then grants team 3 the White it wants.
+
+    With no colour preferences at all, neither team wants anything, art. 4.3.2 cannot fire
+    and the first rule that decides is art. 4.3.5: team 2 has the lower colour difference
+    (-1 against 0) and takes White. The file pairs 2-3 with 2 as White.
+    """
+    (typea, typeapairs) = nocolor_file_pairs(6, ["fideteam", "team_typea"])
+    (nocolor, nocolorpairs) = nocolor_file_pairs(6)
+
+    assert (typea.competitors[2]["cop"], typea.competitors[3]["cop"]) == ("nc", "w2")
+    assert (nocolor.competitors[2]["cop"], nocolor.competitors[3]["cop"]) == ("nc", "nc")
+    assert (typea.competitors[2]["cod"], typea.competitors[3]["cod"]) == (-1, 0)
+
+    assert (3, 2, "4.3.2") in typeapairs
+    assert (2, 3, "4.3.5") in nocolorpairs
+    chj = chessjson.chessjson()
+    declared = [
+        (chj.get_result_cid(match, "white"), chj.get_result_cid(match, "black"))
+        for match in nocolor_file()["matchList"] if match["round"] == 6
+    ]
+    assert (2, 3) in declared
 
 
 def test_art_4_3_3_grant_two_opposite_preferences():
@@ -1789,6 +2220,66 @@ def test_check_mode_reproduces_the_pairing_of_the_file():
     assert bye(checked) == bye(played)
 
 
+def test_check_mode_measures_the_same_quality_criteria_as_the_pairing():
+    """Art. 2.3 - the quality criteria of a bracket, measured on both sides of the
+    comparison the checker makes.
+
+    pairingchecker prints the criteria of the pairing the engine would make beside those
+    of the pairing the file holds, and reads the first criterion on which the two differ
+    as the reason the two pairings differ. That only works if both sides measure the same
+    criteria: a criterion that one side computes and the other leaves at zero reports a
+    difference on every bracket.
+
+    [C6] (art. 2.3.3) is the criterion that can differ here: "unless the following
+    scoregroup is now empty, choose the set of upfloaters so that [C1], [C3] and [C4] are
+    complied with in the bracket where this scoregroup is paired". It is a property of the
+    bracket's set of upfloaters, not of any one pair, so it does not fall out of the pairs
+    the way [C4], [C5], [C7], [C8], [C9] and [C10] do, and has to be asked for.
+
+    The position makes [C6] fail. Ten teams; after round 1 the scoregroups are {1,3,4,6}
+    on 2 MP, {5,9} on 1 MP and {2,7,8,10} on 0. The 2 MP bracket is even and pairs inside
+    itself with no upfloaters at all - but teams 5 and 9 are the whole scoregroup below it
+    and have already met, so that scoregroup cannot be paired with [C4]'s fewest
+    upfloaters (none, its size being even) whatever the bracket above does. [C6] is not
+    complied with, and both sides must say so.
+
+    Round 2 is then paired, written back into the file exactly as it was paired, and read
+    again: the two decompositions agree on the pairs and on the brackets, so every
+    criterion must agree as well.
+    """
+    tournament = event(10, 5)
+    tournament.match(1, 5, 9, ["W", "L"])
+    tournament.match(1, 1, 2, ["W", "W"])
+    tournament.match(1, 3, 7, ["W", "W"])
+    tournament.match(1, 4, 8, ["W", "W"])
+    tournament.match(1, 6, 10, ["W", "W"])
+    played = tournament.pair(2)
+    for (w, b) in played:
+        if b == 0:
+            tournament.pab(2, w)
+        else:
+            tournament.match(2, w, b, ["W", "L"])
+
+    paired = tournament.engine(2).compute_pairing(False)
+    analysed = tournament.engine(2).compute_pairing(True)
+    quality_by_level = {
+        bracket["scorelevel"]: bracket["quality"]
+        for brackets in (paired,)
+        for bracket in brackets
+    }
+    # the two sides decomposed the round into the same brackets, with the same pairs
+    assert [bracket["scorelevel"] for bracket in analysed] == list(quality_by_level)
+    for bracket in analysed:
+        assert sorted((pair["w"], pair["b"]) for pair in bracket["pairs"]) == sorted(
+            (pair["w"], pair["b"])
+            for pair in next(b for b in paired if b["scorelevel"] == bracket["scorelevel"])["pairs"]
+        )
+        assert bracket["quality"] == quality_by_level[bracket["scorelevel"]]
+    # and [C6] did fail in the 2 MP bracket
+    top = next(b for b in paired if b["scorelevel"] == max(quality_by_level))
+    assert top["upfloaters"] == [] and top["quality"]["QC6"] == 1
+
+
 # ---------------------------------------------------------------------------
 # The invariant sweep
 # ---------------------------------------------------------------------------
@@ -1827,7 +2318,8 @@ def has_legal_pairing(teams, met, byes):
     return False
 
 
-def simulate(numteams, numrounds, seed, teamsize=2, typeb=False, primary=None, secondary=None):
+def simulate(numteams, numrounds, seed, teamsize=2, typeb=False, primary=None,
+             secondary=None, nocolor=False, colorrules=None):
     """Pair a whole tournament, round by round, drawing the results of every board with
     Gacrux's own rating model, and check every round-pairing against the absolute criteria.
 
@@ -1839,7 +2331,8 @@ def simulate(numteams, numrounds, seed, teamsize=2, typeb=False, primary=None, s
     """
     statistics = drawresult(seed)
     statistics.set_team(1)
-    tournament = event(numteams, numrounds, teamsize=teamsize, typeb=typeb, primary=primary, secondary=secondary)
+    tournament = event(numteams, numrounds, teamsize=teamsize, typeb=typeb, primary=primary,
+                       secondary=secondary, nocolor=nocolor)
     ratings = {team["cid"]: team["rating"]["rating"] for team in tournament.tournament["competitors"]}
     allteams = list(range(1, numteams + 1))
     met = set()
@@ -1867,6 +2360,8 @@ def simulate(numteams, numrounds, seed, teamsize=2, typeb=False, primary=None, s
                 continue
             # [C1] art. 2.1.1 - two teams shall not meet twice
             assert (w, b) not in met and (b, w) not in met, f"round {rnd}: {w} and {b} meet twice"
+            if colorrules is not None:
+                colorrules.append(pair["colorrule"])
             met.add((w, b))
             met.add((b, w))
             results = []
@@ -1909,6 +2404,42 @@ def test_invariant_sweep_game_points_primary(numteams, numrounds):
     """The same, with game points as the primary score (art. 1.2.1)."""
     for seed in range(1, 6):
         simulate(numteams, numrounds, seed, primary="game", teamsize=4)
+
+
+@pytest.mark.parametrize("numteams,numrounds", [(7, 5), (12, 7), (15, 7)])
+def test_invariant_sweep_no_colour_preferences(numteams, numrounds):
+    """The same, with no colour preferences at all (art. 1.7)."""
+    for seed in range(1, 9):
+        simulate(numteams, numrounds, seed, nocolor=True)
+
+
+def test_art_4_3_allocates_the_colours_without_any_colour_preference():
+    """Art. 4.3 - a match still gets its two colours when no team has a preference.
+
+    Without colour preferences the teams still play White and Black, and art. 4.3 "always
+    decides". Four of its rules grant a colour preference - 4.3.2, 4.3.3, 4.3.4 and
+    4.3.7 - and none of them can fire when there is none to grant, so a whole tournament
+    is coloured by 4.3.1 (both teams have yet to play), 4.3.5 (the lower colour
+    difference), 4.3.6 (alternate from the most recent difference) and 4.3.8 / 4.3.9
+    (alternate from the last played round) alone.
+    """
+    rules = []
+    (tournament, rounds) = simulate(14, 7, seed=5, nocolor=True, colorrules=rules)
+
+    assert rounds == 7
+    # every match that was paired got both of its colours
+    chj = chessjson.chessjson()
+    played = [match for match in tournament.tournament["matchList"] if chj.get_result_cid(match, "black") > 0]
+    assert len(played) == len(rules)
+    for match in played:
+        (white, black) = (chj.get_result_cid(match, "white"), chj.get_result_cid(match, "black"))
+        assert white > 0 and black > 0
+        assert white != black
+    # and art. 4.3 named a rule for every one of them - never one that grants a preference
+    assert set(rules) <= {"4.3.1", "4.3.5", "4.3.6", "4.3.8", "4.3.9"}
+    assert set(rules) & {"4.3.2", "4.3.3", "4.3.4", "4.3.7"} == set()
+    # the rounds after the first are decided by the later rules
+    assert len(set(rules) - {"4.3.1"}) > 1
 
 
 @pytest.mark.parametrize("seed", [3, 11, 17, 29, 101])
