@@ -810,6 +810,56 @@ def test_art_2_3_7_c10_minimise_the_upfloaters_opponents_that_floated():
     assert bracketpairs == [[1, 4], [2, 6], [3, 5]]
 
 
+def test_art_2_3_4_and_2_3_7_count_both_upfloaters_in_one_pair():
+    """A bracket pair may contain two upfloaters, and both criteria count teams.
+
+    Teams 2 and 3 are below this bracket's score level and both floated in the previous
+    round. Their pair therefore contributes two to [C7]. Each is also the other
+    upfloater's previously-floated opponent, so it contributes two to [C10].
+
+    The edge weights show the ordering inside this candidate bracket. Teams 1 and 4 are
+    residents that did not float. The identifier of art. 3.6.2 prefers 1-4, 2-3, but
+    [C10] comes first and makes the two cross-pairs 1-2, 3-4 better. The outer [C4]
+    search prevents a selected bracket from pairing two of its own upfloaters: dropping
+    that pair would leave a legal round with two fewer. The synthetic bracket is useful
+    here because the edge-quality checker still has to report every criterion correctly.
+    """
+    engine = crosstable_fideteam([], False, False, lasttworounds=False)   # [C7], [C10] apply
+    engine.scorelevel = 2
+    engine.maxpsd = 2
+    engine.BLOB = 5
+    engine.competitors = [
+        None,
+        {"cid": 1, "tpn": 1, "scorelevel": 2, "flt": 0, "cop": "nc"},
+        {"cid": 2, "tpn": 2, "scorelevel": 1, "flt": 1, "cop": "nc"},
+        {"cid": 3, "tpn": 3, "scorelevel": 1, "flt": 2, "cop": "nc"},
+        {"cid": 4, "tpn": 4, "scorelevel": 2, "flt": 0, "cop": "nc"},
+    ]
+
+    def edge(a, b):
+        return {
+            "ca": a,
+            "cb": b,
+            "canmeet": True,
+            "qlevel": -1,
+            "quality": None,
+            "weight": 0,
+        }
+
+    edges = [edge(a, b) for a in range(1, 5) for b in range(a + 1, 5)]
+    engine.update_bracket(2, engine.competitors[1:], edges)
+    by_pair = {(item["ca"], item["cb"]): item for item in edges}
+
+    together = by_pair[(2, 3)]["quality"]
+    assert together["QC5"] == [0, 2]
+    assert together["QC7"] == 2
+    assert together["QC10"] == 2
+    assert (
+        by_pair[(1, 4)]["weight"] + by_pair[(2, 3)]["weight"]
+        > by_pair[(1, 2)]["weight"] + by_pair[(3, 4)]["weight"]
+    )
+
+
 # ---------------------------------------------------------------------------
 # Art. 2.3.5 / 2.3.6 - the colour criteria
 # ---------------------------------------------------------------------------
