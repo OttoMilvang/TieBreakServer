@@ -1823,11 +1823,18 @@ class trf2json(chessjson.chessjson):
         file, so what a legacy file is published with is what a record 310 file would
         have had to declare to agree with its own results.
 
+        The game points of each team's pairing-allocated byes are returned on their
+        own. TRF-2026 defines columns 81-84 of a team event's 001 record as the points
+        scored over the board or by forfeit, so a conforming file leaves the bye out of
+        them and has it in record 320 and in record 310's total only. A file may add it
+        to the 001 points as well. validate_team_scores() accepts either.
+
         `record` is the team record the teams were read from, "310" or "013", for the
         message. The rounds counted are returned too, for the same reason.
         """
         matchpoints = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
         recorded = {game["round"] for game in tournament["gameList"]}
+        pabpoints = {cid: Decimal("0.0") for cid in matchpoints}
         counted = set()
         for match in tournament["matchList"]:
             if match["round"] not in recorded and self.get_result_cid(match, "black") <= 0:
@@ -1849,6 +1856,8 @@ class trf2json(chessjson.chessjson):
                     self.put_status(401, message)
                     raise GacruxInputError(message)
 
+            if white > 0 and black <= 0 and self.get_result_res(match, "white") == "P":
+                pabpoints[white] += self.scores.get_score(tournament, "match", "PG")
             if white > 0:
                 matchpoints[white] += self.scores.get_score(
                 tournament, "match", self.get_result_res(match, "white")
@@ -1865,7 +1874,7 @@ class trf2json(chessjson.chessjson):
             )
             for competitor in tournament["competitors"]
         }
-        return matchpoints, gamepoints, counted
+        return matchpoints, gamepoints, pabpoints, counted
 
     def validate_team_scores(self, tournament):
         """Check the match- and game-point totals declared by TRF26 record 310.
@@ -1886,7 +1895,7 @@ class trf2json(chessjson.chessjson):
         reader and a file that disagree about a total is not something anybody can act
         on otherwise.
         """
-        calculated_match, calculated_gamepoints, counted = self.team_score_totals(tournament, "310")
+        calculated_match, calculated_gamepoints, pabpoints, counted = self.team_score_totals(tournament, "310")
 
         problems = []
         for competitor in tournament["competitors"]:
@@ -1897,11 +1906,15 @@ class trf2json(chessjson.chessjson):
                     "team " + str(cid) + " declares " + str(competitor["matchPoints"])
                     + " match points, the matches give " + str(calculated_match[cid])
                 )
-            if competitor["gamePoints"] != calculated_game:
+            # With or without the pairing-allocated bye in the 001 points.
+            withpab = calculated_game + pabpoints[cid]
+            if competitor["gamePoints"] not in (calculated_game, withpab):
                 problems.append(
                     "team " + str(cid) + " declares " + str(competitor["gamePoints"])
                     + " game points, the 001 records of its players give "
                     + str(calculated_game)
+                    + (", or " + str(withpab) + " with the pairing-allocated bye added"
+                       if withpab != calculated_game else "")
                 )
 
         if problems:
@@ -1961,7 +1974,8 @@ class trf2json(chessjson.chessjson):
         This runs from prepare_team_section() after games2matches has built the match
         list, which is what the match points are summed from.
         """
-        matchpoints, gamepoints, _counted = self.team_score_totals(tournament, "013")
+        # A 013 file declares no standing, so its 001 points are published as they are.
+        matchpoints, gamepoints, _pabpoints, _counted = self.team_score_totals(tournament, "013")
         for competitor in tournament["competitors"]:
             cid = competitor["cid"]
             competitor["matchPoints"] = matchpoints[cid]
