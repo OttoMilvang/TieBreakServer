@@ -216,6 +216,12 @@ class trf2json(chessjson.chessjson):
 
         tournament = self.get_tournament(1)
         self.all_lines = self.read_all_lines(tournament, alines, verbose)
+        if self.get_status() == 401:
+            # read_all_lines has refused the file: a record it could not parse, named by
+            # its line, or no 001 records at all. What follows reads the records again
+            # and would only fail on the same fault, less clearly. (467 and 472 are
+            # remarks about a record that was read, and go on.)
+            return
         self.validate_team_pairing_numbers(tournament)
         # json_output("-", self.scores.score)
 
@@ -291,14 +297,14 @@ class trf2json(chessjson.chessjson):
                         trfline["parse"] = True
                     except GacruxError:
                         # A parser that has itself worked out what is wrong with the record
-                        # says so. Do not turn that into a status code and a return: the
-                        # return leaves all_lines unset, and parse_file then reads it.
+                        # says so, and its message goes to the caller as it is, in place of
+                        # the bare line number below.
                         raise
                     except:
                         if verbose:
                             raise
                         self.put_status(401, "Error in trf-file, line " + str(lineno) + ", " + line)
-                        return
+                        return all_lines
             nexttrfid = self.post_parse_line(tournament, trfid)
         if "001" not in all_lines and "092" not in all_lines:
             self.put_status(401, "Error in trf, no 001 records")
