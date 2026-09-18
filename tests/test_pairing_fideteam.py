@@ -530,6 +530,45 @@ def test_art_2_1_2_c2_a_half_point_bye_does_not_bar_the_bye():
     assert not engine.crosstable.had_bye_or_forfeit_win(engine.competitors[5])
 
 
+def test_art_2_1_2_c2_check_mode_names_a_second_bye():
+    """[C2] art. 2.1.2 in check mode.
+
+    A check reproduces the round the file declares, so its crosstable keeps the declared
+    bye even where [C2] would have removed the edge when pairing. find_pab then flags the
+    bracket, so the criterion the file broke can be named.
+
+    Round 2 gives team 5 the bye it already had in round 1. The same round with the bye
+    on team 4, which is entitled to it, carries no flag.
+    """
+    tournament = event(5, 3)
+    tournament.match(1, 1, 2, ["W", "W"])
+    tournament.match(1, 3, 4, ["W", "W"])
+    tournament.pab(1, 5)
+    tournament.match(2, 1, 3, ["W", "W"])
+    tournament.match(2, 2, 4, ["W", "W"])
+    tournament.pab(2, 5)                        # the second bye [C2] forbids
+    engine = tournament.engine(2)
+    brackets = engine.compute_pairing(True)
+    pab = [bracket for bracket in brackets if bracket.get("pab")]
+    assert len(pab) == 1
+    assert pab[0]["competitors"] == [5]         # reproduced as declared
+    assert "team 5" in pab[0]["c2"]
+    assert "2.1.2" in pab[0]["c2"]
+
+    entitled = event(5, 3)
+    entitled.match(1, 1, 2, ["W", "W"])
+    entitled.match(1, 3, 4, ["W", "W"])
+    entitled.pab(1, 5)
+    entitled.match(2, 1, 3, ["W", "W"])
+    entitled.match(2, 2, 5, ["W", "W"])
+    entitled.pab(2, 4)
+    engine = entitled.engine(2)
+    brackets = engine.compute_pairing(True)
+    pab = [bracket for bracket in brackets if bracket.get("pab")]
+    assert pab[0]["competitors"] == [4]
+    assert "c2" not in pab[0]
+
+
 # ---------------------------------------------------------------------------
 # Art. 3.4 - the pairing-allocated-bye
 # ---------------------------------------------------------------------------
