@@ -121,3 +121,17 @@ def test_a_sequence_written_before_the_team_section_is_read_the_same_way():
 
     assert first["teamSequence"] == last["teamSequence"] == "WB"
     assert first["teamSize"] == last["teamSize"] == 2
+
+
+@pytest.mark.parametrize("seq", ["BW", "BWWB", "B"])
+def test_record_352_must_lead_with_white(seq):
+    """C.04.6 art. 1.6.1 takes a team's colour from its first board.
+
+    The sequence gives the colours of the team the pairing designates White, so
+    it has to start with W for the two to agree. A file with 352 BW was read
+    with every match colour reversed, and every colour difference with it.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError, match="must lead with W"):
+        read(team_file("352 " + seq))
+
+    assert read(team_file("352 WB")).get_status() == 0

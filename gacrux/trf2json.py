@@ -1072,6 +1072,17 @@ class trf2json(chessjson.chessjson):
             message = "Record 352 must contain a non-empty colour sequence using only W and B"
             self.put_status(401, message)
             raise GacruxInputError(message)
+        if seq[0] != "W":
+            # The sequence gives the colours of the team the pairing designates White,
+            # and C.04.6 art. 1.6.1 takes a team's colour from its first board. The two
+            # only agree when board 1 is White; otherwise every match colour is reversed.
+            message = (
+                "Record 352 must lead with W: the board sequence gives the colours of the"
+                + " team the pairing designates White, and C.04.6 art. 1.6.1 takes a"
+                + " team's colour from its first board"
+            )
+            self.put_status(401, message)
+            raise GacruxInputError(message)
         tournament["teamSize"] = len(seq)
         tournament["teamColor"] = seq[0]
         tournament["teamSequence"] = seq
