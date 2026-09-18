@@ -2,8 +2,10 @@
 """Regression tests for the point-valued acceleration representation."""
 from decimal import Decimal
 
+from gacrux import chessjson
 from gacrux import ts2json
 from gacrux.tiebreak import tiebreak
+from gacrux.tournamentgenerator import tournamentgenerator
 
 
 def test_ts2json_acceleration_uses_points():
@@ -27,6 +29,32 @@ def test_ts2json_acceleration_uses_points():
         "firstCompetitor": 1,
         "lastCompetitor": 20,
     }
+
+
+def test_do_pairing_stores_acceleration_as_points(monkeypatch):
+    runner = tournamentgenerator()
+    runner.params = {
+        "number_of_rounds": 9,
+        "current_round": 0,
+        "maxmeets": 0,
+        "method": ["dutch"],
+        "experimental": [],
+    }
+    runner.method["dutch"] = lambda tournament, rnd, params: None
+    monkeypatch.setattr(runner, "compute_pairing", lambda engine, params: {"checker": []})
+    monkeypatch.setattr(runner.statistics, "has_bye", lambda: "")
+    tournament = chessjson.chessjson().add_tournament(1, False, 9)
+    tournament["accelerated"] = {"name": "BAKU2016", "values": []}
+    tournament["competitors"] = [
+        {"cid": cid, "present": True, "gamePoints": Decimal("0.0")}
+        for cid in range(1, 5)
+    ]
+
+    runner.do_pairing(chessjson.chessjson(), tournament, 1)
+
+    assert tournament["accelerated"]["values"][0]["matchPoints"] == Decimal("2.0")
+    assert tournament["accelerated"]["values"][0]["gamePoints"] == Decimal("1.0")
+    assert "matchResult" not in tournament["accelerated"]["values"][0]
 
 
 def test_team_secondary_acceleration_uses_game_points():
