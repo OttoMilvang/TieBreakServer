@@ -231,21 +231,37 @@ class crosstable_fideteam(crosstable):
         b = self.competitors[c["cb"]]
         if a["scorelevel"] < b["scorelevel"]:
             (a, b) = (b, a)
-        psd = a["scorelevel"] - b["scorelevel"]
         # [C4] art. 2.3.1 - "minimise the number of upfloaters". The criterion counts
         # teams, so a pair is worth the number of ITS teams that are upfloaters: none, one
         # or two. A team of the bracket is an upfloater when its score is below the score
         # of the bracket (art. 1.3.2) - which is not the same test as "lower than the
         # other team of the pair", and differs from it in a pair of two upfloaters.
         q[QC4] = len([team for team in (a, b) if team["scorelevel"] < self.scorelevel])
-        if psd > 0:
-            # b is an upfloater, and art. 1.5 makes both teams of this pair floaters.
-            q[QC5][maxpsd - psd] = 1                    # [C5] art. 2.3.2
-            if not self.lasttworounds:
-                # [C7] art. 2.3.4 - an upfloater that was a floater in the previous round
-                q[QC7] = 1 if b["flt"] else 0
-                # [C10] art. 2.3.7 - an upfloater's opponent that was one
-                q[QC10] = 1 if a["flt"] else 0
+        # [C5] art. 2.3.2 reads the score of every upfloater, not the score difference
+        # between the two teams of the pair. Those are the same only when the pair holds
+        # one upfloater and one resident. Count from the bracket's score level so a pair
+        # of two upfloaters reports both members at their respective distances.
+        for team in (a, b):
+            if team["scorelevel"] < self.scorelevel:
+                psd = self.scorelevel - team["scorelevel"]
+                q[QC5][maxpsd - psd] += 1
+        if not self.lasttworounds:
+            # A pair can contain two upfloaters: an upfloater is a team below the score
+            # level of the bracket, not merely the lower-scoring team of this pair.
+            # [C7] art. 2.3.4 counts every upfloater that was a floater in the previous
+            # round. [C10] art. 2.3.7 counts the opponent of every such upfloater when
+            # that opponent was a floater. In a pair of two upfloaters, each team is the
+            # other's opponent and either or both can contribute to both criteria.
+            q[QC7] = sum(
+                bool(team["flt"])
+                for team in (a, b)
+                if team["scorelevel"] < self.scorelevel
+            )
+            q[QC10] = sum(
+                bool(opponent["flt"])
+                for team, opponent in ((a, b), (b, a))
+                if team["scorelevel"] < self.scorelevel
+            )
         # [C8] art. 2.3.5 - a pair of teams that want the same colour leaves one of them
         # unfulfilled, whatever the colour allocation of art. 4 does with it.
         (acop, bcop) = (a["cop"], b["cop"])
