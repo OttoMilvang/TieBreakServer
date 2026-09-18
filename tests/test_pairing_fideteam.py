@@ -2,10 +2,8 @@
 """
 FIDE C.04.6, the Swiss Team Pairing System.
 
-There is no second implementation of C.04.6 to check this one against - bbpPairings does
-not pair team tournaments, and no other engine implements the regulation - so these tests
-are the evidence that the engine follows it. Every one of them names the article it holds
-the engine to, and constructs a position in which that article, and no other, decides.
+Each test names the article it holds the engine to and builds a position in which that
+article, and no other, decides.
 
 The tournaments are built by hand, in the structure the readers produce: a team
 competitor holds its players, a match holds its games, and a game holds the two players
@@ -890,7 +888,7 @@ def test_art_2_3_4_and_2_3_7_count_both_upfloaters_in_one_pair():
     residents that did not float. The identifier of art. 3.6.2 prefers 1-4, 2-3, but
     [C10] comes first and makes the two cross-pairs 1-2, 3-4 better. The outer [C4]
     search prevents a selected bracket from pairing two of its own upfloaters: dropping
-    that pair would leave a legal round with two fewer. The synthetic bracket is useful
+    that pair would leave a legal round with two fewer. The hand-built bracket is useful
     here because the edge-quality checker still has to report every criterion correctly.
     """
     engine = crosstable_fideteam([], False, False, lasttworounds=False)   # [C7], [C10] apply
@@ -1889,11 +1887,11 @@ def simulate(numteams, numrounds, seed, teamsize=2, typeb=False, primary=None, s
 
 @pytest.mark.parametrize("numteams,numrounds", [(6, 5), (7, 5), (10, 7), (11, 7), (16, 7), (21, 7)])
 def test_invariant_sweep_type_a(numteams, numrounds):
-    """Many generated team tournaments, type A: every round-pairing is legal.
+    """Type A tournaments paired round by round: every round-pairing is legal.
 
     [C1] and [C2] hold, every team is paired or byed exactly once, and the colours are
-    consistent. The results of the boards are drawn with drawresult, the model Gacrux uses
-    to generate its own tournaments.
+    consistent. The results of the boards are drawn with drawresult, Gacrux's own result
+    model.
     """
     for seed in range(1, 9):
         simulate(numteams, numrounds, seed)
