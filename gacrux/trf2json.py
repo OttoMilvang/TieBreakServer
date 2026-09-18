@@ -1810,10 +1810,13 @@ class trf2json(chessjson.chessjson):
         system. The game points are the sum of the totals the team's players report in
         columns 81-84 of their own 001 records.
 
-        A match in a round past the one the file has reached is left out, because it is
-        a pairing that has been announced and not played, unless it is a
-        pairing-allocated bye -- those points are the team's whether or not anybody
-        else has played the round.
+        Which matches count is decided per match, and not from currentRound, which
+        parse_trf_player() only advances for a game played against an opponent. A
+        match counts when the game list has a game in its round (played, awarded by
+        forfeit under record 330, or sat out with "U" on every board), or when it sets
+        two teams against each other. What is left out is a bye in a round no player
+        has an entry for: record 240 or 320 naming a team for a round that has been
+        announced and not played.
 
         This is the one place either total is computed. validate_team_scores() checks a
         record 310 against it and update_team_score() publishes it for a record 013
@@ -1821,8 +1824,9 @@ class trf2json(chessjson.chessjson):
         have had to declare to agree with its own results.
         """
         matchpoints = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
+        recorded = {game["round"] for game in tournament["gameList"]}
         for match in tournament["matchList"]:
-            if match["round"] > tournament["currentRound"] and self.get_result_res(match, "white") != "P":
+            if match["round"] not in recorded and self.get_result_cid(match, "black") <= 0:
                 continue
             white = self.get_result_cid(match, "white")
             black = self.get_result_cid(match, "black")
