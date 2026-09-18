@@ -492,56 +492,110 @@ def test_art_2_1_1_c1_is_absolute_and_allows_one_meeting():
 def test_art_2_1_2_c2_no_second_pairing_allocated_bye():
     """[C2] art. 2.1.2 - a team that has already received the bye shall not receive it again.
 
-    Team 5 has the lowest score and the largest TPN after round 1, so art. 3.4 would give
-    it the bye - but it had one in round 1. Team 4, the next candidate, gets it.
+    The same shape as the forfeit test below: team 7 had the bye of round 1 and lost its
+    two matches since, so it comes into round 4 strictly lowest (1 match point against 3
+    or more) with the largest TPN. Teams 6 and 5 had the byes of rounds 2 and 3. Of the
+    candidates 1 to 4, teams 3 and 4 have the lower score, 3 match points, and 4 the
+    larger TPN.
+
+    Only team 7's earlier bye keeps the bye away from it, and the engine bars it twice:
+    [C2] in update_canmeet, and the meeting count, which holds the round 1 bye as a
+    meeting with competitor 0, so the one meeting [C1] allows removes that edge as well.
+    Take out both and the bye is team 7's.
     """
-    tournament = event(5, 3)
-    tournament.match(1, 1, 2, ["W", "W"])
-    tournament.match(1, 3, 4, ["W", "W"])
-    tournament.pab(1, 5)
-    pairs = tournament.pair(2)
-    assert bye(pairs) != 5
-    assert bye(pairs) == 4                      # 4 and 2 have 0 points, 4 has the larger TPN
+    tournament = event(7, 5)
+    tournament.pab(1, 7)                        # 7 -> 1 mp, the match points of a draw
+    tournament.match(1, 1, 2, ["W", "L"])       # drawn: 1 mp each
+    tournament.match(1, 3, 4, ["W", "L"])
+    tournament.match(1, 5, 6, ["W", "L"])
+    tournament.match(2, 1, 7, ["W", "W"])       # 1 -> 3, 7 stays on 1
+    tournament.match(2, 2, 3, ["W", "L"])       # 2 -> 2, 3 -> 2
+    tournament.match(2, 4, 5, ["W", "L"])       # 4 -> 2, 5 -> 2
+    tournament.pab(2, 6)                        # 6 -> 2
+    tournament.match(3, 2, 7, ["W", "W"])       # 2 -> 4, 7 stays on 1
+    tournament.match(3, 1, 3, ["W", "L"])       # 1 -> 4, 3 -> 3
+    tournament.match(3, 4, 6, ["W", "L"])       # 4 -> 3, 6 -> 3
+    tournament.pab(3, 5)                        # 5 -> 3
+    engine = tournament.engine(4)
+    engine.compute_pairing(False)
+    scores = {team: engine.competitors[team]["pts"] for team in range(1, 8)}
+    assert scores[7] < min(scores[team] for team in range(1, 7))      # strictly lowest
+    assert engine.crosstable.had_bye_or_forfeit_win(engine.competitors[7])
+    pairs = [(pair["w"], pair["b"]) for bracket in engine.roundpairing for pair in bracket["pairs"]]
+    assert bye(pairs) != 7
+    assert bye(pairs) == 4
 
 
 def test_art_2_1_2_c2_no_bye_after_a_forfeit_win():
     """[C2] art. 2.1.2 - nor shall a team that has won a match by forfeit.
 
-    Team 5 wins round 1 by forfeit over team 4 and would otherwise be a bye candidate in
-    round 2 (it is not: it has 2 points). Team 4 lost the forfeit and stays a candidate.
-    Round 3: team 5 has the lowest score of the teams that may still take a bye, but the
-    forfeit win bars it, so the bye goes to the next candidate.
+    Seven teams, round 4 to be paired. Team 7 won round 1 by forfeit over team 1 and lost
+    its two played matches since, so it comes into round 4 strictly lowest, on 2 match
+    points, with the largest TPN: art. 3.4.2 and 3.4.4 point at it. Only the forfeit win
+    bars it. Teams 6, 5 and 4 had the byes of rounds 1, 2 and 3, so the candidates are 1,
+    2 and 3, all on 3 match points; 2 and 3 have played three matches to team 1's two
+    (art. 3.4.3), and 3 has the larger TPN (art. 3.4.4).
+
+    Without [C2] the bye is team 7's - which is what this test fails with when the
+    criterion is taken out of update_canmeet.
     """
-    tournament = event(5, 3)
-    tournament.forfeit(1, 5, 4)                 # 5 wins by forfeit, 4 loses
-    tournament.match(1, 1, 2, ["W", "W"])
-    tournament.pab(1, 3)
-    tournament.match(2, 1, 5, ["L", "L"])       # 5 beats 1
-    tournament.match(2, 3, 2, ["L", "L"])       # 2 beats 3
-    tournament.pab(2, 4)
-    engine = tournament.engine(3)
+    tournament = event(7, 5)
+    tournament.forfeit(1, 7, 1)                 # 7 wins by forfeit: 2 mp, no match played
+    tournament.match(1, 2, 3, ["W", "L"])       # drawn: 1 mp each
+    tournament.match(1, 4, 5, ["W", "L"])
+    tournament.pab(1, 6)                        # 6 -> 1
+    tournament.match(2, 1, 7, ["W", "W"])       # 1 -> 2, 7 stays on 2
+    tournament.match(2, 2, 6, ["W", "L"])       # 2 -> 2, 6 -> 2
+    tournament.match(2, 3, 4, ["W", "L"])       # 3 -> 2, 4 -> 2
+    tournament.pab(2, 5)                        # 5 -> 2
+    tournament.match(3, 5, 7, ["W", "W"])       # 5 -> 4, 7 stays on 2
+    tournament.match(3, 1, 2, ["W", "L"])       # 1 -> 3, 2 -> 3
+    tournament.match(3, 3, 6, ["W", "L"])       # 3 -> 3, 6 -> 3
+    tournament.pab(3, 4)                        # 4 -> 3
+    engine = tournament.engine(4)
     engine.compute_pairing(False)
-    # 5 has 4 match points and 4 has 1: both are barred from the bye ([C2]), 3 is not.
-    assert engine.competitors[5]["cop"] is not None
-    assert engine.crosstable.had_bye_or_forfeit_win(engine.competitors[5])
-    assert engine.crosstable.had_bye_or_forfeit_win(engine.competitors[4])   # it had the bye in r2
-    assert engine.crosstable.had_bye_or_forfeit_win(engine.competitors[3])   # it had the bye in r1
+    scores = {team: engine.competitors[team]["pts"] for team in range(1, 8)}
+    assert scores[7] < min(scores[team] for team in range(1, 7))      # strictly lowest
+    assert engine.competitors[7]["num"]["val"] == 2                    # the forfeit was not played
+    assert engine.crosstable.had_bye_or_forfeit_win(engine.competitors[7])
     assert not engine.crosstable.had_bye_or_forfeit_win(engine.competitors[1])
     pairs = [(pair["w"], pair["b"]) for bracket in engine.roundpairing for pair in bracket["pairs"]]
-    assert bye(pairs) in (1, 2)
+    assert bye(pairs) != 7
+    assert bye(pairs) == 3
 
 
 def test_art_2_1_2_c2_no_bye_after_a_full_point_bye():
-    """[C2] art. 2.1.2 - "(or been given a FIDE-deprecated full-point bye)"."""
-    tournament = event(5, 3)
-    tournament.match(1, 1, 2, ["W", "W"])
-    tournament.match(1, 3, 4, ["W", "W"])
-    tournament.fullpointbye(1, 5)
-    engine = tournament.engine(2)
+    """[C2] art. 2.1.2 - "(or been given a FIDE-deprecated full-point bye)".
+
+    The same shape as the forfeit test: team 7 was given a full-point bye in round 1 and
+    lost its two matches since, so it is strictly lowest before round 4 (2 match points
+    against 3 or more) and has the largest TPN. Teams 6 and 5 had the byes of rounds 2
+    and 3. Of the candidates 1 to 4, teams 3 and 4 have the lower score, 3 match points,
+    and 4 the larger TPN.
+
+    Without [C2] the bye is team 7's.
+    """
+    tournament = event(7, 5)
+    tournament.fullpointbye(1, 7)               # 7 -> 2 mp, no match played
+    tournament.match(1, 1, 2, ["W", "L"])       # drawn: 1 mp each
+    tournament.match(1, 3, 4, ["W", "L"])
+    tournament.match(1, 5, 6, ["W", "L"])
+    tournament.match(2, 1, 7, ["W", "W"])       # 1 -> 3, 7 stays on 2
+    tournament.match(2, 2, 3, ["W", "L"])       # 2 -> 2, 3 -> 2
+    tournament.match(2, 4, 5, ["W", "L"])       # 4 -> 2, 5 -> 2
+    tournament.pab(2, 6)                        # 6 -> 2
+    tournament.match(3, 2, 7, ["W", "W"])       # 2 -> 4, 7 stays on 2
+    tournament.match(3, 1, 3, ["W", "L"])       # 1 -> 4, 3 -> 3
+    tournament.match(3, 4, 6, ["W", "L"])       # 4 -> 3, 6 -> 3
+    tournament.pab(3, 5)                        # 5 -> 3
+    engine = tournament.engine(4)
     engine.compute_pairing(False)
-    assert engine.crosstable.had_bye_or_forfeit_win(engine.competitors[5])
+    scores = {team: engine.competitors[team]["pts"] for team in range(1, 8)}
+    assert scores[7] < min(scores[team] for team in range(1, 7))      # strictly lowest
+    assert engine.crosstable.had_bye_or_forfeit_win(engine.competitors[7])
     pairs = [(pair["w"], pair["b"]) for bracket in engine.roundpairing for pair in bracket["pairs"]]
-    assert bye(pairs) != 5
+    assert bye(pairs) != 7
+    assert bye(pairs) == 4
 
 
 def test_art_2_1_2_c2_a_half_point_bye_does_not_bar_the_bye():
