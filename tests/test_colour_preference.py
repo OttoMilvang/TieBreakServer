@@ -24,6 +24,7 @@ from gacrux import trf2json
 from gacrux.crosstabledutch import crosstable_dutch
 from gacrux.pairingdutch import pairing_dutch
 
+PAB = (0, "-", "U")  # pairing-allocated bye
 HPB = (0, "-", "H")  # half-point bye
 ZPB = (0, "-", "Z")  # zero-point bye
 
@@ -56,6 +57,15 @@ def pair_round(lines, rnd):
     params = {"experimental": [], "verbose": 0, "rank": False, "top_color": "w"}
     engine = pairing_dutch(tournament, rnd, params)
     return engine, engine.compute_pairing(False, 0)
+
+
+def pair_of(brackets, startno):
+    """The pair *startno* plays in, as the engine reports it ("w" and "b" keys)."""
+    for bracket in brackets:
+        for pair in bracket.get("pairs", []):
+            if startno in (pair["w"], pair["b"]):
+                return pair
+    raise AssertionError("%d was not paired" % startno)
 
 
 class TestTheLastTwoGamesClauseIsUnconditional:
@@ -124,6 +134,56 @@ class TestArticleConflict:
 
     def test_two_whites_cannot_overturn_a_colour_difference_of_minus_two(self):
         assert preference("bbbbww") == "w2"
+
+
+def a_player_who_has_not_played_level_with_one_due_white():
+    # Player 1 takes a half-point bye in each of the first four rounds, so he is on 2.0
+    # and has played no game: by C.04.3 art. 1.7.4 he has no colour preference. Players
+    # 2 to 8 play the four rounds with one pairing-allocated bye a round. Player 8 is the
+    # only one of them on 2.0, with Black, White, White, Black: colour difference 0 and
+    # Black last, a mild preference for White (art. 1.7.3).
+    schedule = [
+        [(4, 8, "=", "="), (3, 7, "1", "0"), (6, 5, "=", "=")],   # 2 has the bye
+        [(4, 6, "=", "="), (8, 3, "1", "0"), (7, 2, "0", "1")],   # 5 has the bye
+        [(4, 2, "0", "1"), (5, 7, "1", "0"), (8, 6, "0", "1")],   # 3 has the bye
+        [(2, 5, "0", "1"), (3, 4, "=", "="), (7, 8, "=", "=")],   # 6 has the bye
+    ]
+    byes = [2, 5, 3, 6]
+    value = {"1": 1.0, "=": 0.5, "0": 0.0}
+    games = {startno: [] for startno in range(1, 9)}
+    points = {startno: 0.0 for startno in range(1, 9)}
+    for rnd, pairs in enumerate(schedule):
+        for white, black, rw, rb in pairs:
+            games[white].append((black, "w", rw))
+            games[black].append((white, "b", rb))
+            points[white] += value[rw]
+            points[black] += value[rb]
+        games[byes[rnd]].append(PAB)
+        points[byes[rnd]] += 1.0
+        games[1].append(HPB)
+        points[1] += 0.5
+    lines = ["012 A player who has not played yet", "042 2026-03-01", "XXR 7"]
+    for startno in range(1, 9):
+        lines.append(player_line(startno, "P%d, X" % startno, 2400 - 10 * startno,
+                                 "%.1f" % points[startno], games[startno]))
+    return lines
+
+
+def test_art_1_7_4_the_opponent_of_a_player_with_no_preference_is_granted_theirs():
+    """art. 1.7.4: "Players who did not play any games have no colour preference (the
+    preference of their opponents is granted)."
+
+    In round 5 players 1 and 8, both on 2.0, are paired. Player 8 has a mild preference
+    for White. Player 1 is the higher ranked, so with a preference for White of his own he
+    would get White (art. 5.2.2, or 5.2.4 if both were mild). He has played no game, so
+    he has none, and player 8's preference is granted.
+    """
+    engine, brackets = pair_round(a_player_who_has_not_played_level_with_one_due_white(), 5)
+
+    assert engine.competitors[1]["cop"] == "nc"
+    assert engine.competitors[8]["cop"] == "w0"
+    pair = pair_of(brackets, 1)
+    assert (pair["w"], pair["b"]) == (8, 1)
 
 
 def eight_players_with_a_forfeit_and_a_bye():
