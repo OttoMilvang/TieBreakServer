@@ -165,3 +165,16 @@ def test_pairing_round_one_with_record_352_goes_ahead():
     engine = pairing_fideteam(tournament, 1, {"experimental": [], "verbose": 0})
     pairs = [pair for bracket in engine.compute_pairing(False) for pair in bracket["pairs"]]
     assert len(pairs) == 1
+
+
+def test_a_team_event_with_matches_still_sizes_itself_from_them():
+    """With matches and no record 352, the board count comes from the matches.
+
+    The fixture is nine teams of two boards, seven rounds played, declared in
+    record 310 and with no record 352.
+    """
+    with open("tests/fixtures/fideteam_nocolor.trf", encoding="latin1") as handle:
+        tournament = read(handle.read()).get_tournament(1)
+
+    assert tournament["teamSize"] == 2
+    assert len(tournament["matchList"]) > 0
