@@ -16,7 +16,7 @@ import os
 
 import pytest
 
-from gacrux import chessjson, trf2json
+from gacrux import chessjson, pairingfideteam, trf2json
 from gacrux.crosstablefideteam import crosstable_fideteam
 from gacrux.drawresult import drawresult
 from gacrux.gacruxexeptions import GacruxInputError, GacruxNoLegalPairing
@@ -380,6 +380,44 @@ def test_art_1_7_2_no_mild_preference_on_zero_in_the_last_round():
     assert preference(+1, "wbw", typeb=True, rnd=9, numrounds=9) == "b1"
 
 
+def test_art_1_7_2_fifth_paragraph_final_round_cd_zero_after_two_blacks():
+    """The first paragraph of art. 1.7.2 against its fifth - the one position on which the
+    two conflict. (The regulation does not number the paragraphs of art. 1.7.2; they are
+    counted here.) This test records the reading the engine takes.
+
+    The first paragraph gives a strong preference for White when CD < -1, or when CD is 0
+    or -1 and the last two played matches were Black. The fifth gives no type B
+    preference to a team that has yet to play a match, or whose CD is zero when pairing
+    for the last round.
+
+    A team that played W, W, B, B has a colour difference of 0 and Black in its last two
+    played matches, so the first paragraph gives it a strong preference for White. Pair
+    the last round, and its colour difference is zero when pairing for the last round, so
+    the fifth paragraph gives it no preference at all. Both clauses fire, and they say
+    opposite things.
+
+    The engine follows the first paragraph: the clauses of art. 1.7.2 are taken in the
+    order they are written, and a team's colour preference is the first definition that
+    fits it, so a team that satisfies the first paragraph never reaches the fifth.
+    crosstable_fideteam.color_preference tests the strong clauses first, and if the point
+    is ever settled the other way this test is the one to change.
+
+    The comparisons below pin the reading exactly: the same team one round earlier, where
+    the two paragraphs agree, and a team whose CD is zero without two Blacks behind it,
+    where the first paragraph does not fire and the fifth alone decides - so the assertion
+    below is about the conflict alone.
+    """
+    assert preference(0, "wwbb", typeb=True, rnd=9, numrounds=9) == "w2"
+    # not the last round: the fifth paragraph is silent and the first says the same thing
+    assert preference(0, "wwbb", typeb=True, rnd=8, numrounds=9) == "w2"
+    # CD zero without two Blacks behind it: the first paragraph does not fire, and in the
+    # last round the fifth is the clause that decides: no preference
+    assert preference(0, "wb", typeb=True, rnd=9, numrounds=9) == "nc"
+    assert preference(0, "wb", typeb=True, rnd=8, numrounds=9) == "w1"
+    # and type A has no such clause at all, so the last round changes nothing there
+    assert preference(0, "wwbb", typeb=False, rnd=9, numrounds=9) == "w2"
+
+
 def test_art_1_7_no_colour_preferences_at_all():
     """Art. 1.7 - "or colour preferences are not to be used at all"."""
     assert preference(+2, "ww", typeb=False) == "b2"
@@ -409,6 +447,114 @@ def test_art_1_6_1_a_match_that_was_not_played_gives_no_colour():
     assert team1["cod"] == 1
     assert team1["csq"].strip() == "w"
     assert team1["cop"] == "b1"          # mild Black, not the strong "b2" of two Whites
+
+
+# ---------------------------------------------------------------------------
+# Art. 1.7 - which of the three colour models the competition uses
+# ---------------------------------------------------------------------------
+
+# The three colour models of art. 1.7, each with the ways the two sources name it:
+#   mtoken  the token "-m" writes into the pairing system: -m fideteam-typeb -> "typeb"
+#   rtoken  the token the record 192 table of trf2json writes into it: "team_typeb"
+#   code    the record 192 code resolve_colour_model reads the model from, or None when
+#           none does - it reads TYPEA and TYPEB only
+#   typeb / usecolor  the two questions the crosstable asks of the model
+COLOUR_MODELS = [
+    ("typea",   "typea",   "team_typea", "FIDE_TEAM_TYPEA_MP_GP", False, True),
+    ("typeb",   "typeb",   "team_typeb", "FIDE_TEAM_TYPEB_MP_GP", True,  True),
+    ("nocolor", "nocolor", "nocolor",    None,                    False, False),
+]
+
+TYPE_A_MODEL = (False, True)
+
+
+def colour_model_engine(tokens, code):
+    """An engine whose pairing system carries "tokens" and whose record 192 code is
+    "code" - the two places art. 1.7's model can reach the engine from."""
+    tournament = event(4, 5)
+    tournament.tournament["pairingSystem"] = ["fideteam"] + list(tokens)
+    tournament.tournament["tournamentInfo"] = {"typeOfTournament": code}
+    return tournament.engine(1)
+
+
+@pytest.mark.parametrize("model,mtoken,rtoken,code,typeb,usecolor", COLOUR_MODELS)
+def test_art_1_7_each_source_names_the_colour_model_on_its_own(model, mtoken, rtoken, code, typeb, usecolor):
+    """Art. 1.7 - "Type A colour preferences are used unless the rules of the team
+    competition specify Type B, or no colour preferences at all."
+
+    Three models, and two places the rules of the competition can reach the engine from: a
+    token in the pairing system - which is where both the -m option and the record 192
+    table of trf2json put it, in two different spellings - and the record 192 code of the
+    file. Whichever source names a model, the whole model must come out of it.
+
+    The engine asks two questions of the model - "type B?" and "colour preferences at
+    all?" - and reading each of them from its own source is what lets a model be applied
+    by halves. Here each source is given alone, and each must answer both.
+
+    resolve_colour_model reads only TYPEA and TYPEB from the record 192 code, so a code
+    that names neither, FIDE_TEAM_MP_GP say, falls to the type A default of art. 1.7's
+    first sentence when it reaches the resolver alone. A file read by trf2json does not
+    get there: its record 192 table turns a score-only code into the "nocolor" token of
+    the pairing system before the resolver sees it.
+
+    Nothing else is exercised: the engines are built and their model read, without pairing
+    a round, so no scoregroup, no upfloater and no colour allocation is involved.
+    """
+    for token in (mtoken, rtoken):
+        engine = colour_model_engine([token], "")
+        assert (engine.typeb, engine.usecolor) == (typeb, usecolor), (model, token)
+    expected = (typeb, usecolor) if code is not None else TYPE_A_MODEL
+    engine = colour_model_engine([], code or "FIDE_TEAM_MP_GP")
+    assert (engine.typeb, engine.usecolor) == expected, (model, code)
+
+
+def test_art_1_7_the_resolver_names_one_model_for_the_whole_engine():
+    """Art. 1.7 - the resolver itself, stated as the three models it can return.
+
+    pairing_fideteam asks two questions of the colour model and the crosstable acts on
+    both, so the two have to be answers to one question asked once. resolve_colour_model
+    is that question; this pins its three answers and the precedence between its two
+    sources, without an engine in the way.
+    """
+    assert resolve_colour_model(["fideteam", "typea"], "") == TYPE_A
+    assert resolve_colour_model(["fideteam", "team_typea"], "") == TYPE_A
+    assert resolve_colour_model(["fideteam", "typeb"], "") == TYPE_B
+    assert resolve_colour_model(["fideteam", "team_typeb"], "") == TYPE_B
+    assert resolve_colour_model(["fideteam", "nocolor"], "") == NO_COLOUR
+    # the record 192 code, read only when the pairing system names no model
+    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEA_MP_GP") == TYPE_A
+    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEB_MP_BAKU") == TYPE_B
+    # and art. 1.7's own default when neither source names one
+    assert resolve_colour_model(["fideteam"], "") == TYPE_A
+    assert resolve_colour_model([], "") == TYPE_A
+    # a code that is not a C.04.6 team code states nothing about art. 1.7
+    assert resolve_colour_model(["fideteam"], "CUSTOM_TEAM_SWISS_MP") == TYPE_A
+    # and the pairing system wins over the code whenever it names a model
+    assert resolve_colour_model(["fideteam", "typea"], "FIDE_TEAM_TYPEB_MP_GP") == TYPE_A
+    assert resolve_colour_model(["fideteam", "nocolor"], "FIDE_TEAM_TYPEB_MP_GP") == NO_COLOUR
+
+
+@pytest.mark.parametrize("model,mtoken,rtoken,code,typeb,usecolor", COLOUR_MODELS)
+def test_art_1_7_a_named_colour_model_wins_over_the_code_of_the_file(model, mtoken, rtoken, code, typeb, usecolor):
+    """Art. 1.7, and the precedence between the two sources that can name the model.
+
+    The -m option replaces the pairing system of the tournament outright and does not
+    touch the record 192 code, so a file paired with a model on the command line carries
+    two statements of the model and they need not agree. The model the caller named is the
+    one in the pairing system, and it decides; the code of the file is read only when the
+    pairing system names no model at all.
+
+    If the two questions were read from separate sources, both statements would apply at
+    once: a file whose code says type B, paired with -m fideteam-typea, would keep the
+    type B preferences that the flag was supposed to replace, and -m fideteam-nocolor on
+    the same file would switch the preferences off while leaving them type B underneath.
+
+    Again nothing but art. 1.7 is exercised: the models are read off freshly built engines.
+    """
+    for othercode in ["", "FIDE_TEAM_TYPEA_MP_GP", "FIDE_TEAM_TYPEB_MP_GP", "FIDE_TEAM_MP_GP"]:
+        for token in (mtoken, rtoken):
+            engine = colour_model_engine([token], othercode)
+            assert (engine.typeb, engine.usecolor) == (typeb, usecolor), (model, token, othercode)
 
 
 # ---------------------------------------------------------------------------
@@ -832,6 +978,49 @@ def test_art_3_5_4_the_sets_are_sorted_lexicographically():
         [2, 8, 1], [2, 8, 3], [2, 8, 5],
         [6, 8, 1], [6, 8, 3], [6, 8, 5],
     ]
+
+
+def test_art_3_5_4_the_sets_are_produced_one_at_a_time_in_that_order(monkeypatch):
+    """Art. 3.5.4 and 3.5.5 - "the sets are sorted among themselves by the lexicographic
+    order of their TPNs", and the set to take is the FIRST one that complies.
+
+    The regulation is a "first that applies" rule, so the sets it asks for are a
+    sequence to walk in order. The order is fixed and each set is the successor of the
+    one before it, so the engine never needs the whole sequence in hand: a bracket whose
+    first candidate set complies has to build one set.
+
+    A bracket of a 60-team event that needs two upfloaters from a lower scoregroup of 20
+    has C(20,2) = 190 sets; one that needs ten of them has C(20,10) = 184 756, and every
+    one of them costs a matching to test.
+
+    This asserts the order and the laziness together, with ten upfloaters out of twenty
+    candidates of one score. The first set is teams 1 to 10 - the lexicographic minimum
+    of art. 3.5.4 - and it costs exactly one combination to produce, the second costs
+    exactly one more. The count is of tuples actually drawn from itertools.combinations.
+
+    Nothing but art. 3.5.3 and 3.5.4 is exercised: list_upfloaters reads a score level and
+    a pairing number from each candidate and nothing else, so the candidates here are
+    given as exactly that, with no result, colour or opponent to interact with.
+    """
+    engine = event(4, 5).engine(1)
+    lower = [{"cid": cid, "rnk": cid, "scorelevel": 1} for cid in range(1, 21)]
+    profile = (1,) * 10                                   # ten upfloaters of one score
+
+    drawn = [0]
+    combinations = pairingfideteam.combinations
+
+    def counting(candidates, take):
+        for chosen in combinations(candidates, take):
+            drawn[0] += 1
+            yield chosen
+
+    monkeypatch.setattr(pairingfideteam, "combinations", counting)
+
+    sets = iter(engine.list_upfloaters(lower, profile))
+    assert [node["cid"] for node in next(sets)] == list(range(1, 11))
+    assert drawn[0] == 1                                  # out of 184 756
+    assert [node["cid"] for node in next(sets)] == list(range(1, 10)) + [11]
+    assert drawn[0] == 2
 
 
 def test_art_3_5_3_a_set_is_sorted_by_descending_score_then_ascending_tpn():
