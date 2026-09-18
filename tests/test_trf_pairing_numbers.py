@@ -237,6 +237,64 @@ def test_310_naming_a_player_who_does_not_exist():
     assert "player 99" in str(excinfo.value)
 
 
+def renumbered(records, old, new):
+    """The team fixture with team `old`'s pairing number (columns 5-7) changed to `new`."""
+    return [
+        line[:4] + "%3d" % new + line[7:] if line.startswith("310" + "%4d" % old) else line
+        for line in teams(records)
+    ]
+
+
+@pytest.mark.parametrize(
+    "old, new, found",
+    [
+        (4, 3, "1, 2, 3, 3"),       # duplicate
+        (4, 5, "1, 2, 3, 5"),       # gap
+        (1, 0, "0, 2, 3, 4"),       # zero
+    ],
+    ids=["duplicate", "gap", "zero"],
+)
+def test_record_310_requires_team_pairing_numbers_1_to_n(old, new, found):
+    """C.04.6 art. 1.1.1: each team has a different TPN, from 1 to the number of teams.
+
+    A duplicate used to replace one team with the other and read on with status 0, a
+    zero was read as team 0, and a gap ran off the end of the board-number list with
+    an IndexError.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(renumbered([], old, new))
+
+    message = str(excinfo.value)
+    assert "Record 310" in message
+    assert found in message
+    assert "expected 1, 2, 3, 4" in message
+
+
+def test_record_310_accepts_the_complete_team_pairing_number_range():
+    assert parse(teams([])).get_status() == 0
+
+
+def test_team_pairing_numbers_1_to_n_is_a_fide_team_swiss_rule():
+    """Art. 1.1.1 is an article of the Swiss team system and nothing else.
+
+    TRF-2026 record 310 only asks for a number "From 1 to 999", and record 192 lists
+    team events that are not C.04.6 at all. A Berger round robin with teams 1, 2, 3
+    and 5 is read. Two teams with one number are refused whatever the system, since
+    the reader keeps the teams by that number.
+    """
+    assert parse(renumbered(["192 BERGER_TEAM_ROUNDROBIN"], 4, 5)).get_status() == 0
+
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(renumbered(["192 FIDE_TEAM_MP_GP"], 4, 5))
+    assert "Record 310" in str(excinfo.value)
+    assert "expected 1, 2, 3, 4" in str(excinfo.value)
+
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(renumbered(["192 BERGER_TEAM_ROUNDROBIN"], 4, 3))
+    assert "Record 310" in str(excinfo.value)
+    assert "1, 2, 3, 3" in str(excinfo.value)
+
+
 def test_001_naming_an_opponent_who_does_not_exist():
     # The opponent of a scheduled game is a pairing number as well, and it is the one an
     # arbiter is most likely to mistype. It cannot be checked while the record is read --

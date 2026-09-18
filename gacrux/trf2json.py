@@ -216,6 +216,7 @@ class trf2json(chessjson.chessjson):
 
         tournament = self.get_tournament(1)
         self.all_lines = self.read_all_lines(tournament, alines, verbose)
+        self.validate_team_pairing_numbers(tournament)
         # json_output("-", self.scores.score)
 
         if "299" not in self.all_lines:
@@ -303,6 +304,44 @@ class trf2json(chessjson.chessjson):
             self.put_status(401, "Error in trf, no 001 records")
 
         return all_lines
+
+    def validate_team_pairing_numbers(self, tournament):
+        """Record 310 must give every team a distinct TPN; under C.04.6, 1 through N.
+
+        TRF-2026 record 310 columns 5-7 hold a team pairing number "From 1 to 999", and
+        the reader keeps the teams by it, so two teams with one number are refused for
+        every team system. C.04.6 art. 1.1.1 asks for more: "Each team must have a
+        different TPN, from 1 to the TPN corresponding to the number of teams". That is
+        an article of the Swiss team system alone, so the full range is only asked for
+        when the pairing system is fideteam: a FIDE_TEAM_* Swiss code in record 192
+        (the round robin codes pair as berger), or no record 192 at all, which the
+        command line pairs as fideteam.
+
+        The numbers are read off the records themselves, before a duplicate can be
+        hidden in tcompetitors.
+        """
+        if "310" not in self.all_lines:
+            return
+        numbers = [helpers.parse_int(line["txt"][4:7]) for line in self.all_lines["310"]]
+        found = ", ".join(str(number) for number in sorted(numbers))
+        if "fideteam" in tournament.get("pairingSystem", ["fideteam"]):
+            expected = list(range(1, len(numbers) + 1))
+            if sorted(numbers) == expected:
+                return
+            message = (
+                "Record 310 must give each team a different tournament pairing number"
+                + " from 1 through the number of teams (C.04.6 art. 1.1.1); found " + found
+                + ", expected " + ", ".join(str(number) for number in expected)
+            )
+        else:
+            if len(set(numbers)) == len(numbers) and all(number > 0 for number in numbers):
+                return
+            message = (
+                "Record 310 must give each team a different tournament pairing number"
+                + " from 1 to 999; found " + found
+            )
+        self.put_status(401, message)
+        raise GacruxInputError(message)
 
     """
     def parse_line(self, tournament, trfkey, line):
@@ -553,7 +592,10 @@ class trf2json(chessjson.chessjson):
             results[rnd].append(result)
 
         numcomp = len(tournament["competitors"])
-        points = [Decimal("0.0")] * (numcomp + 1)
+        # Indexed by pairing number. Outside C.04.6 the team numbers only have to be
+        # distinct (record 310: "From 1 to 999"), so the highest one sets the size.
+        highest = max([competitor["cid"] for competitor in tournament["competitors"]] + [numcomp])
+        points = [Decimal("0.0")] * (highest + 1)
 
         # update each round
         for rnd, roundresults in results.items():
