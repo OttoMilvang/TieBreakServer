@@ -318,7 +318,8 @@ class pairing_fideteam(pairing):
 
     [C2] (art. 2.1.2) is already in the crosstable: a team that has received a bye, won a
     match by forfeit, or been given a full-point bye, has no edge to competitor 0, and so
-    is not a candidate at all.
+    is not a candidate at all. In check mode the crosstable holds the declared bye, so a
+    bye that [C2] bars is flagged on its bracket ("c2") instead.
 
     The bye is a bracket of its own, and pairing.compute_pairing appends it after the
     round has been paired.
@@ -358,6 +359,14 @@ class pairing_fideteam(pairing):
                     "bsne": {edge["cb"]: 1},
                     "pab": True,
                 }
+                if self.checkonly and self.crosstable.had_bye_or_forfeit_win(cmp[edge["cb"]]):
+                    # [C2] art. 2.1.2 - the file gave the bye to a team the criterion bars.
+                    # A check keeps the declared bye, so it is flagged here instead.
+                    bracket["c2"] = (
+                        "team " + str(edge["cb"]) + " has already received a pairing-allocated-bye,"
+                        + " won a match by forfeit or been given a full-point bye, so C.04.6"
+                        + " art. 2.1.2 [C2] bars it from the pairing-allocated-bye"
+                    )
                 return (bracket, pablevel, mod_nodes, mod_edges)
         # art. 3.3.3 - if it is impossible to complete a round-pairing, the Chief Arbiter
         # shall decide what to do.
