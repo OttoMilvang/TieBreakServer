@@ -492,17 +492,18 @@ class pairingchecker(commonmain):
                 pairs.append((a, b))
                 players.add(a)
                 players.add(b)
-            affected = [pair for pair in tournament["gameList"] if pair["round"] == currentround and (pair["white"] in players or pair["black"] in players)]
+            cid = self.chessfile.get_result_cid
+            affected = [pair for pair in tournament["gameList"] if pair["round"] == currentround and (cid(pair, "white") in players or cid(pair, "black") in players)]
             oplayers = set()
             for pair in affected:
-                oplayers.add(pair["white"])
-                oplayers.add(pair["black"]) 
+                oplayers.add(cid(pair, "white"))
+                oplayers.add(cid(pair, "black")) 
             if players != oplayers:
                 errtxt = "Illegal exchange format: " + str(players) + " != " + str(oplayers)
                 raise
             for i, pair in enumerate(affected):
-                pair["white"] = pairs[i][0]
-                pair["black"] = pairs[i][1]
+                pair["white"]["cid"] = pairs[i][0]
+                pair["black"]["cid"] = pairs[i][1]
         except:
             self.error(410, errtxt)
 

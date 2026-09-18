@@ -122,3 +122,24 @@ def test_a_round_that_does_not_match_is_still_reported_as_a_difference(options, 
     path = a_round_two_the_engine_pairs_the_other_way_round(tmp_path)
 
     assert check(options + ["-n", "2"], path) == 1
+
+
+@pytest.mark.parametrize("options", TWO_SIDED)
+def test_an_exchanged_round_is_reported_as_a_difference(options):
+    """`-T` rewrites the declared pairs of the round being checked.
+
+    Round two of the fixture is 1-4 and 3-2. `-T 1-2 3-4` declares it as 1-2 and 3-4
+    instead, the same four players with other opponents, which is not the pairing the
+    engine prescribes. Both two-sided modes have to apply the exchange and report the
+    round as a difference (status 1), not refuse the exchange as malformed (status 410).
+    """
+    assert check(options + ["-n", "2", "-T", "1-2", "3-4"]) == 1
+
+
+@pytest.mark.parametrize("options", TWO_SIDED)
+def test_an_exchange_that_undoes_a_swap_is_reported_as_a_match(options, tmp_path):
+    """The reverse case: round two of the swapped file declares 4-1, and `-T 1-4` puts
+    the pair back the way the engine prescribes it, so the round matches (status 0)."""
+    path = a_round_two_the_engine_pairs_the_other_way_round(tmp_path)
+
+    assert check(options + ["-n", "2", "-T", "1-4"], path) == 0
