@@ -287,3 +287,40 @@ def test_a_match_naming_a_team_record_310_does_not_declare_is_a_typed_error():
     assert "310" in message
     assert "round 2" in message
     assert "1 - 2" in message
+
+
+def test_a_bye_whose_game_points_are_only_in_record_320_agrees_with_record_310():
+    """TRF-2026 leaves a pairing-allocated bye out of a team event's 001 points.
+
+    Columns 81-84 of the 001 record hold what the player scored over the board or by
+    forfeit, so team 1's player writes 0.0 for a round-one bye, record 320 says the bye
+    is worth 1.0 game points, and record 310 declares 1.0. Files that add the bye to the
+    001 points as well are accepted too. Each team is read with the standing record 310
+    declares.
+    """
+    lines = ["012 Bye in record 320 only", "042 2026-03-01", "XXR 1", "352 W"]
+    lines.append(team_line(1, "Team One", [1], "1.0", "1.0"))
+    lines.append(team_line(2, "Team Two", [2], "0.0", "0.0"))
+    lines.append(team_line(3, "Team Three", [3], "2.0", "1.0"))
+    lines.append(player_line(1, "One, Player", 2400, "0.0", [(0, "-", "U")]))
+    lines.append(player_line(2, "Two, Player", 2300, "0.0", [(3, "b", "0")]))
+    lines.append(player_line(3, "Three, Player", 2200, "1.0", [(2, "w", "1")]))
+    lines.append("320  1.0  1.0 001")
+
+    chessfile = parse(lines)
+
+    assert chessfile.get_status() == 0
+    assert "info" not in chessfile.chessjson["status"]
+    tournament = chessfile.get_tournament(1)
+    assert {competitor["cid"]: (competitor["matchPoints"], competitor["gamePoints"])
+            for competitor in tournament["competitors"]} == {
+        1: (Decimal("1.0"), Decimal("1.0")),
+        2: (Decimal("0.0"), Decimal("0.0")),
+        3: (Decimal("2.0"), Decimal("1.0")),
+    }
+
+    # The same file with the bye in the 001 points too still agrees.
+    lines[7] = player_line(1, "One, Player", 2400, "1.0", [(0, "-", "U")])
+    chessfile = parse(lines)
+    assert chessfile.get_status() == 0
+    assert "info" not in chessfile.chessjson["status"]
