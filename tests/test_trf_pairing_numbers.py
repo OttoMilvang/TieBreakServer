@@ -202,8 +202,8 @@ def test_330_naming_a_team_that_does_not_exist():
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["330 +-   2   9   3"]))
 
-    assert "330" in str(excinfo.value) or "Error in teams" in str(excinfo.value)
-    assert "team 9" in str(excinfo.value) or "Error in teams" in str(excinfo.value)
+    assert "330" in str(excinfo.value)
+    assert "team 9" in str(excinfo.value)
 
 
 def test_300_naming_a_team_that_does_not_exist():
@@ -211,8 +211,8 @@ def test_300_naming_a_team_that_does_not_exist():
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["300   2   7   4    3    4"]))
 
-    assert "300" in str(excinfo.value) or "Out-of-order" in str(excinfo.value)
-    assert "team 7" in str(excinfo.value) 
+    assert "300" in str(excinfo.value)
+    assert "team 7" in str(excinfo.value)
 
 
 def test_300_naming_a_player_who_does_not_exist():
@@ -293,6 +293,28 @@ def test_team_pairing_numbers_1_to_n_is_a_fide_team_swiss_rule():
         parse(renumbered(["192 BERGER_TEAM_ROUNDROBIN"], 4, 3))
     assert "Record 310" in str(excinfo.value)
     assert "1, 2, 3, 3" in str(excinfo.value)
+
+
+def test_a_team_tournament_without_record_310_is_refused_by_name():
+    """A team tournament declared by record 192 has to have a team section.
+
+    TRF-2026 marks record 310 mandatory for rating and pairing, and it is where the
+    reader learns which players form a team. A file whose record 192 declares a
+    team tournament with no 310 and no 013 fell over with KeyError('teamId') while
+    counting the boards, with no line named.
+    """
+    lines = [line for line in teams(["192 FIDE_TEAM_MP_GP"])
+             if not line.startswith("310") and not line.startswith("352")]
+    chessfile = trf2json.trf2json()
+
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        chessfile.parse_file("\n".join(lines), 0)
+
+    message = str(excinfo.value)
+    assert "310" in message                  # the record that is missing
+    assert "mandatory" in message
+    assert "FIDE_TEAM_MP_GP" in message      # the declaration that made it mandatory
+    assert chessfile.get_status() == 401
 
 
 def test_001_naming_an_opponent_who_does_not_exist():
