@@ -651,7 +651,12 @@ class trf2json(chessjson.chessjson):
         trans = {"F": "W", "H": "D", "P": "P", "W": "W", "D": "D", "L": "L", "U": "U", "A": "A", "Z": "Z"}
         gameList = tournament["gameList"]
         for bye in self.byelist:
-            elemlist = [game for game in gameList if bye["round"] == game["round"] and bye["competitor"] == self.get_result_cid(game, "white")]
+            # The competitor may have played the round with either colour.
+            elemlist = [
+                game for game in gameList
+                if bye["round"] == game["round"]
+                and bye["competitor"] in (self.get_result_cid(game, "white"), self.get_result_cid(game, "black"))
+            ]
             if len(elemlist) == 0:
                 game = {
                     "id": 0, 
@@ -664,7 +669,8 @@ class trf2json(chessjson.chessjson):
                 self.append_result(gameList, game)
             else:
                 elem = elemlist[0]
-                if self.get_result_res(elem, "white", "") != bye["score"]:
+                side = "white" if bye["competitor"] == self.get_result_cid(elem, "white") else "black"
+                if self.recorded_result(elem, side) != bye["score"]:
                     self.put_status(405, "Error in bye score, competitor " + str(bye["competitor"]))
 
     #    forfeited
