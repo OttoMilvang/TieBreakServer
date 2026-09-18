@@ -1507,10 +1507,21 @@ class tiebreak:
                     val = "pab" if val == "0w" else val
                     if not cmp["rsts"][rnd]["played"]:
                         res = cmp["rsts"][rnd]["res"]
+                        # .get(res, res), not a bare subscript: res is a scoreSystem result
+                        # letter (W, D, L, F, H, Z, P, A, U -- see scoresystem.py's
+                        # default_score, and record 299 can write F/H directly onto a game,
+                        # per TRF-2026's Abnormal Assignment section), and these two tables
+                        # only ever enumerated a subset of it. A letter neither table names
+                        # is already in its final display form, exactly the fallback
+                        # compute_score takes a few lines above for the same "translate a
+                        # result letter, or leave it alone" job (the `trans` dict there).
+                        # Un-enumerated letters used to raise KeyError out of the middle of
+                        # a tie-break computation on an ordinary, valid TRF file -- e.g. any
+                        # tournament recording a half-point bye ("H") directly on a game.
                         if cmp["rsts"][rnd]["opponent"]:
-                            val = {"W": "+", "D": "=", "L": "-", "P": "pab", "A": "=", "U": "-", "Z": "-"}[res]
+                            val = {"W": "+", "D": "=", "L": "-", "P": "pab", "A": "=", "U": "-", "Z": "-"}.get(res, res)
                         else:
-                            val = {"W": "F", "D": "H", "L": "Z", "P": "pab", "A": "=", "U": "-", "Z": "Z"}[res]
+                            val = {"W": "F", "D": "H", "L": "Z", "P": "pab", "A": "=", "U": "-", "Z": "Z"}.get(res, res)
                     tbscore[prefix + "rfp"][rnd] = val
             tbscore[prefix + "rfp"]["val"] = val
         return "rfp"
