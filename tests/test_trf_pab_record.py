@@ -116,3 +116,24 @@ def test_a_record_240_that_contradicts_a_game_played_as_black_is_reported():
     roundone = [game for game in tournament["gameList"] if game["round"] == 1
                 and 1 in (chessfile.get_result_cid(game, "white"), chessfile.get_result_cid(game, "black"))]
     assert len(roundone) == 1
+
+
+def read_team(extra_lines):
+    """Nine teams of two boards, seven rounds, declared in record 310 and with no 320."""
+    with open("tests/fixtures/fideteam_nocolor.trf", encoding="latin1") as handle:
+        chessfile = trf2json.trf2json()
+        chessfile.parse_file(handle.read() + "\n" + "\n".join(extra_lines), 0)
+    return chessfile
+
+
+def test_a_record_320_naming_nobody_adds_no_bye():
+    """The points half of the record without a competitor half, in a team file.
+
+    The loop that reads the pairing numbers starts past the two point fields, so
+    a record that stops after them names no competitor and there is no bye to
+    add. It still declares what a PAB is worth, so it is not an error.
+    """
+    chessfile = read_team(["320 1.0  1.0"])
+
+    assert chessfile.byelist == []
+    assert chessfile.get_status() == 0
