@@ -457,5 +457,5 @@ class chessjson:
         res = self.get_result_res(result, color, default)
         other = "black" if color == "white" else "white"
         if res is None and self.get_result_cid(result, "black") > 0 and other in result:
-            return self.reverse.get(self.get_result_res(result, other))
+            return self.reverse.get(self.get_result_res(result, other, default=None))
         return res

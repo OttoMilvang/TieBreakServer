@@ -295,8 +295,8 @@ class tiebreak:
         res = self.chj.get_result_res(result, color, default=None)
         if res is None and self.chj.get_result_cid(result, color) > 0:
             ores = {"white": "black", "black": "white"}[color]
-            res = self.chj.reverse[self.chj.get_result_res(result, ores, default=None)]
-        elif res is None:
+            res = self.chj.reverse.get(self.chj.get_result_res(result, ores, default=None))
+        if res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
         while res in slist:
@@ -312,8 +312,8 @@ class tiebreak:
         res = self.chj.get_result_res(result, color, default=None)
         if res is None and self.chj.get_result_cid(result, color) > 0:
             ores = {"white": "black", "black": "white"}[color]
-            res = self.chj.reverse[self.chj.get_result_res(result, ores, default=None)]
-        elif res is None:
+            res = self.chj.reverse.get(self.chj.get_result_res(result, ores, default=None))
+        if res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return True
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
@@ -465,7 +465,7 @@ class tiebreak:
         black = self.chj.get_result_cid(rst, "black")
         if black > 0:
             if "result" not in rst["black"]:
-                err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(rst.get("white", 0)) + ", black=" +  str(rst.get("black", 0))
+                err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(white) + ", black=" +  str(black)
                 raise GacruxInputError(err)
             bPoints = self.get_score(scoresystem, rst, "black")
             brPoints = self.get_score(self.rating, rst, "black")
