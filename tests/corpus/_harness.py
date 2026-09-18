@@ -34,6 +34,7 @@ CORPUS_DIR = Path(__file__).resolve().parent
 CORPUS_GZ = CORPUS_DIR / "corpus.jsonl.gz"
 KNOWN_FAILURES = CORPUS_DIR / "known_failures.json"
 KNOWN_FAILURE_OVERLAYS = CORPUS_DIR / "known_failure_overlays"
+FIXTURE_OVERLAYS = "fixture_overlays"
 REPO_ROOT = CORPUS_DIR.parent.parent
 
 sys.path.insert(0, str(REPO_ROOT))
@@ -119,12 +120,46 @@ def load_corpus(full=None):
             line = line.strip()
             if line:
                 records.append(json.loads(line))
+    records = _apply_fixture_overlays(records)
     if full:
         selected = records
     else:
         stride = max(1, len(records) // SAMPLE_SIZE)
         selected = records[::stride]
     return _shard(selected)
+
+
+def _apply_fixture_overlays(records):
+    """Replace snapshot records with the versions optional features own.
+
+    corpus.jsonl.gz is one compressed file shared by every feature, and git
+    cannot merge two edits to it, so a feature that must change fixtures ships
+    them in its own fixture_overlays/<feature>.jsonl.gz instead of rewriting
+    the snapshot. Each line is a complete record that replaces the snapshot
+    record of the same name. Overlays apply in filename order, so where two
+    replace the same record the later one wins. The directory sits beside the
+    snapshot it patches, so a substitute snapshot (as in the tests) brings its
+    own overlays, or none."""
+    directory = Path(CORPUS_GZ).parent / FIXTURE_OVERLAYS
+    if not directory.exists():
+        return records
+    position = {record["name"]: index for index, record in enumerate(records)}
+    for path in sorted(directory.glob("*.jsonl.gz")):
+        seen = set()
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                record = json.loads(line)
+                name = record["name"]
+                if name not in position:
+                    raise ValueError("%s replaces %s, which is not in the corpus" % (path, name))
+                if name in seen:
+                    raise ValueError("%s replaces %s more than once" % (path, name))
+                seen.add(name)
+                records[position[name]] = record
+    return records
 
 
 def _shard(records):
