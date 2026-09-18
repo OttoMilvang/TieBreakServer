@@ -479,6 +479,9 @@ class trf2json(chessjson.chessjson):
                 self.check_player_section(tournament)
                 trfid = self.national["federation"] # This is next record
         elif trfkey == "013":
+                if (tournament["teamTournament"] and len(self.pcompetitors) > 0
+                        and len(self.tcompetitors) == 0 and len(self.bcompetitors) == 0):
+                    self.refuse_missing_team_section(tournament)
                 teamsize = tournament["teamSize"]
                 if tournament["teamTournament"] and (teamsize == 0):
                     countgames = [{} for i in range(tournament["currentRound"])]
@@ -503,6 +506,22 @@ class trf2json(chessjson.chessjson):
                     # print(teamsize)
                     tournament["teamSize"] = teamsize
         return trfid
+
+    def refuse_missing_team_section(self, tournament):
+        # Record 192 (or a team-only record) makes this a team event, and no 310 or 013
+        # says which players form which team. The board count, the matches and the
+        # standings all start from that section.
+        code = tournament["tournamentInfo"].get("typeOfTournament", "")
+        message = (
+            "Record 310 is missing: "
+            + ("record 192 declares " + code + ", a team tournament" if code
+               else "the file declares a team tournament")
+            + ", and TRF-2026 marks record 310 (the team section) mandatory for rating and"
+            + " pairing in team events. Every team has to be declared there, with its team"
+            + " pairing number and the start numbers of its players."
+        )
+        self.put_status(401, message)
+        raise GacruxInputError(message)
 
     # ==============================
     #
@@ -1397,6 +1416,9 @@ class trf2json(chessjson.chessjson):
         rnd = helpers.parse_int(line[7:10])
         whiteteam = helpers.parse_int(line[11:14])
         blackteam = helpers.parse_int(line[15:18])
+        for team in [whiteteam, blackteam]:
+            if team > 0:
+                self.check_competitor(tournament, line[0:3], team)
         forfeitedtrans = { "10": "WZ", "WL": "WZ", "WZ": "WZ", "+-": "WZ",  
                            "00": "ZZ", "LL": "ZZ", "ZZ": "ZZ", "--": "ZZ", 
                            "01": "ZW", "LW": "ZW", "ZW": "ZW", "-+": "ZW", 
