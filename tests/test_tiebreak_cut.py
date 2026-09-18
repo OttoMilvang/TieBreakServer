@@ -35,6 +35,10 @@ _FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 REAL_SWISS = os.path.join(_FIXTURES, "swiss_with_many_unplayed_rounds.trf")
 GOLDEN_BEFORE = os.path.join(_FIXTURES, "swiss_with_many_unplayed_rounds.2026-02-28.txt")
 GOLDEN_ON = os.path.join(_FIXTURES, "swiss_with_many_unplayed_rounds.2026-03-01.txt")
+GOLDEN_ALL_BEFORE = os.path.join(
+    _FIXTURES, "swiss_with_many_unplayed_rounds.2026-02-28.all.txt")
+GOLDEN_ALL_ON = os.path.join(
+    _FIXTURES, "swiss_with_many_unplayed_rounds.2026-03-01.all.txt")
 
 
 def player_line(startno, name, rating, points, games):
@@ -464,6 +468,48 @@ def test_art_16_5_1_ties_among_equal_vur_contributions_go_to_the_lowest_opponent
 
     assert compute(lines, ["SB/C2"], swiss=True)[4] == "5.00"
     assert cut_rounds(lines, "SB/C2", 4, swiss=True) == [2, 5]
+
+
+# 32 individual tie-breaks. The two goldens below hold them all for the fifteen-player,
+# seven-round Swiss, so a change in any of them shows up here, as well as a change in
+# the cuts. ARO, ARO/C1, TPR, PTP and APRO need -u and read -0 here.
+ALL_TIEBREAKS = [
+    "PTS", "WIN", "WON", "BWG", "BPG", "VUR", "NUM", "DE", "PS", "PS/C1", "KS",
+    "BH", "BH/C1", "BH/C2", "BH/M1", "BH/M2", "ABH", "AOB", "FB",
+    "SB", "SB/C1", "SB/C2", "SB/M1", "SB/M2", "ESB",
+    "ARO", "ARO/C1", "TPR", "PTP", "APRO", "COP", "CSQ",
+]
+
+
+def test_swiss_with_many_unplayed_rounds_across_32_tiebreaks_the_day_before():
+    assert checker_output(real_swiss(), ALL_TIEBREAKS) == golden(GOLDEN_ALL_BEFORE)
+
+
+def test_swiss_with_many_unplayed_rounds_across_32_tiebreaks_on_the_day():
+    assert checker_output(real_swiss("2026-03-01"), ALL_TIEBREAKS) == golden(GOLDEN_ALL_ON)
+
+
+def test_the_2026_rules_move_more_than_the_cuts():
+    # Which tie-breaks the March 2026 rules disturb on this tournament. The unplayed-round
+    # rules of article 16 set the dummy scores that the Buchholz and Sonneborn-Berger
+    # families add up, so the plain BH and SB move as well as the cuts.
+    before = golden(GOLDEN_ALL_BEFORE).rstrip("\n").split("\n")
+    on = golden(GOLDEN_ALL_ON).rstrip("\n").split("\n")
+    header = before[0].split("\t")
+    assert header == on[0].split("\t")
+    moved = set()
+    for lrow, rrow in zip(before[1:], on[1:]):
+        left, right = lrow.split("\t"), rrow.split("\t")
+        if len(left) != len(header):
+            continue                      # the trailing Check line
+        for name, a, b in zip(header, left, right):
+            if a != b:
+                moved.add(name)
+    assert moved == {"BH", "BH/C1", "BH/C2", "BH/M1", "BH/M2", "AOB", "FB",
+                     "SB", "SB/C1", "SB/C2", "SB/M1", "SB/M2", "ESB"}
+    # ABH does not move: it is the competitor's own adjusted score, which article 16.3
+    # governs, while the caps of article 16.4 only bound the dummy opponent's score.
+    # Nor does Rank: with this many tie-breaks the order is settled before Buchholz.
 
 
 def buchholz_after_round(startno, currentround):
