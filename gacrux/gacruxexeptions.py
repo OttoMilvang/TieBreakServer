@@ -10,14 +10,14 @@ GacruxNoLegalPairing is a state of the tournament, not a defect of the engine.
     The rules do not guarantee that a field can be paired. Once the competitors have
     met each other often enough there is no assignment left that satisfies the absolute
     criteria, and FIDE C.04.3 says so itself: article 1.9.3 covers the case where a
-    pairing cannot be completed and describes what the arbiter does about it -- pair as
-    many competitors as can be paired and give a bye to the rest. A small field whose
-    round robin is exhausted reaches this in a completely ordinary way, on input that is
-    valid in every respect.
+    pairing cannot be completed and says that the Chief Arbiter shall decide what to do.
+    It does not prescribe a particular recovery. A small field whose round robin is
+    exhausted reaches this in a completely ordinary way, on input that is valid in every
+    respect.
 
-    The engine cannot make that decision on the caller's behalf: which competitors are
-    left out is a decision of the arbiter, and it is taken outside the pairing rules. So
-    the engine reports the state and stops. A caller that pairs a small tournament is
+    The engine cannot make that decision on the caller's behalf: what happens to the
+    round is the arbiter's decision, and it is taken outside the pairing rules. So the
+    engine reports the state and stops. A caller that pairs a small tournament is
     expected to catch this exception -- not to log it as a crash.
 
 GacruxInputError means the tournament that was handed to the engine is malformed.

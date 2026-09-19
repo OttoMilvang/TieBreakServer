@@ -12,6 +12,7 @@ import sys
 
 from gacrux import helpers
 from gacrux.chessjson import chessjson
+from gacrux.gacruxexeptions import GacruxInputError, GacruxNoLegalPairing
 from gacrux.trf2json import trf2json
 from gacrux.ts2json import ts2json
 
@@ -330,13 +331,73 @@ class commonmain:
                     numrounds = numrounds * 2
                 tournament["numRounds"] = max(tournament["numRounds"], numrounds) 
 
+    def report_fault(self, code, txt):
+        """Record one status for a fault, on both the chess file and the result object.
+
+        common_main returns the chess file's status code, while a caller over HTTP reads
+        the one on the result object. A fault written to only one of them is answered two
+        different ways by the same run, so both are written here.
+        """
+        self.chessfile.put_status(code, txt)
+        self.error(code, txt)
+
     def do_command(self, func, errcode, errtxt):
+        """Run one stage of common_main and give a failure the status it deserves.
+
+        Every command-line entry point drives its stages through here, so this mapping is
+        the contract they all report by. gacruxexeptions.py sets out three conditions that
+        are not variations of one another, and each one gets its own outcome:
+
+        GacruxNoLegalPairing -> 505. This round of this tournament has no admissible
+            pairing. That is a state of the tournament and not a defect of the engine: the
+            rules do not guarantee that a field can be paired, and both C.04.3 art. 1.9.3
+            and C.04.6 art. 3.3.3 leave the decision of what to do about it to the arbiter.
+            505 stands beside 504, the other status meaning the round asked for cannot be
+            paired. The exception names which bracket ran out, so its message is carried.
+
+        GacruxInputError -> the status the reader already recorded for the malformation if
+            there is one, and 401 otherwise -- the code trf2json itself records beside the
+            GacruxInputError it raises, so one code carries one meaning wherever the fault
+            is found. The exception carries a message written for the user (which article
+            the file breaks, say), and that message is what is reported.
+
+        GacruxInvariantError, and any exception nobody foresaw -> 510 "Program error",
+            which is precisely what those are: an invariant violation is a bug in the
+            engine, and an unclassified exception may be one.
+
+        Two paths bypass the mapping. errcode 500 is read_command_line, which runs before
+        there is a chess file to record a status on, so it re-raises; and --verbose
+        re-raises everything, so that a developer gets the traceback instead of a code.
+        """
         if self.exit:
             return
         params = self.params
         try:
             func()
-        except:
+        except GacruxNoLegalPairing as fault:
+            if errcode == 500 or params["verbose"] > 0:
+                raise
+            self.report_fault(505, "This round cannot be paired: " + str(fault))
+        except GacruxInputError as fault:
+            if errcode == 500 or params["verbose"] > 0:
+                raise
+            # gacruxexeptions.py: "The reader will normally have recorded a status code
+            # for it as well". Where it has, that status names the malformation more
+            # precisely than the class of the exception can, and it comes with the
+            # reader's own list of what was wrong with the file, so it is preferred.
+            recorded = self.chessfile.chessjson["status"]
+            if recorded["code"] > 0:
+                self.error(recorded["code"], recorded["error"])
+            else:
+                # 401 wherever the malformation is found, and not the stage's own errcode:
+                # GacruxInputError means the file is wrong, and a caller testing for that
+                # should not have to know which stage noticed. See the reasoning in
+                # tests/test_cli_fault_reporting.py.
+                self.report_fault(401, str(fault))
+        except Exception:
+            # Exception, and not a bare except: KeyboardInterrupt and SystemExit are not
+            # "an exception nobody foresaw" in a stage of the run, they are the user or
+            # the interpreter stopping it, and they have to get out.
             if errcode == 500 or params["verbose"] > 0:
                 raise
             if errcode < 500:

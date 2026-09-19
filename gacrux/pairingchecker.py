@@ -22,7 +22,6 @@ from gacrux.tiebreak import tiebreak
 from gacrux.pairing import pairing
 from gacrux.pairingdutch import pairing_dutch
 from gacrux.pairingberger import pairing_berger
-from gacrux.gacruxexeptions import GacruxNoLegalPairing
 from gacrux.pairingfideteam import pairing_fideteam
 
 AHEAD = "  Tournament analysis   "
@@ -405,23 +404,19 @@ class pairingchecker(commonmain):
     def compute_pairing(self, chessfile, pairingengine, params):
         # print('PARAMS', params)
         chessfile = self.chessfile
+        # A GacruxNoLegalPairing raised by either call below is left to reach the caller.
+        # It says that this round of this tournament has no admissible pairing, which is a
+        # state of the tournament and not a defect of the engine: C.04.6 art. 3.3.3, like
+        # C.04.3 art. 1.9.3, leaves the decision of what to do about it to the Chief
+        # Arbiter, so the engine reports the state and stops. A pairing of its own devising
+        # would be worse than useless: a bye for every team it could not seat breaks
+        # art. 1.4, which allows one pairing-allocated bye in a round, and art. 2.1.2 [C2],
+        # which bars some teams from receiving even that one.
         self.pairingengine = pairingengine
         analysis = pairing = []
-        degenerate = False
         acompetitors = pcompetitors = {}
         if self.doanalysis or (self.docheck and not self.doanalysis and not self.dopairing):
-            try:
-                analysis = pairingengine.compute_pairing(True, self.doanalysis)
-            except GacruxNoLegalPairing:
-                if not isinstance(pairingengine, pairing_fideteam):
-                    raise
-                degenerate = True
-                current = [
-                    {"w": chessfile.get_result_cid(match, "white"), "b": chessfile.get_result_cid(match, "black"), "board": match["board"]}
-                    for match in pairingengine.tournament["matchList"]
-                    if match["round"] == pairingengine.rnd
-                ]
-                analysis = [{"pairs": current}]
+            analysis = pairingengine.compute_pairing(True, self.doanalysis)
             acompetitors = sorted(
                 #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.competitors],
                 pairingengine.crosstable.competitors,
@@ -429,13 +424,7 @@ class pairingchecker(commonmain):
             )
 
         if self.dopairing or (self.docheck and not self.doanalysis and not self.dopairing):
-            try:
-                pairing = pairingengine.compute_pairing(False, self.dopairing)
-            except GacruxNoLegalPairing:
-                if not isinstance(pairingengine, pairing_fideteam):
-                    raise
-                degenerate = True
-                pairing = [{"pairs": pairingengine.compute_degenerate_pairing()}]
+            pairing = pairingengine.compute_pairing(False, self.dopairing)
             pcompetitors = sorted(
                 #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.crosstable],
                 pairingengine.crosstable.competitors,
@@ -446,9 +435,6 @@ class pairingchecker(commonmain):
             "pairs": self.compute_pairs(pairing),
             "current": self.compute_pairs(analysis),
         }
-        if degenerate:
-            result["pairs"].sort()
-            result["current"].sort()
         if self.docheck:
             result["check"] = result["pairs"] == result["current"]
             result["pairing"] = pairing
@@ -492,17 +478,18 @@ class pairingchecker(commonmain):
                 pairs.append((a, b))
                 players.add(a)
                 players.add(b)
-            affected = [pair for pair in tournament["gameList"] if pair["round"] == currentround and (pair["white"] in players or pair["black"] in players)]
+            cid = self.chessfile.get_result_cid
+            affected = [pair for pair in tournament["gameList"] if pair["round"] == currentround and (cid(pair, "white") in players or cid(pair, "black") in players)]
             oplayers = set()
             for pair in affected:
-                oplayers.add(pair["white"])
-                oplayers.add(pair["black"]) 
+                oplayers.add(cid(pair, "white"))
+                oplayers.add(cid(pair, "black")) 
             if players != oplayers:
                 errtxt = "Illegal exchange format: " + str(players) + " != " + str(oplayers)
                 raise
             for i, pair in enumerate(affected):
-                pair["white"] = pairs[i][0]
-                pair["black"] = pairs[i][1]
+                pair["white"]["cid"] = pairs[i][0]
+                pair["black"]["cid"] = pairs[i][1]
         except:
             self.error(410, errtxt)
 
@@ -576,7 +563,13 @@ class pairingchecker(commonmain):
         if chessfile.get_status() == 0:
             if params["check"]:
                 ok = all([rndpairing["check"] for rndpairing in chessfile.result["roundpairing"]])
-                ok = ok or (self.dopairing > 0 ^ self. doanalysis > 0)
+                # -a computes the declared pairing and -p the engine's own, so exactly one
+                # of them asks for one side of the comparison and leaves the other empty.
+                # There is then no difference to find, and the verdict is suppressed rather
+                # than reported as a mismatch. write_text_file decides whether to print its
+                # "Check:" line from the same test, written the same way, in the opposite
+                # sense.
+                ok = ok or ((self.dopairing > 0) != (self.doanalysis > 0))
                 chessfile.result["check"] = ok
                 self.resultjson["status"]["code"] = 0 if ok else 1
             else: 
