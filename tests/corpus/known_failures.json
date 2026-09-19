@@ -272,5 +272,25 @@
     "team_0611",
     "team_0613",
     "team_0694"
+  ],
+  "the checker replaces a team round it cannot pair with a pairing of its own, so the file is accepted": [
+    "team_0002",
+    "team_0045",
+    "team_0050",
+    "team_0067",
+    "team_0128",
+    "team_0158",
+    "team_0184",
+    "team_0211",
+    "team_0229",
+    "team_0256",
+    "team_0280",
+    "team_0394",
+    "team_0449",
+    "team_0500",
+    "team_0567",
+    "team_0595",
+    "team_0639",
+    "team_0692"
   ]
 }
