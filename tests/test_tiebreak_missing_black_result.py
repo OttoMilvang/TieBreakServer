@@ -15,8 +15,12 @@ non-team tournament calls prepare_competitors() -> prepare_result() for every ga
 gameList, so a tournament with an incomplete game record crashes the moment tie-breaks
 are computed for it, not from poking prepare_result() directly.
 """
+import json
+from decimal import Decimal
+
 import pytest
 
+from gacrux import chessjson
 from gacrux import gacruxexeptions
 from gacrux import tiebreak
 from gacrux import trf2json
@@ -87,3 +91,130 @@ def test_a_complete_game_record_still_computes_tiebreaks():
     scores = {cmp["cid"]: cmp["tiebreakScore"] for cmp in result["competitors"]}
     assert scores[1][0] == 1
     assert scores[2][0] == 0
+
+
+def bresult_only_round_two():
+    """The mirror of missing_black_result_round_two(): player 1 withdraws instead.
+
+    Player 1's row ends after round 1. Player 2's row runs on into round 2, playing
+    Black against player 1 -- who has no round-2 entry of their own. The resulting
+    round-2 record carries a result for Black and none at all for White.
+
+    Black LOSES that round 2, which is what makes the case measurable: White's half is
+    then worth a win, a point that has to be derived from Black's letter. Had Black won
+    it, White's half would be a loss and worth the same nothing as no result at all, and
+    the test could not tell the two apart.
+    """
+    lines = ["012 One-sided result test", "042 2026-03-01", "XXR 2"]
+    lines.append(player_line(1, "One, Player", 2000, "0.0", [(2, "w", "0")]))
+    lines.append(player_line(2, "Two, Player", 1900, "1.0", [(1, "b", "1"), (1, "b", "0")]))
+    return lines
+
+
+def test_pts_handles_a_record_with_no_white_result():
+    """PTS must complete, and be right, on a game recorded only from Black's side.
+
+    The GacruxInputError guard above cannot help here: it tests for a missing result on
+    Black, and here Black's is the half that is present. White's score has to come from
+    reversing Black's result, and a tie-break engine that read the absent side as the
+    letter "Z" would score the round for nobody.
+
+    The points are derived, not read from the "001" totals: prepare_result() builds each
+    competitor's per-round record from the game list, so player 1's round-2 score comes
+    from the reversal.
+
+      round 1: 2 (Black) beats 1   -> 1 scores 0.0, 2 scores 1.0
+      round 2: 2 (Black) loses to 1 -> recorded for Black only; White's half is the
+                                      reverse of "L", a win, 1.0
+      totals:  player 1 = 1.0, player 2 = 1.0
+
+    Player 1's own "001" record declares 0.0, the one game his row carries, so the point
+    in his PTS can only have come from the game the other row describes.
+    """
+    chessfile = trf2json.trf2json()
+    chessfile.parse_file("\n".join(bresult_only_round_two()), True)
+    tournament = chessfile.get_tournament(1)
+
+    round_two = next(g for g in tournament["gameList"] if g["round"] == 2)
+    assert round_two["black"]["result"] == "L"
+    assert "result" not in round_two["white"]
+
+    params = {"tiebreak": ["PTS"], "check": False, "unrated": None}
+    tb = tiebreak.tiebreak(tournament, -1, params)
+    result = tb.compute_tiebreaks(tournament, params)
+
+    scores = {cmp["cid"]: cmp["tiebreakScore"] for cmp in result["competitors"]}
+    ranks = {cmp["cid"]: cmp["rank"] for cmp in result["competitors"]}
+    # The standings are complete: every competitor got a score and a rank.
+    assert sorted(scores) == [1, 2]
+    assert scores[1][0] == 1
+    assert scores[2][0] == 1
+    assert sorted(ranks.values()) == [1, 1]
+
+
+def test_the_two_one_sided_records_are_treated_differently_on_purpose():
+    """This pins an asymmetry, so that it is on the record rather than accidental.
+
+    A record with no result for White is recovered by reversing Black's, above. A record
+    with no result for Black is refused by the GacruxInputError guard in
+    prepare_result(), because the competitor entry for Black is built from that result
+    further down. Both records come from the same cause -- a withdrawn player leaving
+    half a game behind -- so which one the engine accepts depends only on the colour the
+    withdrawing player had.
+
+    If the asymmetry is resolved in favour of recovering both halves, this is the test to
+    change, and the assertion above says what a reader would be giving up.
+    """
+    params = {"tiebreak": ["PTS"], "check": False, "unrated": None}
+    with pytest.raises(gacruxexeptions.GacruxInputError):
+        tiebreak.tiebreak(build_tournament(), -1, params)
+
+
+def no_result_in_round_three():
+    """A chessjson event whose round-3 games carry no result on either side.
+
+    The TRF reader writes "Z" for a blank result column, so a TRF file cannot say this;
+    a JSON event can, for instance a game whose result has not been entered. Four
+    players, three rounds, written out by the TRF reader and read back as JSON.
+    """
+    lines = ["012 No result in round 3", "042 2026-03-01", "XXR 3"]
+    lines.append(player_line(1, "One, Player", 2400, "3.0", [(2, "w", "1"), (3, "b", "1"), (4, "w", "1")]))
+    lines.append(player_line(2, "Two, Player", 2300, "1.0", [(1, "b", "0"), (4, "w", "1"), (3, "b", "0")]))
+    lines.append(player_line(3, "Three, Player", 2200, "2.0", [(4, "w", "1"), (1, "w", "0"), (2, "w", "1")]))
+    lines.append(player_line(4, "Four, Player", 2100, "0.0", [(3, "b", "0"), (2, "b", "0"), (1, "b", "0")]))
+    reader = trf2json.trf2json()
+    reader.parse_file("\n".join(lines), True)
+    event = reader.chessjson
+    for game in event["event"]["tournaments"][0]["gameList"]:
+        if game["round"] == 3:
+            game["white"].pop("result", None)
+            game["black"].pop("result", None)
+    chessfile = chessjson.chessjson()
+    chessfile.parse_file(json.dumps(event, default=str), True)
+    return chessfile, chessfile.chessjson["event"]["tournaments"][0]
+
+
+def test_a_game_with_no_result_on_either_side_scores_nothing():
+    # Neither side recorded a result, so there is nothing to reverse: no letter for
+    # either side, and no points.
+    chessfile, tournament = no_result_in_round_three()
+    game = next(g for g in tournament["gameList"] if g["round"] == 3 and g["white"]["cid"] == 1)
+    assert "result" not in game["white"] and "result" not in game["black"]
+
+    assert chessfile.recorded_result(game, "white") is None
+    assert chessfile.recorded_result(game, "black") is None
+    scoresystem = tournament["scoreSystem"]["game"]
+    assert chessfile.get_score(scoresystem, game, "white") == Decimal("0.0")
+    assert chessfile.get_score(scoresystem, game, "black") == Decimal("0.0")
+
+
+def test_computing_tiebreaks_reports_a_game_with_no_result_on_either_side():
+    # The same GacruxInputError as a game with only White's half, naming the round and
+    # the two start numbers.
+    _, tournament = no_result_in_round_three()
+
+    params = {"tiebreak": ["PTS", "BH"], "check": False, "unrated": None}
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        tiebreak.tiebreak(tournament, -1, params)
+
+    assert str(excinfo.value) == "No result for black in round 3, white=1, black=4"

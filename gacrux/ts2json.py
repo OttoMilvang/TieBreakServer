@@ -957,9 +957,10 @@ class ts2json(chessjson.chessjson):
             accDrounds = (numrounds + 1)//2
             accWrounds = (accDrounds + 1)//2
             for (res, start, stop) in [("W", 1, accWrounds), ("D", accWrounds+1, accDrounds)]:
+                gamepoints = tournament["scoreSystem"]["game"][res]
                 value = {
-                    "matchResult": res,
-                    "gameResult": res,
+                    "matchPoints": tournament["scoreSystem"]["match"].get(res, gamepoints),
+                    "gamePoints": gamepoints,
                     "firstRound": start,
                     "lastRound": stop,
                     "firstCompetitor": 1,

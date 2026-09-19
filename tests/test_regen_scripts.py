@@ -17,6 +17,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 CORPUS_DIR = Path(__file__).parents[1] / "tests" / "corpus"
 if not CORPUS_DIR.is_dir():                       # running from inside tests/
     CORPUS_DIR = Path(__file__).parent / "corpus"
@@ -153,3 +155,59 @@ def test_has_unclassified_without_permission_refuses_by_default():
 def test_allow_unclassified_flag_defaults_to_false():
     assert regen_known_failures.parse_args([]).allow_unclassified is False
     assert regen_known_failures.parse_args(["--allow-unclassified"]).allow_unclassified is True
+
+
+def _fixture_overlay(tmp_path, filename, records):
+    """A fixture overlay beside the fake corpus, in the snapshot's format."""
+    directory = tmp_path / "fixture_overlays"
+    directory.mkdir(exist_ok=True)
+    with gzip.open(directory / filename, "wt", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record) + "\n")
+
+
+def _replacement(index, trf):
+    return {"name": "ind_%05d" % index, "category": "individual", "valid": False,
+            "skip": False, "trf": trf}
+
+
+def test_fixture_overlays_replace_snapshot_records_in_filename_order(tmp_path,
+                                                                     monkeypatch):
+    """A feature changes fixtures through its own overlay, not the snapshot.
+
+    ``corpus.jsonl.gz`` is compressed, so git cannot merge two branches that
+    each rewrite it: whichever merges second conflicts. Each feature ships its
+    changed records in ``fixture_overlays/<feature>.jsonl.gz`` instead. A record
+    replaces the snapshot record of the same name in place, the others are
+    untouched, and where two overlays replace the same record the one later in
+    filename order wins, as with the known-failure overlays.
+    """
+    monkeypatch.setattr(_harness, "CORPUS_GZ", _fake_corpus(tmp_path, 4))
+    monkeypatch.delenv("TIEBREAK_CORPUS_SHARDS", raising=False)
+    monkeypatch.delenv("TIEBREAK_CORPUS_SHARD", raising=False)
+    _fixture_overlay(tmp_path, "05-later.jsonl.gz", [_replacement(2, "later\n")])
+    _fixture_overlay(tmp_path, "02-earlier.jsonl.gz",
+                     [_replacement(1, "earlier\n"), _replacement(2, "earlier\n")])
+
+    records = _harness.load_corpus(full=True)
+
+    assert [record["name"] for record in records] == \
+        ["ind_%05d" % index for index in range(4)]
+    assert [record["trf"] for record in records] == \
+        ["012 fake\n", "earlier\n", "later\n", "012 fake\n"]
+    assert [record["valid"] for record in records] == [True, False, False, True]
+
+
+def test_fixture_overlay_must_name_snapshot_records_once(tmp_path, monkeypatch):
+    """An overlay only replaces: a name the snapshot lacks, or one listed twice
+    in the same overlay, is an error rather than a silent addition or a silent
+    choice between two versions."""
+    monkeypatch.setattr(_harness, "CORPUS_GZ", _fake_corpus(tmp_path, 2))
+    _fixture_overlay(tmp_path, "feature.jsonl.gz", [_replacement(7, "new\n")])
+    with pytest.raises(ValueError, match="not in the corpus"):
+        _harness.load_corpus(full=True)
+
+    _fixture_overlay(tmp_path, "feature.jsonl.gz",
+                     [_replacement(1, "one\n"), _replacement(1, "two\n")])
+    with pytest.raises(ValueError, match="more than once"):
+        _harness.load_corpus(full=True)

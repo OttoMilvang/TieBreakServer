@@ -77,6 +77,10 @@ class tiebreak:
         2 : "2026-03-01",   # Approved by FIDE Council on 02/02/2026
         } 
 
+    # The format TIEBREAK_RULES states its dates in, and the one a tournament's start
+    # date is read in, so that find_tmversion() compares two dates and not two strings.
+    ISO_DATE = "%Y-%m-%d"
+
     # constructor function
     def __init__(self, tournament, currentround, params):
         self.tiebreaklist = {
@@ -167,7 +171,12 @@ class tiebreak:
         if declared_primary is not None:
             self.set_primaryscore(declared_primary)
         self.accelerated = tournament["accelerated"] if "accelerated" in tournament else None
-        self.rating = {"W": Decimal("1.0"), "D": Decimal("0.5"), "L": "Z", "Z": Decimal("0.0"), "A": "Z", "U": "Z"}
+        # Every result a game can carry has to resolve to a number here: get_score
+        # returns a letter it cannot look up, and the caller subtracts it. The
+        # unplayed results all score as Z, which is what A and U already did --
+        # F, H and P are the three record 299 can write that were missing.
+        self.rating = {"W": Decimal("1.0"), "D": Decimal("0.5"), "L": "Z", "Z": Decimal("0.0"),
+                       "A": "Z", "U": "Z", "F": "Z", "H": "Z", "P": "Z"}
 
         if self.isteam:
             self.scoresystem = tournament["scoreSystem"]
@@ -203,13 +212,54 @@ class tiebreak:
         self.unrated = int(params["unrated"]) if params is not None and "unrated" in params and params["unrated"] is not None else None
         self. rulesversion = max(self.TIEBREAK_RULES.keys())
 
+    def get_startdate(self, tm):
+        """The tournament's start date as a date, or None when the file gives no usable one.
+
+        The date is read, not measured. The leading ten characters are parsed as an ISO
+        "YYYY-MM-DD" and whatever follows them is discarded - the field padding of a
+        fixed-width TRF, a time of day, the rest of a timestamp - because none of it
+        changes the day the tournament started. Returning a date rather than the string it
+        was written as is what stops a longer spelling of the same day from choosing a
+        different rule set than the short one.
+
+        None is returned for an absent record, for a JSON null (len() raised TypeError on
+        it) and for anything that is not an ISO date, because a date the engine cannot
+        read is one it must not guess at.
+        """
+        startdate = tm.get("tournamentInfo", {}).get("startDate", None)
+        if not isinstance(startdate, str):
+            return None
+        try:
+            return datetime.strptime(startdate[0:10], self.ISO_DATE).date()
+        except ValueError:
+            return None
+
     def find_tmversion(self, tm):
-        startdate = tm.get("tournamentInfo", {}).get("startDate", "")
-        if len(startdate) != 10:
-            startdate = str(datetime.now())[0:10]
-        if startdate < self.TIEBREAK_RULES[2]:
-            self.rulesversion = 1
-        
+        """Select the tie-break rules that apply to this tournament, by its start date.
+
+        A rule set applies from the day it came into force, so a tournament that started
+        before the 2026 rules did is scored under the previous set. Both sides of the
+        comparison are dates, so no spelling of a date can decide it.
+        """
+        startdate = self.get_startdate(tm)
+        if startdate is None:
+            # No usable start date: the tournament cannot be placed on either side of the
+            # cut-off, so it takes the newest rule set - the rules in force - as a stated
+            # and deterministic fallback.
+            #
+            # It does not fall back on today's date, which is what used to happen. That
+            # was datetime.now(), the local clock, so an undated file scored its
+            # tie-breaks one way before local midnight and another way after it, and two
+            # machines in different time zones disagreed about the same file.
+            #
+            # Refusing an undated file was considered instead and rejected: such files are
+            # ordinary and score correctly, so refusing them would reject working input to
+            # fix a defect they do not have.
+            self.rulesversion = max(self.TIEBREAK_RULES.keys())
+            return
+        cutoff = datetime.strptime(self.TIEBREAK_RULES[2], self.ISO_DATE).date()
+        self.rulesversion = 1 if startdate < cutoff else max(self.TIEBREAK_RULES.keys())
+
     def zero(self, scorename):
         return self.matchscore["Z"] if scorename == "match" else self.gamescore["Z"]
 
@@ -245,8 +295,8 @@ class tiebreak:
         res = self.chj.get_result_res(result, color, default=None)
         if res is None and self.chj.get_result_cid(result, color) > 0:
             ores = {"white": "black", "black": "white"}[color]
-            res = self.chj.reverse[self.chj.get_result_res(result, ores, default=None)]
-        elif res is None:
+            res = self.chj.reverse.get(self.chj.get_result_res(result, ores, default=None))
+        if res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
         while res in slist:
@@ -262,8 +312,8 @@ class tiebreak:
         res = self.chj.get_result_res(result, color, default=None)
         if res is None and self.chj.get_result_cid(result, color) > 0:
             ores = {"white": "black", "black": "white"}[color]
-            res = self.chj.reverse[self.chj.get_result_res(result, ores, default=None)]
-        elif res is None:
+            res = self.chj.reverse.get(self.chj.get_result_res(result, ores, default=None))
+        if res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return True
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
@@ -415,7 +465,7 @@ class tiebreak:
         black = self.chj.get_result_cid(rst, "black")
         if black > 0:
             if "result" not in rst["black"]:
-                err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(rst.get("white", 0)) + ", black=" +  str(rst.get("black", 0))
+                err = "No result for black in round " +  str(rst.get("round", 0)) + ", white=" +  str(white) + ", black=" +  str(black)
                 raise GacruxInputError(err)
             bPoints = self.get_score(scoresystem, rst, "black")
             brPoints = self.get_score(self.rating, rst, "black")
@@ -1135,7 +1185,9 @@ class tiebreak:
                             if opponent > 0:  # 16.4.1
                                 score = min(score, cmps[opponent]["tbval"][oprefix + "abh"]["val"])
                             else:             # 16.4.2
-                                score = min(score, opointsfordraw * rounds)
+                                # "number of rounds in the tournament": the scheduled
+                                # rounds, also in standings after an earlier round
+                                score = min(score, opointsfordraw * self.rounds)
                     else:
                         score = Decimal("0")
                     if tb["modifiers"].get("urd", False) and not self.rr:
@@ -1346,7 +1398,9 @@ class tiebreak:
                 and startno >= val["firstCompetitor"]
                 and startno <= val["lastCompetitor"]
             ):
-                acc = val["gamePoints"] if prefix == "points_" else val["matchPoints"]
+                # game points for an individual score and for a team's game-point
+                # score, which ACC/X reaches as gpoints_ when match points are primary
+                acc = val["gamePoints"] if prefix in ("points_", "gpoints_") else val["matchPoints"]
         return acc
 
     # STD: 1.0/ 0.5 /0.0 point system
