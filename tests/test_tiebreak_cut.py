@@ -32,7 +32,7 @@ HPB = (0, "-", "H")  # half-point bye
 ZPB = (0, "-", "Z")  # zero-point bye
 
 _FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
-REAL_SWISS = os.path.join(_FIXTURES, "swiss_with_many_unplayed_rounds.trf")
+UNPLAYED_ROUNDS_SWISS = os.path.join(_FIXTURES, "swiss_with_many_unplayed_rounds.trf")
 GOLDEN_BEFORE = os.path.join(_FIXTURES, "swiss_with_many_unplayed_rounds.2026-02-28.txt")
 GOLDEN_ON = os.path.join(_FIXTURES, "swiss_with_many_unplayed_rounds.2026-03-01.txt")
 GOLDEN_ALL_BEFORE = os.path.join(
@@ -374,16 +374,14 @@ def golden(path):
         return handle.read()
 
 
-def real_swiss(startdate=None):
-    # Fifteen players, seven rounds, a real Swiss with names, federation, identifiers and
-    # birth dates removed. It is thick with unplayed rounds - half-point byes, zero-point
-    # byes, pairing-allocated byes and forfeits on both sides - which is what makes it
-    # worth keeping: the article 16 paths are exercised on a real pairing history rather
-    # than on a fixture built to reach them.
+def unplayed_rounds_swiss(startdate=None):
+    # Fifteen players and seven rounds, thick with unplayed rounds: half-point byes,
+    # zero-point byes, pairing-allocated byes and forfeits on both sides, so the article
+    # 16 paths all meet in one tournament.
     #
     # The file is dated 2026-02-28, the last day before the March 2026 rules, so as it
     # stands it runs under the rules of 2024-08-01. startdate re-dates it in memory.
-    lines = open(REAL_SWISS, encoding="utf-8").read().split("\n")
+    lines = open(UNPLAYED_ROUNDS_SWISS, encoding="utf-8").read().split("\n")
     if startdate is None:
         return lines
     return [("042 " + startdate) if line.startswith("042 ") else line for line in lines]
@@ -392,22 +390,23 @@ def real_swiss(startdate=None):
 TIEBREAKS = ["PTS", "SB", "SB/C1", "SB/C2"]
 
 
-def test_a_real_swiss_the_day_before_the_2026_rules():
+def test_swiss_with_many_unplayed_rounds_the_day_before_the_2026_rules():
     # 2026-02-28: no article 16.4 cap applies, so every VUR of a participant takes that
     # participant's own score as its dummy. Nothing here depends on how the VURs of one
     # participant are ranked against each other, because without the caps they all carry
     # the same dummy score and cannot be ranked apart.
-    assert checker_output(real_swiss(), TIEBREAKS) == golden(GOLDEN_BEFORE)
+    assert checker_output(unplayed_rounds_swiss(), TIEBREAKS) == golden(GOLDEN_BEFORE)
 
 
-def test_a_real_swiss_on_the_day_the_2026_rules_start():
+def test_swiss_with_many_unplayed_rounds_on_the_day_the_2026_rules_start():
     # 2026-03-01: the caps apply, so this is the same file measured under the other rule
     # set. Start number 4 is the row the art. 16.5.1 tie-break between equal VUR
     # contributions decides; his SB/C2 of 5.00 is derived element by element in
     # test_art_16_5_1_ties_among_equal_vur_contributions_go_to_the_lowest_opponent_score
     # below. Regenerate this golden only when a value change is intended, and say in the
     # commit message which cells moved.
-    assert checker_output(real_swiss("2026-03-01"), TIEBREAKS) == golden(GOLDEN_ON)
+    output = checker_output(unplayed_rounds_swiss("2026-03-01"), TIEBREAKS)
+    assert output == golden(GOLDEN_ON)
 
 
 def changed_rows(left, right):
@@ -425,7 +424,7 @@ def changed_rows(left, right):
 
 
 def test_the_2026_caps_change_this_tournament():
-    # What crossing 2026-03-01 does to one real tournament, so that the pair of goldens
+    # What crossing 2026-03-01 does to this tournament, so that the pair of goldens
     # is read as a pair and a regeneration that flattened the difference would be caught.
     assert changed_rows(golden(GOLDEN_BEFORE), golden(GOLDEN_ON)) == {
         "1", "3", "4", "5", "9", "10", "11", "12", "14", "Check",
@@ -437,7 +436,7 @@ def test_the_2026_caps_change_this_tournament():
 def test_art_16_5_1_ties_among_equal_vur_contributions_go_to_the_lowest_opponent_score():
     """Art. 16.5.1 breaks a tie between equal VUR contributions by the opponent's score.
 
-    Start number 4 of the real Swiss forfeited rounds 1, 2 and 3, so all three are VURs
+    Start number 4 of the Swiss forfeited rounds 1, 2 and 3, so all three are VURs
     contributing 0.00, but art. 16.4.1 caps their dummy scores at the scheduled
     opponent's adjusted score and gives them 2.5, 1.5 and 2.5. His seven elements are:
 
@@ -460,7 +459,7 @@ def test_art_16_5_1_ties_among_equal_vur_contributions_go_to_the_lowest_opponent
     and the ordinary candidate is cut, for 6.00 - 1.00 = 5.00. Taking round 1 first
     leaves round 2 in the pool and cuts another 0.00, for 6.00.
     """
-    lines = real_swiss("2026-03-01")
+    lines = unplayed_rounds_swiss("2026-03-01")
 
     assert compute(lines, ["SB"], swiss=True)[4] == "6.00"
     assert compute(lines, ["SB/C1"], swiss=True)[4] == "6.00"
@@ -482,11 +481,13 @@ ALL_TIEBREAKS = [
 
 
 def test_swiss_with_many_unplayed_rounds_across_32_tiebreaks_the_day_before():
-    assert checker_output(real_swiss(), ALL_TIEBREAKS) == golden(GOLDEN_ALL_BEFORE)
+    output = checker_output(unplayed_rounds_swiss(), ALL_TIEBREAKS)
+    assert output == golden(GOLDEN_ALL_BEFORE)
 
 
 def test_swiss_with_many_unplayed_rounds_across_32_tiebreaks_on_the_day():
-    assert checker_output(real_swiss("2026-03-01"), ALL_TIEBREAKS) == golden(GOLDEN_ALL_ON)
+    output = checker_output(unplayed_rounds_swiss("2026-03-01"), ALL_TIEBREAKS)
+    assert output == golden(GOLDEN_ALL_ON)
 
 
 def test_the_2026_rules_move_more_than_the_cuts():
@@ -515,7 +516,7 @@ def test_the_2026_rules_move_more_than_the_cuts():
 def buchholz_after_round(startno, currentround):
     # One competitor's Buchholz in the standings after currentround, and the element each
     # round contributed to it. The details are keyed by the round number as a string.
-    result = run(real_swiss("2026-03-01"), ["BH"], check=True, swiss=True,
+    result = run(unplayed_rounds_swiss("2026-03-01"), ["BH"], check=True, swiss=True,
                  currentround=currentround)
     competitor = [cmp for cmp in result["competitors"] if cmp["cid"] == startno][0]
     details = competitor["tiebreakDetails"][0]
