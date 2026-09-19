@@ -9,14 +9,15 @@ art. 1.4.4 forbids the Baku acceleration when game points are the primary score,
 user who does that has to be told which article they violated, not that the program is
 broken.
 
-The team checker deliberately handles an incompletable C.04.6 round by producing the
-largest legal matching and leaving each unmatched team opposite competitor zero. Those
-article-3.3.3 policy results do not reach the command-line fault mapping; other callers
-and the individual Dutch engine still can.
+A round that cannot be paired reaches the mapping like any other condition. C.04.6
+art. 3.3.3 prescribes nothing for it and hands the round to the Chief Arbiter, so the
+checker reports the state and stops rather than answering with a pairing of its own.
 """
 import contextlib
 import io
 import sys
+
+import pytest
 
 from gacrux import pairingchecker
 
@@ -146,6 +147,123 @@ def reported_pairs(checker):
         for key in ("pairs", "current"):
             pairs.extend(rndpairing.get(key) or [])
     return [tuple(pair) for pair in pairs]
+
+
+# ---------------------------------------------------------------------------------
+# An impossible round is reported, not fabricated
+# ---------------------------------------------------------------------------------
+
+
+def test_pairing_an_impossible_round_reports_it_instead_of_giving_everyone_a_bye(tmp_path):
+    """`-p` on an exhausted field must not answer with a bye for every unseated team.
+
+    Three rounds of a four-team round robin use up every pair, so round four has no legal
+    pairing at all. The engine says so with GacruxNoLegalPairing, and the only correct
+    answer for the CLI is to report that condition (C.04.6 art. 3.3.3 leaves the decision
+    to the Chief Arbiter). Four teams is an even field, so art. 1.4 -- "should the number
+    of teams to be paired be odd, one team is not paired" -- allows no bye whatsoever
+    here; a report naming competitor 0 as an opponent is therefore an invention, and four
+    of them at once would break art. 1.4 even on an odd field, quite apart from art.
+    2.1.2 [C2], which bars a team that has already had a bye from receiving another.
+
+    The assertion is that no such pair is reported and that the run ends in a failure
+    status rather than a successful-looking pairing.
+    """
+    path = write(tmp_path, round_robin(declared=3))
+
+    (checker, _) = run(path, ["-p"])
+
+    assert [pair for pair in reported_pairs(checker) if 0 in pair] == []
+    assert status(checker) >= 400, "an unpairable round must not be reported as a pairing"
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        pytest.param(["-c"], id="check"),
+        pytest.param(["-c", "-p"], id="check-pairing"),
+        pytest.param(["-c", "-a"], id="check-analysis"),
+    ],
+)
+def test_checking_an_impossible_round_neither_fabricates_byes_nor_faults(tmp_path, options):
+    """The three check invocations over a round that cannot be paired.
+
+    The file declares a fourth round -- necessarily a repeat of round one, since every
+    pair is used up -- and `-n 4` points each invocation at it. `-d T` asks for the text
+    report, which is where the second half of this holds: the report renders a bracket by
+    reading its "scorelevel", "competitors" and "downfloaters", so a bracket carrying only
+    a "pairs" key makes write_text_details raise KeyError. common_main swallows that into
+    status 503, "Error when writing file" -- a message about the output file for a fault
+    that has nothing to do with it.
+
+    `-c -a` is the control here: analysis reconstructs the pairing the file declares
+    rather than computing one, and this file does declare a fourth round, so on this
+    fixture that path never reaches the unpairable state and must keep reporting the
+    declared round exactly as it always did. (It is reachable in general -- a declared
+    round that cannot be reconstructed as a legal sequence of brackets raises from the
+    analysis call too -- which is why both call sites have to leave the exception alone.)
+
+    Two assertions, both of which hold whatever the invocation: on an even field of four
+    teams art. 1.4 allows no pairing-allocated bye, so no reported pair may name
+    competitor 0; and no run may end in 503, which here can only mean a malformed bracket
+    reached the report.
+    """
+    path = write(tmp_path, round_robin(declared=4))
+
+    (checker, _) = run(path, options + ["-n", "4", "-d", "T"])
+
+    assert [pair for pair in reported_pairs(checker) if 0 in pair] == []
+    assert status(checker) != 503, "the text report faulted on a bracket it cannot render"
+
+
+def test_no_legal_pairing_has_its_own_status_code(tmp_path):
+    """An exhausted field is not a program error, and the CLI must not call it one.
+
+    ``gacruxexeptions.py``: "GacruxNoLegalPairing is a state of the tournament, not a
+    defect of the engine ... A caller that pairs a small tournament is expected to catch
+    this exception -- not to log it as a crash." Status 510 is literally "Program error",
+    so reporting this condition as 510 tells the caller the opposite of the truth, and
+    leaves it no way to tell the one exception that is not a bug apart from the ones that
+    are.
+
+    505 is the status for it -- the neighbour of 504, the other code that means the round
+    asked for cannot be paired -- and the message the engine wrote has to survive with it,
+    because a bare code cannot say which bracket ran out.
+    """
+    path = write(tmp_path, round_robin(declared=3))
+
+    (checker, output) = run(path, ["-p", "-d", "T"])
+
+    assert status(checker) != 510, "an unpairable round is not a defect of the engine"
+    assert status(checker) == 505
+    assert "cannot be paired" in messages(checker)
+    assert "no legal pairing" in messages(checker)
+    assert "Program error" not in messages(checker)
+    # And it reaches the user, not just the JSON: write_error_file prints the status.
+    assert "505" in output
+    assert "no legal pairing" in output
+
+
+def test_a_declared_round_with_no_legal_pairing_is_not_accepted(tmp_path):
+    """A file may not check out on a round the rules prescribe no pairing for.
+
+    This is the corpus class the change turns over. Eighteen team records of
+    tests/corpus reach a round whose field is exhausted, and they were accepted --
+    marked valid, no disagreement -- because the checker computed the same maximum
+    matching for them that had been written into the file. Neither side of that
+    comparison came from C.04.6: art. 3.3.3 prescribes nothing at all for a round that
+    cannot be completed, it hands the round to the Chief Arbiter, so agreeing with the
+    file proves nothing about the file.
+
+    The verdict for such a round is therefore not "check passed" and not "check failed"
+    but "there is no pairing to compare against", which is what 505 says.
+    """
+    path = write(tmp_path, round_robin(declared=4))
+
+    (checker, _) = run(path, ["-c"])
+
+    assert status(checker) == 505
+    assert status(checker) not in (0, 1), "a round the rules do not prescribe has no verdict"
 
 
 # ---------------------------------------------------------------------------------
