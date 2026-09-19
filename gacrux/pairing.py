@@ -117,12 +117,16 @@ class pairing:
         self.tournament = tournament
         self.rnd = rnd
         self.numcompetitors = len(tournament["competitors"])
-        self.topcolor = self.get_topcolor(tournament, params.get("top_color", ""))
         self.experimental = params.get("experimental", None)
         self.verbose = params.get("verbose", None)
         self.nummeets = int((rnd-1) * tournament.get("maxMeets", 1) / tournament["numRounds"]) + 1
+        # self.rank names the field that orders the competitors, and so - through
+        # crosstable.list_edges - their pairing numbers. It is set before get_topcolor,
+        # which needs it in the team system: C.04.6 art. 4.3.1 ties the initial-colour to
+        # the parity of the pairing number.
         rank = "experimental" in params and "fakerank" not in params["experimental"] and params.get('rank', False)
         self.rank = "rnk" if rank else "cid"
+        self.topcolor = self.get_topcolor(tournament, params.get("top_color", ""))
         self.rules = "2022-01-01"
         self.optimize = "weighted" not in self.experimental
         self.showtime = "time" in self.experimental
@@ -131,6 +135,13 @@ class pairing:
         if "topColor" in tournament:
             # print("Topcolor if", tournament["topColor"].lower())
             return tournament["topColor"].lower()
+        return self.draw_topcolor(defcolor)
+
+    def draw_topcolor(self, defcolor):
+        # Nothing in the file witnesses the drawing of lots, so the caller's default
+        # stands in for it, and failing that the lot is drawn here.
+        if defcolor in ["w", "b", "W", "B"]:
+            return defcolor.lower()
         return "w" if random.random() < 0.5 else "b"
 
     """

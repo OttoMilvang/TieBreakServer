@@ -193,6 +193,10 @@ class trf2json(chessjson.chessjson):
                 "tournamentInfo": {},
                 "ratingList": "TRF",
                 "numRounds": 0,
+                # Record 142 is the only TRF field that states the scheduled length.
+                # A later player record may reveal that rounds were played, but that
+                # inferred lower bound cannot answer which round is the last one.
+                "numRoundsExplicit": False,
                 "currentRound": 0,
                 "teamTournament": False,
                 "rankOrder": ["PTS"],
@@ -823,7 +827,7 @@ class trf2json(chessjson.chessjson):
                     lastplayed = currentround
                     if self.get_result_cid(game, "white") > 0 and self.get_result_cid(game, "black") > 0 and currentround > lastpaired:
                         lastpaired = currentround
-        if lastplayed > tournament["numRounds"]:
+        if lastplayed > tournament["numRounds"] and not tournament.get("numRoundsExplicit", False):
             tournament["numRounds"] = lastplayed
         if lastpaired > tournament["currentRound"]:
             tournament["currentRound"] = lastpaired
@@ -910,16 +914,26 @@ class trf2json(chessjson.chessjson):
         self.parse_trf_info(tournament, "typeOfTournament", trfvalue)
         rec = self.code192[trfvalue] if trfvalue in self.code192 else {}
         tournament.update(rec)
+        # A code that names its scores answers both questions of C.04.6 art. 1.2.1 at
+        # once: which score is the primary one, and whether the other is used for colour
+        # allocation. "secondaryUsed" records the second answer on its own, because
+        # commonmain overwrites "primary" from a -m option and the engine could otherwise
+        # not tell a file that stated "not used" from a command line that named the
+        # primary score and stated nothing (pairing_fideteam.resolve_secondary_score).
         if "_MP_GP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "match"
             tournament["scoreSystem"]["secondary"] = "game"
+            tournament["scoreSystem"]["secondaryUsed"] = True
         elif "_GP_MP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "game"
             tournament["scoreSystem"]["secondary"] = "match"
+            tournament["scoreSystem"]["secondaryUsed"] = True
         elif "_MP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "match"
+            tournament["scoreSystem"]["secondaryUsed"] = False
         elif "_GP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "game"
+            tournament["scoreSystem"]["secondaryUsed"] = False
 
     def parse_timecontrol(self, tournament, line):
         trfvalue = line[4:]
@@ -1007,9 +1021,16 @@ class trf2json(chessjson.chessjson):
 
     def parse_trf_numbrounds(self, tournament, line):
         tournament["numRounds"] = helpers.parse_int(line[4:].rstrip())
+        tournament["numRoundsExplicit"] = True
 
     def parse_trf_initialcolor(self, tournament, line):
         tournament["topColor"] = line[4:].rstrip().upper()
+        # A record 152 is the file stating the drawing of lots of C.04.6 art. 4.1. Where
+        # there is no such record, prepare_tournament derives a value from the round that
+        # was played, and the two are not the same thing: a derived value is a reading of
+        # the results under one system's colour rules, so a system whose rules read them
+        # differently has to be able to tell it from a value the arbiter recorded.
+        tournament["topColorExplicit"] = True
 
     def parse_trf_gamescore(self, tournament, line):
         self.parse_trf_scoresystem(tournament, line, "game")

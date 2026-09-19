@@ -43,7 +43,7 @@ class pairingchecker(commonmain):
         -t w | b             # initial color on top ranked player in round 1
         -u [list of illagal pairings]
         -n <no>              # Round to pair, default next round, or all rounds in check mode
-        -m <method>          # dutch | berger | fideteam[-typeb]
+        -m <method>          # dutch | berger | fideteam[-typeb | -nocolor]
         -c                   # check mode, look if tournament pairing is correct
         -a                   # Analysis and show tournament pairing
         -p                   # Dhow the correct pairing of next round (or another round with -n)
@@ -146,7 +146,7 @@ class pairingchecker(commonmain):
         self.parser.add_argument("-p", "--pairing", required=False, action="count", default=0, help="Do pairing")
         self.parser.add_argument(
             "-m", "--method", required=False, nargs="*", default=[],
-            help="dutch | berger | fideteam[-typeb]",
+            help="dutch | berger | fideteam[-typeb | -nocolor]",
         )
         self.parser.add_argument("-t", "--top-color", required=False, default=" ", help="Color on top board")
         self.parser.add_argument("-K", "--maxmeets", required=False, default="0", help="The maximum number of meets")
