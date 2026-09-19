@@ -22,18 +22,34 @@ import os
 import datetime
 import codecs
 from decimal import Decimal
-from gacrux.pairingberger import pairing_berger
-from gacrux.pairingdutch import pairing_dutch
-from gacrux import version
-from gacrux import helpers
-from gacrux.chessjson import chessjson
-from gacrux.commonmain import commonmain
-from gacrux.trf2json import trf2json
-from gacrux.ts2json import ts2json
-from gacrux.tiebreak import tiebreak
-from gacrux.crosstable import crosstable
-from gacrux.pairing import pairing
-from gacrux.drawresult import drawresult
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.pairingberger import pairing_berger
+    from gacrux.pairingdutch import pairing_dutch
+    from gacrux import version
+    from gacrux import helpers
+    from gacrux.chessjson import chessjson
+    from gacrux.commonmain import commonmain
+    from gacrux.trf2json import trf2json
+    from gacrux.ts2json import ts2json
+    from gacrux.tiebreak import tiebreak
+    from gacrux.crosstable import crosstable
+    from gacrux.pairing import pairing
+    from gacrux.drawresult import drawresult
+else:
+    from pairingberger import pairing_berger
+    from pairingdutch import pairing_dutch
+    import version
+    import helpers
+    from chessjson import chessjson
+    from commonmain import commonmain
+    from trf2json import trf2json
+    from ts2json import ts2json
+    from tiebreak import tiebreak
+    from crosstable import crosstable
+    from pairing import pairing
+    from drawresult import drawresult
+    
 #from generator import generator
 
 # ==============================

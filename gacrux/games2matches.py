@@ -5,8 +5,13 @@ Created on Mon Dec 15 16:26:22 2025
 @author: Otto
 """
 from decimal import Decimal
-from gacrux.gacruxexeptions import GacruxInputError
-from gacrux import scoresystem
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.gacruxexeptions import GacruxInputError
+    from gacrux import scoresystem
+else:
+    from gacruxexeptions import GacruxInputError
+    import scoresystem
 
 
 

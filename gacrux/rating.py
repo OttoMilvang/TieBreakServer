@@ -7,8 +7,10 @@ Created on Fri Aug 18 08:28:13 2023
 from decimal import Decimal
 
 # import tables from FIDE Handbook
-from gacrux import fidetables
-
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux import fidetables
+else:
+    import fidetables
 
 #
 # Exact computation on integers (pd*100)

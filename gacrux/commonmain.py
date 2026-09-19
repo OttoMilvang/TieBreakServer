@@ -10,10 +10,16 @@ import io
 import json
 import sys
 
-from gacrux import helpers
-from gacrux.chessjson import chessjson
-from gacrux.trf2json import trf2json
-from gacrux.ts2json import ts2json
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux import helpers
+    from gacrux.chessjson import chessjson
+    from gacrux.trf2json import trf2json
+    from gacrux.ts2json import ts2json
+else:
+    import helpers
+    from chessjson import chessjson
+    from trf2json import trf2json
+    from ts2json import ts2json
 
 # ==============================
 

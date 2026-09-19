@@ -13,17 +13,32 @@ import sys
 import time
 
 from collections import defaultdict
-from gacrux import version
-from gacrux import pairingdutch
-from gacrux import helpers
-from gacrux.chessjson import chessjson
-from gacrux.commonmain import commonmain
-from gacrux.tiebreak import tiebreak
-from gacrux.pairing import pairing
-from gacrux.pairingdutch import pairing_dutch
-from gacrux.pairingberger import pairing_berger
-from gacrux.gacruxexeptions import GacruxNoLegalPairing
-from gacrux.pairingfideteam import pairing_fideteam
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux import version
+    from gacrux import pairingdutch
+    from gacrux import helpers
+    from gacrux.chessjson import chessjson
+    from gacrux.commonmain import commonmain
+    from gacrux.tiebreak import tiebreak
+    from gacrux.pairing import pairing
+    from gacrux.pairingdutch import pairing_dutch
+    from gacrux.pairingberger import pairing_berger
+    from gacrux.gacruxexeptions import GacruxNoLegalPairing
+    from gacrux.pairingfideteam import pairing_fideteam
+else:
+    import version
+    import pairingdutch
+    import helpers
+    from chessjson import chessjson
+    from commonmain import commonmain
+    from tiebreak import tiebreak
+    from pairing import pairing
+    from pairingdutch import pairing_dutch
+    from pairingberger import pairing_berger
+    from gacruxexeptions import GacruxNoLegalPairing
+    from pairingfideteam import pairing_fideteam
+
 
 AHEAD = "  Tournament analysis   "
 PHEAD = "  Checker pairing       "

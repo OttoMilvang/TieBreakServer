@@ -35,9 +35,14 @@ from itertools import combinations, combinations_with_replacement
 
 import networkx as nx
 
-from gacrux.crosstablefideteam import crosstable_fideteam, qdefs, QC6
-from gacrux.gacruxexeptions import GacruxInputError, GacruxInvariantError, GacruxNoLegalPairing
-from gacrux.pairing import pairing
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.crosstablefideteam import crosstable_fideteam, qdefs, QC6
+    from gacrux.gacruxexeptions import GacruxInputError, GacruxInvariantError, GacruxNoLegalPairing
+    from gacrux.pairing import pairing
+else:
+    from crosstablefideteam import crosstable_fideteam, qdefs, QC6
+    from gacruxexeptions import GacruxInputError, GacruxInvariantError, GacruxNoLegalPairing
+    from pairing import pairing
 
 
 class pairing_fideteam(pairing):

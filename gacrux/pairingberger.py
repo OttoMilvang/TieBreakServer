@@ -12,13 +12,19 @@ import json
 import sys
 import time
 from decimal import Decimal
-from gacrux.crosstable import crosstable
 from collections import defaultdict
-from gacrux import berger
-
-from gacrux.pairing import pairing
 from enum import Enum
-from gacrux import helpers
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.crosstable import crosstable
+    from gacrux import berger
+    from gacrux.pairing import pairing
+    from gacrux import helpers
+else:
+    from crosstable import crosstable
+    from pairing import pairing
+    import berger
+    import helpers
 
 
 

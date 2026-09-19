@@ -25,9 +25,12 @@ Everything else - the competitor and opponent structures, the score levels, the 
 the prohibited pairings of record 260 - is the one of the base class.
 """
 
-from gacrux.crosstable import crosstable
 from enum import Enum
 
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.crosstable import crosstable
+else:
+    from crosstable import crosstable
 
 class qdefs(Enum):
     QC4 = 0

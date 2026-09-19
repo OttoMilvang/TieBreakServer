@@ -10,13 +10,16 @@ opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects
 
 """
 
-from decimal import Decimal
-from gacrux.tiebreak import tiebreak
-from gacrux.gacruxexeptions import GacruxInvariantError
-from itertools import combinations  
-
 from itertools import combinations  
 from enum import Enum
+from decimal import Decimal
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.tiebreak import tiebreak
+    from gacrux.gacruxexeptions import GacruxInvariantError
+else:
+    from tiebreak import tiebreak
+    from gacruxexeptions import GacruxInvariantError
 
 # Keywords from tiebreaks
 PTS = 0

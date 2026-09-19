@@ -9,12 +9,20 @@ import time
 import re
 from decimal import Decimal
 
-from gacrux import berger
-from gacrux import chessjson
-from gacrux import games2matches
-from gacrux import scoresystem
-from gacrux.gacruxexeptions import GacruxError, GacruxInputError
-from gacrux import helpers 
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux import berger
+    from gacrux import chessjson
+    from gacrux import games2matches
+    from gacrux import scoresystem
+    from gacrux.gacruxexeptions import GacruxError, GacruxInputError
+    from gacrux import helpers 
+else:
+    import berger
+    import chessjson
+    import games2matches
+    import scoresystem
+    import helpers 
+    from gacruxexeptions import GacruxError, GacruxInputError
 
 
 class trf2json(chessjson.chessjson):

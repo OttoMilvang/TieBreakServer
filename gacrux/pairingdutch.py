@@ -16,12 +16,19 @@ from collections import defaultdict
 import networkx as nx
 
 # from networkx.algorithms import bipartite
-from gacrux.crosstable import crosstable
-from gacrux.crosstabledutch import crosstable_dutch, qdefs, flt
-from gacrux.gacruxexeptions import GacruxInvariantError, GacruxNoLegalPairing
-from gacrux.pairing import pairing
-from gacrux import helpers
 
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.crosstable import crosstable
+    from gacrux.crosstabledutch import crosstable_dutch, qdefs, flt
+    from gacrux.gacruxexeptions import GacruxInvariantError, GacruxNoLegalPairing
+    from gacrux.pairing import pairing
+    from gacrux import helpers
+else:
+    from crosstable import crosstable
+    from crosstabledutch import crosstable_dutch, qdefs, flt
+    from gacruxexeptions import GacruxInvariantError, GacruxNoLegalPairing
+    from pairing import pairing
+    import helpers
 
 """
 Structre 

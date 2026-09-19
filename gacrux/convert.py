@@ -4,8 +4,12 @@ Created on Mon Aug  7 16:48:53 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 import sys
-from gacrux.commonmain import commonmain
-from gacrux import version
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.commonmain import commonmain
+    from gacrux import version
+else:
+    from commonmain import commonmain
+    import version
 
 # ==============================
 

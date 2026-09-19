@@ -1,3 +1,12 @@
+2026-09-19
+Promote the test-branch to main
+Now the program is stored under the gacrax directory
+You may run it trom the gacrux-folder as a script or from the top folder with 
+python -m gacrux.tiebreakchecher [arguments]
+python -m gacrux.pairingchecher [arguments]
+The play is to register it on PyPi, so it can be installed with 
+pip install gacrux 
+
 2026-09-14
 Adjust tournamentgenerator to new structures for rating and score in accelleration
 

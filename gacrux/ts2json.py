@@ -11,10 +11,17 @@ Created on Thu Oct 19 11:55:32 2023
 """
 import xml.etree.ElementTree as ET
 from decimal import Decimal
-from gacrux import chessjson
-from gacrux import games2matches
-from gacrux import helpers
-from gacrux import scoresystem
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux import chessjson
+    from gacrux import games2matches
+    from gacrux import helpers
+    from gacrux import scoresystem
+else:
+    import chessjson
+    import games2matches
+    import helpers
+    import scoresystem
 
 
 class ts2json(chessjson.chessjson):

@@ -7,15 +7,25 @@ Created on Mon Oct 25 08:16:13 2024
 import json
 import json
 import sys
-from gacrux.convert import convert2jch
-from gacrux import helpers
-from gacrux.pairingchecker import pairingchecker
-from gacrux.tiebreakchecker import tiebreakchecker
-from gacrux import version
-from gacrux.commonmain import commonmain
-from gacrux.tiebreak import tiebreak
-from gacrux.pairing import pairing
 
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.convert import convert2jch
+    from gacrux import helpers
+    from gacrux.pairingchecker import pairingchecker
+    from gacrux.tiebreakchecker import tiebreakchecker
+    from gacrux import version
+    from gacrux.commonmain import commonmain
+    from gacrux.tiebreak import tiebreak
+    from gacrux.pairing import pairing
+else:
+    from convert import convert2jch
+    import helpers
+    import pairingchecker
+    import tiebreakchecker
+    import version
+    import commonmain
+    import tiebreak
+    import pairing
 
 """
 ==============================

@@ -6,12 +6,20 @@ import sys
 import json
 import os
 import statistics
-from gacrux import helpers
-from gacrux.chessjson import chessjson
-from gacrux.trf2json import trf2json
 from decimal import Decimal, ROUND_HALF_UP
-from gacrux.tiebreak import tiebreak
-from gacrux import version
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux import helpers
+    from gacrux.chessjson import chessjson
+    from gacrux.trf2json import trf2json
+    from gacrux.tiebreak import tiebreak
+    from gacrux import version
+else:
+    import helpers
+    from chessjson import chessjson
+    from trf2json import trf2json
+    from tiebreak import tiebreak
+    import version
 
 # pip install matplotlib
 # pip install numpy

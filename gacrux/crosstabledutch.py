@@ -10,12 +10,18 @@ opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects
 
 """
 
-from decimal import Decimal
-from gacrux.crosstable import crosstable, flt
-from gacrux.tiebreak import tiebreak
-from gacrux.gacruxexeptions import GacruxInvariantError
 from itertools import combinations  
 from enum import Enum
+from decimal import Decimal
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.crosstable import crosstable, flt
+    from gacrux.tiebreak import tiebreak
+    from gacrux.gacruxexeptions import GacruxInvariantError
+else:
+    from crosstable import crosstable, flt
+    from tiebreak import tiebreak
+    from gacruxexeptions import GacruxInvariantError
 
 
 class qdefs(Enum):

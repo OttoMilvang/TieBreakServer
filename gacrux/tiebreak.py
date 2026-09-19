@@ -6,9 +6,15 @@ Created on Fri Aug  11 11:43:23 2023
 import math
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
-from gacrux import chessjson 
-from gacrux import rating
-from gacrux.gacruxexeptions import GacruxInputError
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux import chessjson 
+    from gacrux import rating
+    from gacrux.gacruxexeptions import GacruxInputError
+else:
+    import chessjson 
+    import rating
+    from gacruxexeptions import GacruxInputError
 
 
 """

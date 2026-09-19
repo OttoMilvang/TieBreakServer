@@ -17,9 +17,16 @@ from collections import defaultdict
 import networkx as nx
 
 # from networkx.algorithms import bipartite
-from gacrux.crosstable import crosstable, flt
-from gacrux import helpers
-from gacrux.gacruxexeptions import GacruxNoLegalPairing
+
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.crosstable import crosstable, flt
+    from gacrux import helpers
+    from gacrux.gacruxexeptions import GacruxNoLegalPairing
+else:
+    from crosstable import crosstable, flt
+    import helpers
+    from gacruxexeptions import GacruxNoLegalPairing
 
 
 """

@@ -5,8 +5,13 @@ Created on Tue Oct 31 13:57:55 2023
 """
 
 from decimal import Decimal
-from gacrux.gacruxexeptions import GacruxInputError
-from gacrux import helpers
+
+if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
+    from gacrux.gacruxexeptions import GacruxInputError
+    from gacrux import helpers
+else:
+    from gacruxexeptions import GacruxInputError
+    import helpers
 
 # ==============================
 #

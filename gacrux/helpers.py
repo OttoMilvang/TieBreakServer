@@ -4,13 +4,10 @@ Created on Tue Oct 31 13:57:55 2023
 @author: Otto Milvang, sjakk@milvang.no
 """
 import collections.abc
-import dataclasses
 import decimal
 import json
 import sys
 import decimal
-from enum import Enum #  EnumType is not defined in ver 3.8.10
-from gacrux import qdefs
 
 
 class DecimalEncoder(json.JSONEncoder):
