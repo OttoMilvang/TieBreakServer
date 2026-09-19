@@ -1229,7 +1229,7 @@ def test_art_3_3_3_an_impossible_pairing_is_reported():
         tournament.pair(4)
 
 
-def test_art_3_3_3_checker_fallback_byes_the_unmatched_teams():
+def test_the_degenerate_pairing_byes_every_unmatched_team():
     tournament = event(4, 5)
     tournament.match(1, 1, 2, ["W", "W"])
     tournament.match(1, 3, 4, ["W", "W"])
