@@ -12,9 +12,10 @@ order and the last one wins, so it is numbered to sort first: a feature that rep
 same record keeps its own version of it.
 
 Two of the twenty, team_0347 and team_0642, are also on the record 299 list: their 299
-line stops the reader before it reaches the round, so they are refused for that instead.
-The file is not one the checker should accept either way, so the record is marked invalid
-and the 299 entry, which expects a valid record, goes with the rest.
+line stops the reader before it reaches the rounds, so on this branch they are refused
+for that, and the record is marked invalid to say so. A branch that removes the 299 line
+replaces the record with its own version, which sorts later and decides the verdict:
+team_0347 still declares such a round, team_0642 does not.
 
 The known-failure lists those records are on describe a checker that accepts them, which
 stops being true here. This file removes the names, and is numbered to sort after the
