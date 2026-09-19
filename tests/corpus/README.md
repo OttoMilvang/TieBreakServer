@@ -46,10 +46,29 @@ No current fixture is skipped. The `skip` fields remain part of the format so a
 consumer can stage future additions when necessary.
 
 The fixtures cover field and team sizes, board and round counts, draws,
-forfeits, byes, Baku acceleration, non-default score systems, prohibited
-pairings (record 260), abnormal assignments (record 299), Type A and Type B team
-colour models, match-point and game-point primary scoring (record 192), and the
-individual and team tie-break catalogues (record 212).
+forfeits, byes, Baku acceleration, prohibited pairings (record 260), Type A and
+Type B team colour models, match-point and game-point primary scoring (record
+192), and the individual and team tie-break catalogues (record 212).
+
+### What the fixtures do not cover
+
+No fixture carries these records. Unit tests under `tests/` cover them instead.
+
+| record | what it decides |
+|--------|-----------------|
+| 162 | the game score system |
+| 202 | the tie-breaks used to break a tie in the standings |
+| 240 | half-point and full-point byes |
+| 300 | out-of-order pairings, which set board order |
+| 320 | pairing-allocated byes of a team event |
+| 330 | forfeited team matches |
+| 362 | the team match-point score system |
+| XXZ | competitors who will not meet |
+
+Record 260 appears in individual fixtures only. Eight result codes appear in no
+fixture: `W`, `D` and `L` (an unrated played result), `X` and `?` (which score
+as "A"), `F`, `A`, and a blank. The "A" points class is therefore not scored end
+to end by any fixture.
 
 ## Verdict semantics
 
@@ -65,10 +84,10 @@ changes that ranking; it cannot detect an incorrect intermediate value that
 leaves the final order unchanged. The reader separately checks that declared
 score totals reconcile with the recorded results and score system.
 
-Most deliberately invalid fixtures begin as valid tournaments and then receive
-one isolated change. The fixture name records the mechanism:
+An invalid fixture departs from the prescribed pairing or ranking in one
+respect, and its name records which:
 
-| mechanism | category | change |
+| mechanism | category | difference |
 |-----------|----------|--------|
 | `c1` | individual | repeat pairing |
 | `c2` | individual | second pairing-allocated bye for an ineligible player |
@@ -77,9 +96,9 @@ one isolated change. The fixture name records the mechanism:
 | `team_opponent` | team | cross-swapped opponents in two matches |
 | `team_rank` | team | swapped final ranks for two teams |
 
-The corrupted files remain parseable and internally consistent; the intended
-failure is the mismatch with the prescribed pairing or ranking. These six
-mechanisms account for every invalid fixture in the corpus.
+Invalid fixtures are parseable and internally consistent; the intended failure
+is the mismatch with the prescribed pairing or ranking. Every invalid fixture in
+the corpus has one of these six differences.
 
 ## Running the tests
 
