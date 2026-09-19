@@ -23,8 +23,8 @@ The corpus contains 6,000 TRF-2026 tournaments:
 | category | valid | invalid | total |
 |----------|------:|--------:|------:|
 | Individual | 4,281 | 719 | 5,000 |
-| Team | 700 | 300 | 1,000 |
-| **Total** | **4,981** | **1,019** | **6,000** |
+| Team | 682 | 318 | 1,000 |
+| **Total** | **4,963** | **1,037** | **6,000** |
 
 Each decompressed line is one JSON object:
 
@@ -84,8 +84,8 @@ changes that ranking; it cannot detect an incorrect intermediate value that
 leaves the final order unchanged. The reader separately checks that declared
 score totals reconcile with the recorded results and score system.
 
-An invalid fixture departs from the prescribed pairing or ranking in one
-respect, and its name records which:
+Most invalid fixtures depart from the prescribed pairing or ranking in one
+respect, and the name records which:
 
 | mechanism | category | difference |
 |-----------|----------|--------|
@@ -97,8 +97,12 @@ respect, and its name records which:
 | `team_rank` | team | swapped final ranks for two teams |
 
 Invalid fixtures are parseable and internally consistent; the intended failure
-is the mismatch with the prescribed pairing or ranking. Every invalid fixture in
-the corpus has one of these six differences.
+is the mismatch with the prescribed pairing or ranking.
+
+Eighteen team fixtures are invalid for a different reason and carry no such
+suffix: they declare a round in which more than one team has no opponent, where
+C.04.6 art. 1.4 allows one pairing-allocated bye. There is no pairing to compare
+them against, so the engine reports the round rather than ranking it.
 
 ## Running the tests
 
