@@ -62,23 +62,27 @@ def individual(records):
     return lines + records
 
 
-def teams(records):
+def teams(records, first=1):
     # Four teams of two players, two rounds played, a third round declared but not yet
     # played. Team 1 is players 1 and 2, team 2 is players 3 and 4, and so on -- so a
-    # number like 6 names a player and no team at all.
+    # number like 6 names a player and no team at all. `first` is the start number of
+    # the first player; the players are numbered consecutively from it.
+    def p(number):
+        return number + first - 1
+
     lines = ["012 Pairing numbers, teams", "042 2026-03-01", "XXR 3", "352 WB"]
-    lines.append(team_line(1, "Team One", [1, 2], "2.0", "2.5"))
-    lines.append(team_line(2, "Team Two", [3, 4], "2.0", "2.0"))
-    lines.append(team_line(3, "Team Three", [5, 6], "0.0", "0.5"))
-    lines.append(team_line(4, "Team Four", [7, 8], "4.0", "3.0"))
-    lines.append(player_line(1, "One, Player", 2400, "1.5", [(5, "w", "1"), (7, "w", "=")]))
-    lines.append(player_line(2, "Two, Player", 2300, "1.0", [(6, "b", "1"), (8, "b", "0")]))
-    lines.append(player_line(3, "Three, Player", 2200, "0.5", [(7, "b", "0"), (5, "b", "=")]))
-    lines.append(player_line(4, "Four, Player", 2100, "1.5", [(8, "w", "="), (6, "w", "1")]))
-    lines.append(player_line(5, "Five, Player", 2000, "0.5", [(1, "b", "0"), (3, "w", "=")]))
-    lines.append(player_line(6, "Six, Player", 1900, "0.0", [(2, "w", "0"), (4, "b", "0")]))
-    lines.append(player_line(7, "Seven, Player", 1800, "1.5", [(3, "w", "1"), (1, "b", "=")]))
-    lines.append(player_line(8, "Eight, Player", 1700, "1.5", [(4, "b", "="), (2, "w", "1")]))
+    lines.append(team_line(1, "Team One", [p(1), p(2)], "2.0", "2.5"))
+    lines.append(team_line(2, "Team Two", [p(3), p(4)], "2.0", "2.0"))
+    lines.append(team_line(3, "Team Three", [p(5), p(6)], "0.0", "0.5"))
+    lines.append(team_line(4, "Team Four", [p(7), p(8)], "4.0", "3.0"))
+    lines.append(player_line(p(1), "One, Player", 2400, "1.5", [(p(5), "w", "1"), (p(7), "w", "=")]))
+    lines.append(player_line(p(2), "Two, Player", 2300, "1.0", [(p(6), "b", "1"), (p(8), "b", "0")]))
+    lines.append(player_line(p(3), "Three, Player", 2200, "0.5", [(p(7), "b", "0"), (p(5), "b", "=")]))
+    lines.append(player_line(p(4), "Four, Player", 2100, "1.5", [(p(8), "w", "="), (p(6), "w", "1")]))
+    lines.append(player_line(p(5), "Five, Player", 2000, "0.5", [(p(1), "b", "0"), (p(3), "w", "=")]))
+    lines.append(player_line(p(6), "Six, Player", 1900, "0.0", [(p(2), "w", "0"), (p(4), "b", "0")]))
+    lines.append(player_line(p(7), "Seven, Player", 1800, "1.5", [(p(3), "w", "1"), (p(1), "b", "=")]))
+    lines.append(player_line(p(8), "Eight, Player", 1700, "1.5", [(p(4), "b", "="), (p(2), "w", "1")]))
     return lines + records
 
 
@@ -155,13 +159,51 @@ def test_320_naming_a_team_that_does_not_exist():
     assert "team 6" in str(excinfo.value)
 
 
+def test_a_second_record_320_is_refused():
+    """TRF-2026: record 320 is "one record per tournament".
+
+    The record carries the value of a pairing-allocated bye and one team per round, so
+    a second one is either a repeat or a contradiction, and the reader used to let the
+    second silently replace what the first had put into the score system and add its
+    byes on top of the first's. Neither reading is the file's, so the file is refused
+    and the message says which record and which rule.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(teams(["320  1.0  1.0 000 000 003", "320  1.0  1.0 000 000 003"]))
+
+    message = str(excinfo.value)
+    assert "320" in message
+    assert "one record per tournament" in message
+
+
+def test_a_second_record_240_of_the_same_type_and_round_is_refused():
+    """TRF-2026: record 240 is "at most one record per type per round".
+
+    Every team or player getting a half-point bye in round 3 is listed on the one "H"
+    record for round 3, so a second "H 003" record is a repeat or a contradiction, and
+    the reader used to append its byes to the first's without a word. A record of a
+    different type in the same round, or of the same type in another round, is what
+    the specification allows, and the control below keeps it readable.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(teams(["240 H 003    3", "240 H 003    4"]))
+
+    message = str(excinfo.value)
+    assert "240" in message
+    assert "per type per round" in message
+    assert "H" in message and "round 3" in message
+
+    # Control: a different type in the same round, and the same type in another round.
+    assert parse(teams(["240 H 003    3", "240 F 003    4"])).get_status() == 0
+
+
 def test_330_naming_a_team_that_does_not_exist():
     # Record 330, a forfeited match: the two teams scheduled to play it.
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["330 +-   2   9   3"]))
 
-    assert "330" in str(excinfo.value) or "Error in teams" in str(excinfo.value)
-    assert "team 9" in str(excinfo.value) or "Error in teams" in str(excinfo.value)
+    assert "330" in str(excinfo.value)
+    assert "team 9" in str(excinfo.value)
 
 
 def test_300_naming_a_team_that_does_not_exist():
@@ -169,8 +211,8 @@ def test_300_naming_a_team_that_does_not_exist():
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
         parse(teams(["300   2   7   4    3    4"]))
 
-    assert "300" in str(excinfo.value) or "Out-of-order" in str(excinfo.value)
-    assert "team 7" in str(excinfo.value) 
+    assert "300" in str(excinfo.value)
+    assert "team 7" in str(excinfo.value)
 
 
 def test_300_naming_a_player_who_does_not_exist():
@@ -193,6 +235,86 @@ def test_310_naming_a_player_who_does_not_exist():
 
     assert "310" in str(excinfo.value)
     assert "player 99" in str(excinfo.value)
+
+
+def renumbered(records, old, new):
+    """The team fixture with team `old`'s pairing number (columns 5-7) changed to `new`."""
+    return [
+        line[:4] + "%3d" % new + line[7:] if line.startswith("310" + "%4d" % old) else line
+        for line in teams(records)
+    ]
+
+
+@pytest.mark.parametrize(
+    "old, new, found",
+    [
+        (4, 3, "1, 2, 3, 3"),       # duplicate
+        (4, 5, "1, 2, 3, 5"),       # gap
+        (1, 0, "0, 2, 3, 4"),       # zero
+    ],
+    ids=["duplicate", "gap", "zero"],
+)
+def test_record_310_requires_team_pairing_numbers_1_to_n(old, new, found):
+    """C.04.6 art. 1.1.1: each team has a different TPN, from 1 to the number of teams.
+
+    A duplicate used to replace one team with the other and read on with status 0, a
+    zero was read as team 0, and a gap ran off the end of the board-number list with
+    an IndexError.
+    """
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(renumbered([], old, new))
+
+    message = str(excinfo.value)
+    assert "Record 310" in message
+    assert found in message
+    assert "expected 1, 2, 3, 4" in message
+
+
+def test_record_310_accepts_the_complete_team_pairing_number_range():
+    assert parse(teams([])).get_status() == 0
+
+
+def test_team_pairing_numbers_1_to_n_is_a_fide_team_swiss_rule():
+    """Art. 1.1.1 is an article of the Swiss team system and nothing else.
+
+    TRF-2026 record 310 only asks for a number "From 1 to 999", and record 192 lists
+    team events that are not C.04.6 at all. A Berger round robin with teams 1, 2, 3
+    and 5 is read. Two teams with one number are refused whatever the system, since
+    the reader keeps the teams by that number.
+    """
+    assert parse(renumbered(["192 BERGER_TEAM_ROUNDROBIN"], 4, 5)).get_status() == 0
+
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(renumbered(["192 FIDE_TEAM_MP_GP"], 4, 5))
+    assert "Record 310" in str(excinfo.value)
+    assert "expected 1, 2, 3, 4" in str(excinfo.value)
+
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        parse(renumbered(["192 BERGER_TEAM_ROUNDROBIN"], 4, 3))
+    assert "Record 310" in str(excinfo.value)
+    assert "1, 2, 3, 3" in str(excinfo.value)
+
+
+def test_a_team_tournament_without_record_310_is_refused_by_name():
+    """A team tournament declared by record 192 has to have a team section.
+
+    TRF-2026 marks record 310 mandatory for rating and pairing, and it is where the
+    reader learns which players form a team. A file whose record 192 declares a
+    team tournament with no 310 and no 013 fell over with KeyError('teamId') while
+    counting the boards, with no line named.
+    """
+    lines = [line for line in teams(["192 FIDE_TEAM_MP_GP"])
+             if not line.startswith("310") and not line.startswith("352")]
+    chessfile = trf2json.trf2json()
+
+    with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
+        chessfile.parse_file("\n".join(lines), 0)
+
+    message = str(excinfo.value)
+    assert "310" in message                  # the record that is missing
+    assert "mandatory" in message
+    assert "FIDE_TEAM_MP_GP" in message      # the declaration that made it mandatory
+    assert chessfile.get_status() == 401
 
 
 def test_001_naming_an_opponent_who_does_not_exist():
@@ -219,3 +341,21 @@ def test_a_tournament_that_names_nobody_wrong_still_reads():
     assert parse(individual(["240 H 003    3"])).get_status() == 0
     assert parse(teams(["240 H 003    3",
                         "300   2   2   3    3    4"])).get_status() == 0
+
+
+def test_a_four_digit_player_id_on_record_310_is_read():
+    """A player id of 1000 or more in record 310 is data, not misalignment.
+
+    TRF-2026 gives record 310 its rank in columns 69-71 and its first player in columns
+    74-77; the player ids of record 001 run "from 1 to 9999". The misalignment check
+    read line[71:74], which is columns 72-74, and column 74 is the first digit of the
+    first player id -- blank for an id below 1000, and a digit for 1000 and above. So a
+    team whose first player was numbered 1000 or more was reported as "misaligned
+    data, may be bad character encoding", status 467, for a record that is correct.
+    """
+    chessfile = parse(teams([], first=1001))
+
+    assert chessfile.get_status() == 0
+    tournament = chessfile.get_tournament(1)
+    teamone = next(team for team in tournament["competitors"] if team["cid"] == 1)
+    assert [player["cid"] for player in teamone["cplayers"]] == [1001, 1002]

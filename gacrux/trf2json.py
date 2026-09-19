@@ -48,12 +48,14 @@ class trf2json(chessjson.chessjson):
             {"id": "202", "read": self.parse_tiebreaks202,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to break ties"},
             {"id": "212", "read": self.parse_tiebreaks212,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to define standings"},
             {"id": "222", "read": self.parse_trf_timecontrol,   "write": self.output_trf_noop,          "desc": "Encoded Time Control"},
-            {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
             {"id": "362", "read": self.parse_trf_matchscore,    "write": self.output_trf_noop,          "desc": "Scoring point system for teams"},
             {"id": "001", "read": self.parse_trf_player,        "write": self.output_trf_player,        "desc": "Player section"},
             {"id": "FID", "read": self.parse_trf_natrating,     "write": self.output_trf_noop,          "desc": "National Rating Support"},
             {"id": "310", "read": self.parse_trf_team,          "write": self.output_trf_noop,          "desc": "Team section"},
             {"id": "013", "read": self.parse_trf_team,          "write": self.output_trf_noop,          "desc": "Team section"},
+            # Record 352 is parsed after both team-section forms, so its team-only check
+            # does not depend on where the records happened to appear in the file.
+            {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
             {"id": "250", "read": self.parse_trf_accelerated,   "write": self.output_trf_accelerated,  "desc": "Accelerated Round"},
             {"id": "260", "read": self.parse_trf_prohibited,    "write": self.output_trf_prohibited,    "desc": "Prohibited pairings"},
             {"id": "240", "read": self.parse_trf_bye4,          "write": self.output_trf_noop,          "desc": "Bye section HPB and FPB"},
@@ -161,6 +163,10 @@ class trf2json(chessjson.chessjson):
         self.forfeitedlist = []
         self.ooolist = []
         self.aatlist = []
+        # TRF-2026 allows record 320 once per tournament, and record 240 once per bye
+        # type per round; the parsers refuse a repeat rather than merge two of them.
+        self.pabrecordline = None
+        self.byerecordlines = {}
         self.o001 = {}
         self.pcompetitors = {}  # pointer to player section competitors
         self.bcompetitors = {}  # pointer to team competitors, index id 1st board player cid
@@ -210,6 +216,13 @@ class trf2json(chessjson.chessjson):
 
         tournament = self.get_tournament(1)
         self.all_lines = self.read_all_lines(tournament, alines, verbose)
+        if self.get_status() == 401:
+            # read_all_lines has refused the file: a record it could not parse, named by
+            # its line, or no 001 records at all. What follows reads the records again
+            # and would only fail on the same fault, less clearly. (467 and 472 are
+            # remarks about a record that was read, and go on.)
+            return
+        self.validate_team_pairing_numbers(tournament)
         # json_output("-", self.scores.score)
 
         if "299" not in self.all_lines:
@@ -284,19 +297,57 @@ class trf2json(chessjson.chessjson):
                         trfline["parse"] = True
                     except GacruxError:
                         # A parser that has itself worked out what is wrong with the record
-                        # says so. Do not turn that into a status code and a return: the
-                        # return leaves all_lines unset, and parse_file then reads it.
+                        # says so, and its message goes to the caller as it is, in place of
+                        # the bare line number below.
                         raise
                     except:
                         if verbose:
                             raise
                         self.put_status(401, "Error in trf-file, line " + str(lineno) + ", " + line)
-                        return
+                        return all_lines
             nexttrfid = self.post_parse_line(tournament, trfid)
         if "001" not in all_lines and "092" not in all_lines:
             self.put_status(401, "Error in trf, no 001 records")
 
         return all_lines
+
+    def validate_team_pairing_numbers(self, tournament):
+        """Record 310 must give every team a distinct TPN; under C.04.6, 1 through N.
+
+        TRF-2026 record 310 columns 5-7 hold a team pairing number "From 1 to 999", and
+        the reader keeps the teams by it, so two teams with one number are refused for
+        every team system. C.04.6 art. 1.1.1 asks for more: "Each team must have a
+        different TPN, from 1 to the TPN corresponding to the number of teams". That is
+        an article of the Swiss team system alone, so the full range is only asked for
+        when the pairing system is fideteam: a FIDE_TEAM_* Swiss code in record 192
+        (the round robin codes pair as berger), or no record 192 at all, which the
+        command line pairs as fideteam.
+
+        The numbers are read off the records themselves, before a duplicate can be
+        hidden in tcompetitors.
+        """
+        if "310" not in self.all_lines:
+            return
+        numbers = [helpers.parse_int(line["txt"][4:7]) for line in self.all_lines["310"]]
+        found = ", ".join(str(number) for number in sorted(numbers))
+        if "fideteam" in tournament.get("pairingSystem", ["fideteam"]):
+            expected = list(range(1, len(numbers) + 1))
+            if sorted(numbers) == expected:
+                return
+            message = (
+                "Record 310 must give each team a different tournament pairing number"
+                + " from 1 through the number of teams (C.04.6 art. 1.1.1); found " + found
+                + ", expected " + ", ".join(str(number) for number in expected)
+            )
+        else:
+            if len(set(numbers)) == len(numbers) and all(number > 0 for number in numbers):
+                return
+            message = (
+                "Record 310 must give each team a different tournament pairing number"
+                + " from 1 to 999; found " + found
+            )
+        self.put_status(401, message)
+        raise GacruxInputError(message)
 
     """
     def parse_line(self, tournament, trfkey, line):
@@ -434,12 +485,24 @@ class trf2json(chessjson.chessjson):
                 self.check_player_section(tournament)
                 trfid = self.national["federation"] # This is next record
         elif trfkey == "013":
+                if (tournament["teamTournament"] and len(self.pcompetitors) > 0
+                        and len(self.tcompetitors) == 0 and len(self.bcompetitors) == 0):
+                    self.refuse_missing_team_section(tournament)
                 teamsize = tournament["teamSize"]
                 if tournament["teamTournament"] and (teamsize == 0):
                     countgames = [{} for i in range(tournament["currentRound"])]
                     teamsize = 0
                     for game in tournament["gameList"]:
-                        if game["played"] and self.get_result_cid(game, "white") > 0 and self.get_result_cid(game, "black") > 0:
+                        # Every board of the match, not only the boards that were played.
+                        # A board decided by forfeit has the two players paired at it and
+                        # named as each other's opponents; it is a board. Counting only
+                        # played ones measured an event whose every round held a forfeit
+                        # one board short, which numbered the last board of every match 0,
+                        # dropped it from the match, and left the team's game points and
+                        # the value of a pairing-allocated bye short with it. A bye is
+                        # still not a board: it has no opponent, which is what the two
+                        # tests below on white and black keep out.
+                        if self.get_result_cid(game, "white") > 0 and self.get_result_cid(game, "black") > 0:
                             rnd = game["round"] - 1
                             for col in ["white", "black"]:
                                 player = game[col]
@@ -449,6 +512,22 @@ class trf2json(chessjson.chessjson):
                     # print(teamsize)
                     tournament["teamSize"] = teamsize
         return trfid
+
+    def refuse_missing_team_section(self, tournament):
+        # Record 192 (or a team-only record) makes this a team event, and no 310 or 013
+        # says which players form which team. The board count, the matches and the
+        # standings all start from that section.
+        code = tournament["tournamentInfo"].get("typeOfTournament", "")
+        message = (
+            "Record 310 is missing: "
+            + ("record 192 declares " + code + ", a team tournament" if code
+               else "the file declares a team tournament")
+            + ", and TRF-2026 marks record 310 (the team section) mandatory for rating and"
+            + " pairing in team events. Every team has to be declared there, with its team"
+            + " pairing number and the start numbers of its players."
+        )
+        self.put_status(401, message)
+        raise GacruxInputError(message)
 
     # ==============================
     #
@@ -538,7 +617,10 @@ class trf2json(chessjson.chessjson):
             results[rnd].append(result)
 
         numcomp = len(tournament["competitors"])
-        points = [Decimal("0.0")] * (numcomp + 1)
+        # Indexed by pairing number. Outside C.04.6 the team numbers only have to be
+        # distinct (record 310: "From 1 to 999"), so the highest one sets the size.
+        highest = max([competitor["cid"] for competitor in tournament["competitors"]] + [numcomp])
+        points = [Decimal("0.0")] * (highest + 1)
 
         # update each round
         for rnd, roundresults in results.items():
@@ -594,7 +676,12 @@ class trf2json(chessjson.chessjson):
         trans = {"F": "W", "H": "D", "P": "P", "W": "W", "D": "D", "L": "L", "U": "U", "A": "A", "Z": "Z"}
         gameList = tournament["gameList"]
         for bye in self.byelist:
-            elemlist = [game for game in gameList if bye["round"] == game["round"] and bye["competitor"] == self.get_result_cid(game, "white")]
+            # The competitor may have played the round with either colour.
+            elemlist = [
+                game for game in gameList
+                if bye["round"] == game["round"]
+                and bye["competitor"] in (self.get_result_cid(game, "white"), self.get_result_cid(game, "black"))
+            ]
             if len(elemlist) == 0:
                 game = {
                     "id": 0, 
@@ -607,7 +694,8 @@ class trf2json(chessjson.chessjson):
                 self.append_result(gameList, game)
             else:
                 elem = elemlist[0]
-                if self.get_result_res(elem, "white", "") != bye["score"]:
+                side = "white" if bye["competitor"] == self.get_result_cid(elem, "white") else "black"
+                if self.recorded_result(elem, side) != bye["score"]:
                     self.put_status(405, "Error in bye score, competitor " + str(bye["competitor"]))
 
     #    forfeited
@@ -840,7 +928,9 @@ class trf2json(chessjson.chessjson):
         matchPoints = helpers.parse_float(line[54:60]) if ext else Decimal("0.0")
         gamePoints = helpers.parse_float(line[61:67]) if ext else Decimal("0.0")
         rank = helpers.parse_int(line[68:71]) if ext else 0
-        if ext and line[71:74].strip() != "":
+        # Columns 72-73 are the gap between the rank (69-71) and the first player id
+        # (74-77). Column 74 is the first digit of a four-figure id, so it is data.
+        if ext and line[71:73].strip() != "":
             self.put_status(467, "Team " + str(cid) + " has misaligned data, may be bad character encoding") 
         team = {"id": 0, "teamName": teamname, "players": []}
         teamid = self.append_team(team, 0)
@@ -1000,10 +1090,33 @@ class trf2json(chessjson.chessjson):
         self.parse_tiebreaks(tournament, line, True)
 
     def parse_colorsequence(self, tournament, line):
-        seq = line[4:].strip()
+        if not tournament["teamTournament"]:
+            message = "Record 352 is only valid in a team tournament"
+            self.put_status(401, message)
+            raise GacruxInputError(message)
+        if "teamSequence" in tournament:
+            message = "Record 352 may occur only once in a tournament"
+            self.put_status(401, message)
+            raise GacruxInputError(message)
+        seq = line[4:].strip().upper()
+        if not seq or any(color not in {"W", "B"} for color in seq):
+            message = "Record 352 must contain a non-empty colour sequence using only W and B"
+            self.put_status(401, message)
+            raise GacruxInputError(message)
+        if seq[0] != "W":
+            # The sequence gives the colours of the team the pairing designates White,
+            # and C.04.6 art. 1.6.1 takes a team's colour from its first board. The two
+            # only agree when board 1 is White; otherwise every match colour is reversed.
+            message = (
+                "Record 352 must lead with W: the board sequence gives the colours of the"
+                + " team the pairing designates White, and C.04.6 art. 1.6.1 takes a"
+                + " team's colour from its first board"
+            )
+            self.put_status(401, message)
+            raise GacruxInputError(message)
         tournament["teamSize"] = len(seq)
-        tournament["teamColor"] = seq[0].upper()
-        tournament["teamSequence"] = seq.upper()
+        tournament["teamColor"] = seq[0]
+        tournament["teamSequence"] = seq
 
     def parse_trf_numbrounds(self, tournament, line):
         tournament["numRounds"] = helpers.parse_int(line[4:].rstrip())
@@ -1221,6 +1334,31 @@ class trf2json(chessjson.chessjson):
         return
 
     def parse_trf_pab(self, tournament, line):
+        if not tournament["teamTournament"]:
+            # TRF-2026 puts record 320 under "Teams" and says the bye section carries
+            # FPB, HPB and ZPB "for both individuals and teams (240); pairing-
+            # allocated-bye (320) just for teams". Its identifier fields are named
+            # "Team Pairing Number", so in a file with no team section there is
+            # nothing for them to name. Records 013 and 310 both set teamTournament
+            # and read_all_lines parses both before this record, so a team file
+            # reaches here with the flag already set whatever order its lines are in.
+            message = (
+                'Record 320 "' + line.rstrip() + '" is for team tournaments only'
+                + " (TRF-2026): this file has no 013 or 310 record declaring a team"
+            )
+            self.put_status(401, message)
+            raise GacruxInputError(message)
+        if self.pabrecordline is not None:
+            # TRF-2026: "Pairing-Allocated-Bye (PAB) (one record per tournament)". A
+            # second one would silently replace the first's points in the score system
+            # and add its byes on top of the first's, and neither is what the file says.
+            message = (
+                "Record 320 may occur only once, one record per tournament (TRF-2026):"
+                + ' a second one was found after "' + self.pabrecordline.rstrip() + '"'
+            )
+            self.put_status(401, message)
+            raise GacruxInputError(message)
+        self.pabrecordline = line
         matchPoints = helpers.parse_float(line[4:8])
         gamePoints = helpers.parse_float(line[9:13])
         self.scores.add_unplayed("P", matchPoints, gamePoints)
@@ -1246,6 +1384,19 @@ class trf2json(chessjson.chessjson):
         bye = line[4].upper()
         score = trans[bye]
         rnd = helpers.parse_int(line[6:9])
+        if line[0:3] == "240":
+            # TRF-2026: "Half (HPB) or Full (FPB) Point-Bye (at most one record per
+            # type per round)". Everybody getting that bye in that round is listed on
+            # the one record, so a second one is a repeat or a contradiction.
+            if (bye, rnd) in self.byerecordlines:
+                message = (
+                    "Record 240 may occur at most once per type per round (TRF-2026):"
+                    + " a second record of type " + bye + " for round " + str(rnd)
+                    + ' was found after "' + self.byerecordlines[(bye, rnd)].rstrip() + '"'
+                )
+                self.put_status(401, message)
+                raise GacruxInputError(message)
+            self.byerecordlines[(bye, rnd)] = line
         for i in range(10 + idsize, len(line) + 1, idsize + 1):
             competitor = helpers.parse_int(line[i - idsize : i])
             if competitor > 0:
@@ -1271,6 +1422,9 @@ class trf2json(chessjson.chessjson):
         rnd = helpers.parse_int(line[7:10])
         whiteteam = helpers.parse_int(line[11:14])
         blackteam = helpers.parse_int(line[15:18])
+        for team in [whiteteam, blackteam]:
+            if team > 0:
+                self.check_competitor(tournament, line[0:3], team)
         forfeitedtrans = { "10": "WZ", "WL": "WZ", "WZ": "WZ", "+-": "WZ",  
                            "00": "ZZ", "LL": "ZZ", "ZZ": "ZZ", "--": "ZZ", 
                            "01": "ZW", "LW": "ZW", "ZW": "ZW", "-+": "ZW", 
@@ -1648,47 +1802,184 @@ class trf2json(chessjson.chessjson):
         else:
             self.update_team_score(tournament)
 
-    def validate_team_scores(self, tournament):
-        """Check the match- and game-point totals declared by TRF26 record 310."""
-        calculated_match = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
+    def team_score_totals(self, tournament, record):
+        """The match- and game-point totals the results of a team tournament give.
+
+        Two totals per team, worked out from two different places. The match points are
+        the sum of what each of the team's matches was worth under the match score
+        system. The game points are the sum of the totals the team's players report in
+        columns 81-84 of their own 001 records.
+
+        Which matches count is decided per match, and not from currentRound, which
+        parse_trf_player() only advances for a game played against an opponent. A
+        match counts when the game list has a game in its round (played, awarded by
+        forfeit under record 330, or sat out with "U" on every board), or when it sets
+        two teams against each other. What is left out is a bye in a round no player
+        has an entry for: record 240 or 320 naming a team for a round that has been
+        announced and not played.
+
+        This is the one place either total is computed. validate_team_scores() checks a
+        record 310 against it and update_team_score() publishes it for a record 013
+        file, so what a legacy file is published with is what a record 310 file would
+        have had to declare to agree with its own results.
+
+        The game points of each team's pairing-allocated byes are returned on their
+        own. TRF-2026 defines columns 81-84 of a team event's 001 record as the points
+        scored over the board or by forfeit, so a conforming file leaves the bye out of
+        them and has it in record 320 and in record 310's total only. A file may add it
+        to the 001 points as well. validate_team_scores() accepts either.
+
+        `record` is the team record the teams were read from, "310" or "013", for the
+        message. The rounds counted are returned too, for the same reason.
+        """
+        matchpoints = {competitor["cid"]: Decimal("0.0") for competitor in tournament["competitors"]}
+        recorded = {game["round"] for game in tournament["gameList"]}
+        pabpoints = {cid: Decimal("0.0") for cid in matchpoints}
+        counted = set()
         for match in tournament["matchList"]:
-            if match["round"] > tournament["currentRound"] and self.get_result_res(match, "white") != "P":
+            if match["round"] not in recorded and self.get_result_cid(match, "black") <= 0:
                 continue
+            counted.add(match["round"])
             white = self.get_result_cid(match, "white")
             black = self.get_result_cid(match, "black")
+            for cid in [white, black]:
+                if cid > 0 and cid not in matchpoints:
+                    # Every record naming a team is checked as it is read, so this is
+                    # the last place a number that names nobody can arrive.
+                    numbers = sorted(matchpoints.keys())
+                    message = (
+                        "A match in round " + str(match["round"]) + " is played by team "
+                        + str(cid) + ", which record " + record + " does not declare: the"
+                        + " tournament has " + str(len(numbers)) + " teams"
+                        + (" (" + str(numbers[0]) + " - " + str(numbers[-1]) + ")" if numbers else "")
+                    )
+                    self.put_status(401, message)
+                    raise GacruxInputError(message)
 
+            if white > 0 and black <= 0 and self.get_result_res(match, "white") == "P":
+                pabpoints[white] += self.scores.get_score(tournament, "match", "PG")
             if white > 0:
-                calculated_match[white] += self.scores.get_score(
+                matchpoints[white] += self.scores.get_score(
                 tournament, "match", self.get_result_res(match, "white")
                 )
             if black > 0:
-                calculated_match[black] += self.scores.get_score(
+                matchpoints[black] += self.scores.get_score(
                 tournament, "match", self.get_result_res(match, "black")
                 )
 
-        badteams = []
-        for competitor in tournament["competitors"]:
-            cid = competitor["cid"]
-            calculated_game = sum(
+        gamepoints = {
+            competitor["cid"]: sum(
                 (player["gamePoints"] for player in competitor["cplayers"]),
                 Decimal("0.0"),
             )
-            if (
-                competitor["matchPoints"] != calculated_match[cid]
-                or competitor["gamePoints"] != calculated_game
-            ):
-                badteams.append(str(cid))
+            for competitor in tournament["competitors"]
+        }
+        return matchpoints, gamepoints, pabpoints, counted
 
-        if badteams and False:
-            raise GacruxInputError(
-                "record 310 reports incorrect match or game points for team(s) "
-                + ", ".join(badteams)
+    def validate_team_scores(self, tournament):
+        """Check the match- and game-point totals declared by TRF26 record 310.
+
+        Record 310 columns 55-60 and 62-67 carry a team's match points and its game
+        points -- its standing. team_score_totals() works out what the results give,
+        and this is the comparison.
+
+        A disagreement is reported and not refused. A standing that differs from the
+        results is the ordinary shape of a file carrying an arbiter's decision -- a team
+        docked for not appearing, a penalty, a fine -- and TRF-2026 has record 299,
+        Abnormal Assignment points, for exactly that. The declared standing is what the
+        arbiter published, so it is the one kept, and the recomputed figure is reported
+        beside it. Refusing would throw away a whole event, and every number in it, over
+        a file with nothing wrong with it.
+
+        The message names each team, both figures and the rounds counted, because a
+        reader and a file that disagree about a total is not something anybody can act
+        on otherwise.
+        """
+        calculated_match, calculated_gamepoints, pabpoints, counted = self.team_score_totals(tournament, "310")
+
+        problems = []
+        for competitor in tournament["competitors"]:
+            cid = competitor["cid"]
+            calculated_game = calculated_gamepoints[cid]
+            if competitor["matchPoints"] != calculated_match[cid]:
+                problems.append(
+                    "team " + str(cid) + " declares " + str(competitor["matchPoints"])
+                    + " match points, the matches give " + str(calculated_match[cid])
+                )
+            # With or without the pairing-allocated bye in the 001 points.
+            withpab = calculated_game + pabpoints[cid]
+            if competitor["gamePoints"] not in (calculated_game, withpab):
+                problems.append(
+                    "team " + str(cid) + " declares " + str(competitor["gamePoints"])
+                    + " game points, the 001 records of its players give "
+                    + str(calculated_game)
+                    + (", or " + str(withpab) + " with the pairing-allocated bye added"
+                       if withpab != calculated_game else "")
+                )
+
+        if problems:
+            self.report_info(
+                "Record 310 disagrees with the results of " + self.describe_rounds(counted)
+                + ": " + "; ".join(problems)
+                + ". The declared standing is used; see record 299 for assignments that"
+                + " make the two differ on purpose"
             )
 
+    def describe_rounds(self, rounds):
+        rounds = sorted(rounds)
+        if len(rounds) == 0:
+            return "no round"
+        if len(rounds) == 1:
+            return "round " + str(rounds[0])
+        if rounds == list(range(rounds[0], rounds[-1] + 1)):
+            return "rounds " + str(rounds[0]) + " - " + str(rounds[-1])
+        return "rounds " + ", ".join(str(rnd) for rnd in rounds)
+
+    def report_info(self, message):
+        """Record a message that does not stop the file being read.
+
+        put_status() sets the status code and appends to "error", which is the fatal
+        channel: everything in it is a fault, and it is what a caller tests before it
+        uses the event. "info" is the other channel of the same status block --
+        put_status() writes it itself for the code 0 case, and jsonscheme declares it --
+        and it is where a remark about a file that is going to be read anyway belongs.
+        It is created here if nothing has made it. Multiple remarks are separated by
+        newlines so the value remains the string declared by the public JSON schema.
+        """
+        status = self.chessjson["status"]
+        existing = status.get("info")
+        status["info"] = existing + "\n" + message if existing else message
 
     def update_team_score(self, tournament):
+        """Give every team of a file that declares no standing the one its results give.
+
+        The older team record, 013, is a team name and a list of players and nothing
+        else: it has no score columns, so a team read from one keeps the zeros
+        parse_trf_team() starts it with, and nothing replaced them -- this function was
+        a loop over the competitors with "pass" in it. Every team of a legacy team file
+        was therefore published on 0.0 match points and 0.0 game points, a figure the
+        file never stated, and one a team that won every match shared with a team that
+        lost every match, with status 0 and no message either way.
+
+        Nothing inside the engine reads these fields -- the pairing and the tie-breaks
+        work the scores out for themselves from the match list and the game list -- so
+        this changes no pairing, no tie-break and no ranking. What was wrong is the
+        chessjson the reader hands out, and a program reading a team's standing from it
+        got a zero with nothing to say the number was missing rather than nil.
+
+        The totals come from team_score_totals(), which is what validate_team_scores()
+        checks a record 310 against, so the two team records report the same standing
+        for the same results.
+
+        This runs from prepare_team_section() after games2matches has built the match
+        list, which is what the match points are summed from.
+        """
+        # A 013 file declares no standing, so its 001 points are published as they are.
+        matchpoints, gamepoints, _pabpoints, _counted = self.team_score_totals(tournament, "013")
         for competitor in tournament["competitors"]:
-            pass
+            cid = competitor["cid"]
+            competitor["matchPoints"] = matchpoints[cid]
+            competitor["gamePoints"] = gamepoints[cid]
 
     # Module test
 
@@ -1967,8 +2258,12 @@ class trf2json(chessjson.chessjson):
         if "accelerated" in tournament and "values" in tournament["accelerated"]:
             acc = tournament["accelerated"]["values"]
             for value in acc:
-                match = self.scores.score.get("match", {}).get(value["matchPoints"], 0.0)
-                game = self.scores.score.get("game", {}).get(value["gamePoints"], 0.0)
+                # matchPoints and gamePoints are the point values record 250 states,
+                # so they are written out as they stand. Looking them up in the score
+                # system keyed them by a result letter, found nothing and wrote the
+                # 0.0 default over every accelerated value.
+                match = value["matchPoints"]
+                game = value["gamePoints"]
                 line = "250 " + f"{match:>4.1f} " + f"{game:>4.1f} " + f"{value['firstRound']:>3} " + f"{value['lastRound']:>3} " + f"{value['firstCompetitor']:>4} " + f"{value['lastCompetitor']:>4}"
                 t250 += line + "\n"
         return t250
