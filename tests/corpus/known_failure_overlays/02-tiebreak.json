@@ -57,6 +57,9 @@
     "the engine refuses the prescribed pairing: virtual game points of record 250": [
       "team_0078", "team_0101", "team_0119", "team_0249", "team_0263",
       "team_0305", "team_0403", "team_0582", "team_0657", "team_0698"
+    ],
+    "the checker replaces a team round it cannot pair with a pairing of its own, so the file is accepted": [
+      "team_0050", "team_0347", "team_0642"
     ]
   }
 }
