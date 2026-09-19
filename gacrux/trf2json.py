@@ -549,10 +549,7 @@ class trf2json(chessjson.chessjson):
             for result in roundresults:
                 wScore = self.get_score(slist, result, "white")
                 bScore = Decimal("0")
-                try:
-                    points[self.get_result_cid(result, "white")] += wScore
-                except TypeError:
-                    breakpoint()
+                points[self.get_result_cid(result, "white")] += wScore
                 if self.get_result_res(result, "black", None) is not None:
                     bScore = self.get_score(slist, result, "black")
                     points[self.get_result_cid(result, "black")] += bScore

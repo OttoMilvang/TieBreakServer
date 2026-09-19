@@ -9,7 +9,8 @@ C.07 tie-break calculations.
 ```
 tests/corpus/
   corpus.jsonl.gz            gzip-compressed JSON Lines fixture data
-  known_failures.json        active expected failures, grouped by reason
+  known_failures.json        baseline expected failures, grouped by reason
+  known_failure_overlays/    feature-owned expectation deltas
   _harness.py                corpus loader and in-process checker driver
   test_corpus.py             pytest entry point
   regen_known_failures.py    expectation regeneration tool
@@ -22,8 +23,8 @@ The corpus contains 6,000 TRF-2026 tournaments:
 | category | valid | invalid | total |
 |----------|------:|--------:|------:|
 | Individual | 4,281 | 719 | 5,000 |
-| Team | 700 | 300 | 1,000 |
-| **Total** | **4,981** | **1,019** | **6,000** |
+| Team | 682 | 318 | 1,000 |
+| **Total** | **4,963** | **1,037** | **6,000** |
 
 Each decompressed line is one JSON object:
 
@@ -45,10 +46,29 @@ No current fixture is skipped. The `skip` fields remain part of the format so a
 consumer can stage future additions when necessary.
 
 The fixtures cover field and team sizes, board and round counts, draws,
-forfeits, byes, Baku acceleration, non-default score systems, prohibited
-pairings (record 260), abnormal assignments (record 299), Type A and Type B team
-colour models, match-point and game-point primary scoring (record 192), and the
-individual and team tie-break catalogues (record 212).
+forfeits, byes, Baku acceleration, prohibited pairings (record 260), Type A and
+Type B team colour models, match-point and game-point primary scoring (record
+192), and the individual and team tie-break catalogues (record 212).
+
+### What the fixtures do not cover
+
+No fixture carries these records. Unit tests under `tests/` cover them instead.
+
+| record | what it decides |
+|--------|-----------------|
+| 162 | the game score system |
+| 202 | the tie-breaks used to break a tie in the standings |
+| 240 | half-point and full-point byes |
+| 300 | out-of-order pairings, which set board order |
+| 320 | pairing-allocated byes of a team event |
+| 330 | forfeited team matches |
+| 362 | the team match-point score system |
+| XXZ | competitors who will not meet |
+
+Record 260 appears in individual fixtures only. Eight result codes appear in no
+fixture: `W`, `D` and `L` (an unrated played result), `X` and `?` (which score
+as "A"), `F`, `A`, and a blank. The "A" points class is therefore not scored end
+to end by any fixture.
 
 ## Verdict semantics
 
@@ -64,10 +84,10 @@ changes that ranking; it cannot detect an incorrect intermediate value that
 leaves the final order unchanged. The reader separately checks that declared
 score totals reconcile with the recorded results and score system.
 
-Most deliberately invalid fixtures begin as valid tournaments and then receive
-one isolated change. The fixture name records the mechanism:
+Most invalid fixtures depart from the prescribed pairing or ranking in one
+respect, and the name records which:
 
-| mechanism | category | change |
+| mechanism | category | difference |
 |-----------|----------|--------|
 | `c1` | individual | repeat pairing |
 | `c2` | individual | second pairing-allocated bye for an ineligible player |
@@ -76,9 +96,13 @@ one isolated change. The fixture name records the mechanism:
 | `team_opponent` | team | cross-swapped opponents in two matches |
 | `team_rank` | team | swapped final ranks for two teams |
 
-The corrupted files remain parseable and internally consistent; the intended
-failure is the mismatch with the prescribed pairing or ranking. These six
-mechanisms account for every invalid fixture in the corpus.
+Invalid fixtures are parseable and internally consistent; the intended failure
+is the mismatch with the prescribed pairing or ranking.
+
+Eighteen team fixtures are invalid for a different reason and carry no such
+suffix: they declare a round in which more than one team has no opponent, where
+C.04.6 art. 1.4 allows one pairing-allocated bye. There is no pairing to compare
+them against, so the engine reports the round rather than ranking it.
 
 ## Running the tests
 
@@ -105,13 +129,21 @@ shard index. Once every runner finishes, CI posts or updates one pull-request
 comment with the combined results; the same report remains available on the
 workflow run's summary page.
 
-Fixtures listed in `known_failures.json` run under strict `xfail` markers. A
+Fixtures in the composed known-failure data run under strict `xfail` markers. A
 fixed disagreement therefore becomes an XPASS and fails the suite until its
-expectation is removed. After an engine change, regenerate the file with:
+expectation is removed. `known_failures.json` is the common baseline. Each
+optional feature owns a separate JSON overlay with `remove` names and `add`
+groups, so independent changes never regenerate or rewrite a shared snapshot.
+Overlays are applied in filename order; each operation names a fixture, making
+the effective set deterministic and reviewable.
+
+Feature-specific rationale lives beside the overlays in
+`known_failure_overlays/*.md`. Aggregate counts are intentionally not copied
+into this README; derive the current totals from the composed data:
 
 ```bash
-python3 tests/corpus/regen_known_failures.py
+PYTHONPATH=tests/corpus python3 -c 'import _harness; print(len(_harness.load_known_failures()))'
 ```
 
-Review and classify every new disagreement rather than treating regeneration as
-an automatic re-baseline.
+Regeneration refuses unclassified failures by default. Review and classify every
+new disagreement rather than treating regeneration as an automatic re-baseline.

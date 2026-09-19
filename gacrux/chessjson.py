@@ -149,7 +149,7 @@ class chessjson:
             except:
                 pass
         return
-    
+
     def parse_file(self, lines, verbose):
         # now = time.time()
         # self.chessjson = json.loads(lines, parse_float=Decimal)
@@ -336,11 +336,8 @@ class chessjson:
 
 
     def get_score(self, slist, result, color):
-        other = "black" if color == "white" else "white"
-        res = self.get_result_res(result, color)
-        if res is None and self.get_result_cid(result, "black") > 0 and other in result:
-            res = self.reverse[result[other]]
-        elif res is None:
+        res = self.recorded_result(result, color, default="Z")
+        if res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
         while res in slist:
@@ -353,11 +350,8 @@ class chessjson:
     def is_vur(self, result, color):  #
         if result["played"]:
             return False
-        other = "black" if color == "white" else "white"
-        res = self.get_result_res(result, color)
-        if res is None and self.get_result_cid(result, "black") > 0 and other in result:
-            res = self.reverse[result[other]]
-        elif res is None:
+        res = self.recorded_result(result, color, default="Z")
+        if res is None:
             return True
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
         if res == "W":
@@ -452,4 +446,16 @@ class chessjson:
 
     def get_result_res(self, result, color, default="Z"):
         return self.get_result_value(result, color, "result", default)
-    
+
+    def recorded_result(self, result, color, default=None):
+        """Return this side's result letter, deriving it from the other side.
+
+        Callers that need the legacy ``"Z"`` fallback pass it explicitly;
+        callers interested in the recorded letter can distinguish a missing
+        result from an explicit zero without duplicating one-sided-game lookup.
+        """
+        res = self.get_result_res(result, color, default)
+        other = "black" if color == "white" else "white"
+        if res is None and self.get_result_cid(result, "black") > 0 and other in result:
+            return self.reverse.get(self.get_result_res(result, other))
+        return res

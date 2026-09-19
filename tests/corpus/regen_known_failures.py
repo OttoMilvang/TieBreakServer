@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Regenerate known_failures.json against the current engine.
+"""Regenerate one known-failure layer against the current engine.
 
 Runs every non-skipped corpus record through the same check the test applies and
 records the ones that fail -- the tournaments whose combined pairing/standings
@@ -13,10 +13,32 @@ fails but was not listed before is added under an "unclassified" reason for a
 human to describe.  Run this after changing the engine, review the diff, and
 commit it.
 
+The whole corpus is always used: the CI shard variables are stripped before the
+records are read, because a baseline regenerated from one shard silently drops
+every known failure outside it.  See ``load_records``.
+
+An UNCLASSIFIED entry is a placeholder, not a verdict -- it means a record fails
+today and nobody has said why yet.  Writing one to the checked-in file lets it
+sit there indefinitely with no human having looked at it, which is exactly the
+gap the "unclassified" reason exists to flag rather than hide.  So by default
+this refuses to write a baseline that would contain one: it exits non-zero and
+prints the offending record names instead of committing them silently.  Pass
+``--allow-unclassified`` to write anyway (the record still lands in the
+UNCLASSIFIED group, still printed as a reminder) when that is genuinely what is
+wanted -- for instance, capturing a fresh batch of failures before triaging them
+one by one.
+
+Choose the common baseline only when no feature overlays exist, or name the
+feature overlay that owns the engine change. An overlay is a minimal delta
+against every other layer, so regeneration never rewrites another feature's
+expectations.
+
 Usage (from the repo root, uses all cores):
 
-    python tests/corpus/regen_known_failures.py
+    python tests/corpus/regen_known_failures.py --baseline
+    python tests/corpus/regen_known_failures.py --overlay 02-tiebreak
 """
+import argparse
 import json
 import os
 import sys
@@ -28,6 +50,34 @@ import _harness  # noqa: E402
 
 UNCLASSIFIED = ("unclassified -- the engine fails this record but no reason has been "
                 "recorded yet; investigate and describe the bug here")
+
+# The variables CI uses to split the corpus across runners.  _harness.load_corpus
+# honours them, which is right for the test suite and wrong here.
+SHARD_VARS = ("TIEBREAK_CORPUS_SHARDS", "TIEBREAK_CORPUS_SHARD")
+
+
+def load_records():
+    """Every non-skipped corpus record, whatever the environment says.
+
+    ``_harness.load_corpus`` splits the corpus when TIEBREAK_CORPUS_SHARDS and
+    TIEBREAK_CORPUS_SHARD are set, which is how the eight CI runners divide the
+    work.  This script rewrites the *whole* of known_failures.json, so reading a
+    shard would not produce a partial baseline -- it would produce a complete-
+    looking one with seven eighths of the failures missing, and nothing in the
+    file's shape to show it.  Anyone regenerating in a shell where the variables
+    are still exported, or inside a container that inherits the CI environment,
+    would commit that.
+
+    So the variables are removed from the environment for the rest of the run,
+    and their removal is announced rather than done silently.
+    """
+    ignored = [name for name in SHARD_VARS if name in os.environ]
+    for name in ignored:
+        del os.environ[name]
+    if ignored:
+        print("ignoring %s: this rewrites the whole baseline, so it always reads "
+              "the whole corpus" % " and ".join(ignored), flush=True)
+    return [r for r in _harness.load_corpus(full=True) if not r.get("skip")]
 
 
 def _test_fails(record):
@@ -43,8 +93,43 @@ def _test_fails(record):
     return (record["name"], accepts != record["valid"])
 
 
-def main():
-    records = [r for r in _harness.load_corpus(full=True) if not r.get("skip")]
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument("--baseline", action="store_true",
+                        help="rewrite the common baseline (only with no overlays present)")
+    target.add_argument("--overlay", metavar="NAME",
+                        help="rewrite known_failure_overlays/NAME.json")
+    parser.add_argument(
+        "--allow-unclassified", action="store_true",
+        help="write known_failures.json even though it would contain an "
+             "UNCLASSIFIED entry, instead of refusing. Without this, a "
+             "record that fails today with no reason recorded yet stops "
+             "the write so a human describes it first.")
+    return parser.parse_args(argv)
+
+
+def _has_unclassified_without_permission(grouped, allow_unclassified):
+    """True if *grouped* would commit an UNCLASSIFIED entry that nobody has
+    explicitly allowed. A record landing in this group is not a verdict --
+    it is a record whose failure nobody has looked at yet -- so writing it
+    to the checked-in baseline by default would let it sit there
+    indefinitely with nothing to say it was never triaged."""
+    return UNCLASSIFIED in grouped and not allow_unclassified
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    baseline = args.baseline or args.overlay is None
+
+    overlay_paths = sorted(_harness.KNOWN_FAILURE_OVERLAYS.glob("*.json")) \
+        if _harness.KNOWN_FAILURE_OVERLAYS.exists() else []
+    if baseline and overlay_paths:
+        print("refusing to rewrite the baseline while feature overlays exist; "
+              "regenerate the owning --overlay instead", file=sys.stderr)
+        return 2
+
+    records = load_records()
     total = len(records)
     prior = _harness.load_known_failures()
     print("checking %d non-skipped records ..." % total, flush=True)
@@ -67,19 +152,54 @@ def main():
                       % (done, total, 100 * done / total, rate, el, eta), flush=True)
                 last = now
 
-    grouped = {}
+    desired = {}
     for name in sorted(failing):
-        grouped.setdefault(prior.get(name, UNCLASSIFIED), []).append(name)
+        desired[name] = prior.get(name, UNCLASSIFIED)
 
-    with open(_harness.KNOWN_FAILURES, "w") as handle:
-        json.dump(grouped, handle, indent=2)
+    if baseline:
+        grouped = {}
+        for name, reason in desired.items():
+            grouped.setdefault(reason, []).append(name)
+        output = _harness.KNOWN_FAILURES
+        payload = grouped
+    else:
+        without_target = _harness.load_known_failures(exclude_overlays=(args.overlay,))
+        remove = sorted(name for name, reason in without_target.items()
+                        if desired.get(name) != reason)
+        grouped = {}
+        for name, reason in desired.items():
+            if without_target.get(name) != reason:
+                grouped.setdefault(reason, []).append(name)
+        output = _harness.KNOWN_FAILURE_OVERLAYS / (args.overlay + ".json")
+        payload = {"remove": remove, "add": grouped}
+
+    if _has_unclassified_without_permission(grouped, args.allow_unclassified):
+        print(
+            "\nrefusing to write %s: %d record(s) fail with no reason "
+            "recorded yet:" % (output, len(grouped[UNCLASSIFIED])),
+            file=sys.stderr,
+        )
+        for name in grouped[UNCLASSIFIED]:
+            print("  %s" % name, file=sys.stderr)
+        print(
+            "Investigate and describe each one under an existing or new "
+            "reason, or pass --allow-unclassified to write this baseline "
+            "with them left UNCLASSIFIED.",
+            file=sys.stderr,
+        )
+        return 1
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with open(output, "w") as handle:
+        json.dump(payload, handle, indent=2)
         handle.write("\n")
     print("\nwrote %s\n  %d known failures across %d reason group(s)"
-          % (_harness.KNOWN_FAILURES, len(failing), len(grouped)))
+          % (output, len(failing), len(set(desired.values()))))
     if UNCLASSIFIED in grouped:
         print("  %d are UNCLASSIFIED -- give them a reason before committing"
               % len(grouped[UNCLASSIFIED]))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

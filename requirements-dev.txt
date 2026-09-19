@@ -1,3 +1,8 @@
-# Dependencies for running the test suite. Runtime dependencies live in requirements.txt.
+# Dependencies for running the test suite. Install these and the runtime ones:
+#
+#     pip install -r requirements.txt -r requirements-dev.txt
+#
+# requirements-dev.txt alone is not enough - the tests import the engine, and the
+# engine imports networkx.
 pytest>=7.0
 pytest-xdist>=3.0

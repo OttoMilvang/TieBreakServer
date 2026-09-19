@@ -33,6 +33,7 @@ from pathlib import Path
 CORPUS_DIR = Path(__file__).resolve().parent
 CORPUS_GZ = CORPUS_DIR / "corpus.jsonl.gz"
 KNOWN_FAILURES = CORPUS_DIR / "known_failures.json"
+KNOWN_FAILURE_OVERLAYS = CORPUS_DIR / "known_failure_overlays"
 REPO_ROOT = CORPUS_DIR.parent.parent
 
 sys.path.insert(0, str(REPO_ROOT))
@@ -66,8 +67,13 @@ def _drive(checker_cls, extra_argv):
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             try:
                 obj.common_main()
-            except SystemExit:
-                pass
+            except SystemExit as exc:
+                # A checker may call exit() for a command-line failure. Preserve a
+                # numeric exit status when it bypassed the normal result object;
+                # swallowing it would turn a broken corpus case into an apparent
+                # pass (or an uninformative None).
+                if exc.code not in (None, 0):
+                    return exc.code if isinstance(exc.code, int) else 510
             except Exception:
                 # common_main normally converts engine faults to a 510 status
                 # itself; this is only reached if something escapes that net.
@@ -136,15 +142,37 @@ def _shard(records):
     return [record for position, record in enumerate(records) if position % total == this]
 
 
-def load_known_failures():
-    """Return {record name: reason} for records the current engine is known to
-    get wrong.  Stored grouped by reason in known_failures.json so a follow-up
-    fix flips a marker by editing that file alone, with no change here."""
-    if not KNOWN_FAILURES.exists():
-        return {}
-    grouped = json.loads(KNOWN_FAILURES.read_text(encoding="utf-8"))
+def _read_failure_groups(path):
+    grouped = json.loads(path.read_text(encoding="utf-8"))
     name_to_reason = {}
     for reason, names in grouped.items():
         for name in names:
+            if name in name_to_reason:
+                raise ValueError("%s lists %s more than once" % (path, name))
             name_to_reason[name] = reason
+    return name_to_reason
+
+
+def load_known_failures(exclude_overlays=()):
+    """Return {record name: reason} for records the current engine is known to
+    get wrong. The common baseline is grouped by reason in
+    known_failures.json; optional features add independently owned overlays."""
+    name_to_reason = _read_failure_groups(KNOWN_FAILURES) if KNOWN_FAILURES.exists() else {}
+    excluded = set(exclude_overlays)
+    if not KNOWN_FAILURE_OVERLAYS.exists():
+        return name_to_reason
+    for path in sorted(KNOWN_FAILURE_OVERLAYS.glob("*.json")):
+        if path.stem in excluded:
+            continue
+        overlay = json.loads(path.read_text(encoding="utf-8"))
+        for name in overlay.get("remove", []):
+            name_to_reason.pop(name, None)
+        added = overlay.get("add", {})
+        seen = set()
+        for reason, names in added.items():
+            for name in names:
+                if name in seen:
+                    raise ValueError("%s adds %s more than once" % (path, name))
+                seen.add(name)
+                name_to_reason[name] = reason
     return name_to_reason

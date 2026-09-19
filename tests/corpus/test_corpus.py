@@ -12,11 +12,11 @@ not this module:
 
 * ``skip: true`` records are skipped with their own ``skip_reason``. The current
   corpus has no skipped records.
-* records named in ``known_failures.json`` are marked ``xfail`` with the reason
-  recorded there -- these tests still execute, but document tournaments the
-  current engine gets wrong because of a known, not-yet-fixed bug. ``strict=True``
-  means that when the bug is fixed the record turns into an XPASS and fails the
-  suite, which is the signal to remove it from ``known_failures.json``.
+* records named by the composed baseline and feature overlays are marked
+  ``xfail`` with the recorded reason -- these tests still execute, but document
+  tournaments the current engine does not yet accept as expected. ``strict=True``
+  means that when the behavior changes the record turns into an XPASS and fails
+  the suite, which is the signal to update the owning expectation layer.
 
 By default a fast deterministic sample of the corpus runs, for quick local
 feedback; set ``TIEBREAK_CORPUS_FULL=1`` to run all of it, which CI does on every
