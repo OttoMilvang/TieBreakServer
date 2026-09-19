@@ -14,7 +14,7 @@ sorts later, so its versions are used when both are present.
 
 The one-sided-result and abnormal-score changes, together with that cleanup,
 remove the obsolete tie-break fault and disagreement groups from the baseline.
-Four team fixtures still disagree for reasons independent of record 299; the
+Three team fixtures still disagree for reasons independent of record 299; the
 overlay reclassifies them by the checker result that remains after removal.
 
 The overlay deliberately contains only this branch's delta. Counts for the
@@ -26,7 +26,7 @@ of a match-point team tournament. In the Baku team fixtures record 250 gives
 0.0 virtual game points, so where an accelerated team and a team outside the
 acceleration are level on match points, art. 4.2.2 decides the first team
 on game points alone. That agrees with the declared colours of 32 fixtures
-listed as refusing the prescribed pairing. It disagrees with
-10 others, whose declared colours count half the accelerated team's virtual
-match points as game points; they are listed under "the engine refuses the
+listed as refusing the prescribed pairing. It disagrees with 10 others,
+whose declared colours count half the accelerated team's virtual match
+points as game points; they are listed under "the engine refuses the
 prescribed pairing: virtual game points of record 250".
