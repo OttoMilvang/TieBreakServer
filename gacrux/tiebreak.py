@@ -7,6 +7,7 @@ import math
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 from gacrux import chessjson 
+from gacrux import colourpreference
 from gacrux import rating
 from gacrux.gacruxexeptions import GacruxInputError
 
@@ -664,13 +665,35 @@ class tiebreak:
                             self.addtbval(tbscore[prefix + "cod"], rnd, pf)
                             self.addtbval(tbscore[prefix + "cod"], "val", pf)
                             pf = tbscore[prefix + "cod"]["val"]
-                            colpref = other[ocol] + "bbbbwwww"
-                            # a competitor with the same color in every game reaches |pf| >= len(colpref),
-                            # which is outside the table. Saturate on the last entry in each direction.
-                            ncol = colpref[max(-len(colpref), min(pf, len(colpref) - 1))]
-                            ncol += str(abs(pf)) if ocol != pcol else "2"
-    
                             csq += ocol
+                            if self.isteam:
+                                colpref = other[ocol] + "bbbbwwww"
+                                # colpref is a map for a colour difference in [-4, +4] and for
+                                # no other index. Entry 0 is "alternate"; entries +1..+4 are the
+                                # four "b" characters, for a team due Black; entries -1..-4 are
+                                # the four "w" characters counted from the end, for one due
+                                # White. A team with the same colour in every match runs |pf|
+                                # past 4 and off its own half of the table into the other one -
+                                # pf = +5 indexes position 5, the first "w", telling a team that
+                                # has had nothing but White to prefer White. Saturating on the
+                                # length of the string ([-9, +8]) lands in the opposite half too,
+                                # so the clamp is to the range the table actually covers.
+                                ncol = colpref[max(-4, min(pf, 4))]
+                                ncol += str(abs(pf)) if ocol != pcol else "2"
+                            else:
+                                # C.04.3 art. 1.7, by the function the Dutch pairing engine
+                                # reads for the same player (crosstable_dutch.color_preference
+                                # is this function). The table above is a notation of its own
+                                # -- colour by colour difference alone, strength "2" when the
+                                # last two colours match and |cod| otherwise -- and it
+                                # contradicted the engine at a colour difference of +/-1 with
+                                # two of the same colour last (wwwbb: "b2" against the
+                                # engine's "w2") and emitted strengths art. 1.7 does not
+                                # define ("b3" for wwwwb). Only played games with an opponent
+                                # reach here (C.04.2 art. 3.4), so cod and csq are the
+                                # engine's.
+                                ncol = colourpreference.color_preference(pf, csq)
+
                             pcol = ocol
                             self.addtbval(tbscore[prefix + "csq"], rnd, ocol)
                             self.addtbval(tbscore[prefix + "csq"], "val", ocol)

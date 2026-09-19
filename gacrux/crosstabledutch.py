@@ -11,6 +11,7 @@ opponents - Two-dimentional array of size [0..P+1][0..P+1] of opponent objects
 """
 
 from decimal import Decimal
+from gacrux import colourpreference
 from gacrux.crosstable import crosstable, flt
 from gacrux.tiebreak import tiebreak
 from gacrux.gacruxexeptions import GacruxInvariantError
@@ -125,33 +126,17 @@ class crosstable_dutch(crosstable):
     def maxquality(self):
         return qdefs.IW.value
 
+    """
+    color_preference - C.04.3 art. 1.7
+
+    The definition, the strengths it returns and the decision about which article wins
+    when several fit are in colourpreference.py, which the tie-break listing (the COP
+    column of tiebreak.compute_score) reads too, so that the engine and the listing
+    cannot disagree about the same player. This is the engine's handle on it.
+    """
+
     def color_preference(self, cod, csq):
-        # Implementation for determining color preference
-        #print(cod, csq)
-        # C.04.3 art. 1.7.1: "The preference is for White when the colour difference is less
-        # than -1 OR when the last two games were played with Black." The second clause is
-        # unconditional on the colour difference. Gating it at cod <= 0 (resp. cod >= 0) drops
-        # the |cod| == 1 cases, which then fall through to art. 1.7.2 and come back as a STRONG
-        # preference for the OPPOSITE colour -- e.g. a player with the colour history wwwbb
-        # (cod = +1, last two Black) has an absolute preference for White by 1.7.1, but was
-        # returned "b1". Widening to cod <= 1 / cod >= -1 covers them.
-        #
-        # cod >= +2 with the last two games Black (and its mirror) is left resolving by the
-        # colour difference, as before: there art. 1.7.1 asserts BOTH preferences, and the
-        # article does not say which wins.
-        if cod <= -2 or cod <= 1 and csq[-2:] == "bb":
-             return "w2"
-        elif cod >= 2 or cod >= -1 and csq[-2:] == "ww":
-             return "b2"
-        elif cod == -1:
-             return "w1"
-        elif cod == 1:
-             return "b1"
-        elif csq[-1:] == "b":
-             return "w0"
-        elif csq[-1:] == "w":
-             return "b0"
-        return "nc"
+        return colourpreference.color_preference(cod, csq)
 
 
 
@@ -200,9 +185,18 @@ class crosstable_dutch(crosstable):
             canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
             for col in ["w", "b"]:
                 col2 = col + "2"
+                # C.04.3 art. 2.1.3 [C3]: two players holding an ABSOLUTE
+                # same-colour preference (art. 1.7.1, cop == col2) may not be
+                # paired together. A merely STRONG preference (art. 1.7.2)
+                # does not carry this restriction, however large the other
+                # player's own colour difference is -- there used to be a
+                # second test here, "a['cod'] * b['cod'] >= 4", that forbade
+                # a pairing whenever one side's |cod| was 4 or worse even if
+                # the other side's preference was only strong. That treated a
+                # strong preference as if it were absolute and had no article
+                # behind it; it could delete the one legal edge a bracket
+                # needed; see tests/test_strong_preference_may_meet_absolute.py.
                 if a["cop"] == col2 and b["cop"] == col2 and (not a["top"]) and (not b["top"]):
-                    canmeet = False
-                if a["cod"] * b["cod"] >= 4 and (not a["top"]) and (not b["top"]):
                     canmeet = False
         # score diff
         return canmeet
