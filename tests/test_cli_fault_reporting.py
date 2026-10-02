@@ -89,6 +89,7 @@ def round_robin(declared, numrounds=4, typeoftournament="FIDE_TEAM_MP_GP", extra
         "142 %d" % numrounds,
         "152 W",
         "192 " + typeoftournament,
+        "352 " + "WB"[:BOARDS],
         "212 PTS",
     ]
     lines.extend(extra)
