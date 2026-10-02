@@ -101,10 +101,10 @@ def test_record_352_wins_over_a_longer_roster():
     lines = team_file().split("\n")
     lines.insert(10, "001    5      Alpha Reserve                    1800                             0.0    0")
     lines[11] += "    5"
-    tournament = read("\n".join(lines + ["352 WBWB"])).get_tournament(1)
+    tournament = read("\n".join(lines + ["352 WB"])).get_tournament(1)
 
     assert len(tournament["competitors"][0]["cplayers"]) == 3
-    assert tournament["teamSize"] == 4
+    assert tournament["teamSize"] == 2
 
 
 def test_a_sequence_written_before_the_team_section_is_read_the_same_way():
