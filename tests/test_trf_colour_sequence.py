@@ -108,18 +108,12 @@ def test_record_352_wins_over_a_longer_roster():
 
 
 def test_a_sequence_written_before_the_team_section_is_read_the_same_way():
-    """Where the record sits in the file does not decide whether it is accepted.
-
-    The reader parses the records in its own order, not the file's, and record 352
-    used to be read before either team-section record. The team-only check would then
-    have refused every team file that declares its teams with a record 310 and
-    nothing else, because nothing had yet said the tournament was a team event. The
-    record is parsed after both team-section forms instead.
-    """
+    """Physical record order does not change the parsed tournament."""
     lines = team_file().split("\n")
     first = read("\n".join(lines[:6] + ["352 WB"] + lines[6:])).get_tournament(1)
     last = read(team_file("352 WB")).get_tournament(1)
 
+    assert first == last
     assert first["teamSequence"] == last["teamSequence"] == "WB"
     assert first["teamSize"] == last["teamSize"] == 2
 
@@ -178,3 +172,22 @@ def test_a_team_event_with_matches_still_sizes_itself_from_them():
 
     assert tournament["teamSize"] == 2
     assert len(tournament["matchList"]) > 0
+
+
+@pytest.mark.parametrize("section", ["310", "013"])
+def test_board_count_is_available_before_reading_the_team_section(section):
+    class Reader(trf2json.trf2json):
+        def parse_trf_team(self, tournament, line):
+            assert tournament["teamTournament"] is True
+            assert tournament["teamSize"] == 2
+            assert tournament["teamSequence"] == "WB"
+            return super().parse_trf_team(tournament, line)
+
+    text = team_file("352 WB")
+    if section == "013":
+        text = "\n".join(line for line in text.splitlines() if not line.startswith("310"))
+        text += "\n013 " + "Alpha".ljust(32) + "    1    2"
+        text += "\n013 " + "Beta".ljust(32) + "    3    4"
+    reader = Reader()
+    reader.parse_file(text, 1)
+    assert reader.get_status() == 0

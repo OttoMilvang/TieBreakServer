@@ -56,14 +56,12 @@ class trf2json(chessjson.chessjson):
             {"id": "202", "read": self.parse_tiebreaks202,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to break ties"},
             {"id": "212", "read": self.parse_tiebreaks212,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to define standings"},
             {"id": "222", "read": self.parse_trf_timecontrol,   "write": self.output_trf_noop,          "desc": "Encoded Time Control"},
+            {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
             {"id": "362", "read": self.parse_trf_matchscore,    "write": self.output_trf_noop,          "desc": "Scoring point system for teams"},
             {"id": "001", "read": self.parse_trf_player,        "write": self.output_trf_player,        "desc": "Player section"},
             {"id": "FID", "read": self.parse_trf_natrating,     "write": self.output_trf_noop,          "desc": "National Rating Support"},
             {"id": "310", "read": self.parse_trf_team,          "write": self.output_trf_noop,          "desc": "Team section"},
             {"id": "013", "read": self.parse_trf_team,          "write": self.output_trf_noop,          "desc": "Team section"},
-            # Record 352 is parsed after both team-section forms, so its team-only check
-            # does not depend on where the records happened to appear in the file.
-            {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
             {"id": "250", "read": self.parse_trf_accelerated,   "write": self.output_trf_accelerated,  "desc": "Accelerated Round"},
             {"id": "260", "read": self.parse_trf_prohibited,    "write": self.output_trf_prohibited,    "desc": "Prohibited pairings"},
             {"id": "240", "read": self.parse_trf_bye4,          "write": self.output_trf_noop,          "desc": "Bye section HPB and FPB"},
@@ -280,6 +278,10 @@ class trf2json(chessjson.chessjson):
                 if trfkey not in all_lines:
                     all_lines[trfkey] = []
                 all_lines[trfkey].append({"no": lineno, "txt": line, "parse": False})
+
+        # Team rosters are known before parsing; record 352 supplies their board count.
+        if "310" in all_lines or "013" in all_lines:
+            tournament["teamTournament"] = True
 
         #
         # Pass 2
