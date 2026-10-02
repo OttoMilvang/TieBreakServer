@@ -24,6 +24,7 @@ if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacr
     from gacrux.pairing import pairing
     from gacrux.pairingdutch import pairing_dutch
     from gacrux.pairingberger import pairing_berger
+    from gacrux.gacruxexeptions import GacruxNoLegalPairing
     from gacrux.pairingfideteam import pairing_fideteam
 else:
     import version
@@ -35,6 +36,7 @@ else:
     from pairing import pairing
     from pairingdutch import pairing_dutch
     from pairingberger import pairing_berger
+    from gacruxexeptions import GacruxNoLegalPairing
     from pairingfideteam import pairing_fideteam
 
 
@@ -418,16 +420,9 @@ class pairingchecker(commonmain):
     def compute_pairing(self, chessfile, pairingengine, params):
         # print('PARAMS', params)
         chessfile = self.chessfile
-        # A GacruxNoLegalPairing raised by either call below is left to reach the caller.
-        # It says that this round of this tournament has no admissible pairing, which is a
-        # state of the tournament and not a defect of the engine: C.04.6 art. 3.3.3, like
-        # C.04.3 art. 1.9.3, leaves the decision of what to do about it to the Chief
-        # Arbiter, so the engine reports the state and stops. A pairing of its own devising
-        # would be worse than useless: a bye for every team it could not seat breaks
-        # art. 1.4, which allows one pairing-allocated bye in a round, and art. 2.1.2 [C2],
-        # which bars some teams from receiving even that one.
         self.pairingengine = pairingengine
         analysis = pairing = []
+        complete = True
         acompetitors = pcompetitors = {}
         if self.doanalysis or (self.docheck and not self.doanalysis and not self.dopairing):
             analysis = pairingengine.compute_pairing(True, self.doanalysis)
@@ -438,7 +433,11 @@ class pairingchecker(commonmain):
             )
 
         if self.dopairing or (self.docheck and not self.doanalysis and not self.dopairing):
-            pairing = pairingengine.compute_pairing(False, self.dopairing)
+            try:
+                pairing = pairingengine.compute_pairing(False, self.dopairing)
+            except GacruxNoLegalPairing:
+                # No prescribed round; the declared analysis above still applies.
+                complete = False
             pcompetitors = sorted(
                 #[{key: value for (key, value) in c.items() if key != "opp"} for c in pairingengine.crosstable.crosstable],
                 pairingengine.crosstable.competitors,
@@ -450,7 +449,7 @@ class pairingchecker(commonmain):
             "current": self.compute_pairs(analysis),
         }
         if self.docheck:
-            result["check"] = result["pairs"] == result["current"]
+            result["check"] = complete and result["pairs"] == result["current"]
             result["pairing"] = pairing
             result["analysis"] = analysis
             result["competitors"] = pcompetitors if len(pcompetitors) >= len(acompetitors) else acompetitors
@@ -588,7 +587,7 @@ class pairingchecker(commonmain):
                 self.resultjson["status"]["code"] = 0 if ok else 1
             else: 
                 pairs = "pairs" if self.dopairing else "current"
-                ok = len(chessfile.result) != 1 or len(chessfile.result["roundpairing"][0][pairs]) > 0
+                ok = len(chessfile.result["roundpairing"][0][pairs]) > 0
                 self.resultjson["status"]["code"] = 0 if ok else 2  
                 chessfile.result["pairs"] =  chessfile.result["roundpairing"][0][pairs]
                 chessfile.result["round"] =  chessfile.result["roundpairing"][0]["round"]

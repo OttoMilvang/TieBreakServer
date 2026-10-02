@@ -183,11 +183,8 @@ class pairing:
         self.hamilton = self.compute_hamilton(nodes, edges)
         unpaired = self.hamilton[levels - 1].get("rem_unpaired", 0)
         if unpaired != 0:
-            # The Hamilton table for the whole field says a maximum matching leaves
-            # competitors over, so no round-pairing can be complete (C.04.3 art. 1.9.1).
-            # That is a state of the tournament and the arbiter's decision (art. 1.9.3),
-            # not an empty round: returning [] here reported a successful pairing of
-            # nobody. find_weighted_pab records the shortfall as a negative count.
+            # A whole-field shortfall cannot be repaired within a score bracket.
+            # The checker translates this search sentinel to zero prescribed pairs.
             raise GacruxNoLegalPairing(
                 "the round-pairing cannot be completed: %d competitors would remain "
                 "unpaired whatever the rest of the field does, and C.04.3 art. 1.9.3 "
@@ -221,7 +218,8 @@ class pairing:
             if bracket:
                 self.roundpairing.append(bracket)
             scorelevel -= 1
-        if len(nodes) > 0:
+        # Analysis retains unmatched competitors; only generation must complete the round.
+        if len(nodes) > 0 and not self.checkonly:
             raise GacruxNoLegalPairing(
                 str(len(nodes)) + " competitor(s) remain after every score bracket has been paired"
                 + " (no legal pairing of the whole field exists, see C.04.3 art. 1.9.3)"

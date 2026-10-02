@@ -17,8 +17,8 @@ GacruxNoLegalPairing is a state of the tournament, not a defect of the engine.
 
     The engine cannot make that decision on the caller's behalf: what happens to the
     round is the arbiter's decision, and it is taken outside the pairing rules. So the
-    engine reports the state and stops. A caller that pairs a small tournament is
-    expected to catch this exception -- not to log it as a crash.
+    search uses this exception to unwind. The pairing checker catches it and returns
+    zero prescribed pairs, retaining the declared round and its analysis.
 
 GacruxInputError means the tournament that was handed to the engine is malformed.
     A record does not carry the data it must carry, or the records contradict each

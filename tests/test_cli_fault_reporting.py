@@ -9,9 +9,8 @@ art. 1.4.4 forbids the Baku acceleration when game points are the primary score,
 user who does that has to be told which article they violated, not that the program is
 broken.
 
-A round that cannot be paired reaches the mapping like any other condition. C.04.6
-art. 3.3.3 prescribes nothing for it and hands the round to the Chief Arbiter, so the
-checker reports the state and stops rather than answering with a pairing of its own.
+A round that cannot be completed returns zero prescribed pairs. Check mode still
+analyzes the declared round and compares it with that empty result.
 """
 import contextlib
 import io
@@ -95,10 +94,11 @@ def round_robin(declared, numrounds=4, typeoftournament="FIDE_TEAM_MP_GP", extra
     lines.extend(extra)
     for team in range(1, TEAMS + 1):
         for startno in players(team):
-            lines.append(player_line(startno, "%.1f" % (0.5 * declared), games[startno]))
+            lines.append(player_line(startno, "%.1f" % (0.5 * len(games[startno])), games[startno]))
     for team in range(1, TEAMS + 1):
         # Every match drawn: one match point and one game point per round, per team.
-        lines.append(team_line(team, "%.1f" % declared, "%.1f" % declared, players(team)))
+        played = len(games[players(team)[0]])
+        lines.append(team_line(team, "%.1f" % played, "%.1f" % played, players(team)))
     return "\n".join(lines) + "\n"
 
 
@@ -149,121 +149,32 @@ def reported_pairs(checker):
     return [tuple(pair) for pair in pairs]
 
 
-# ---------------------------------------------------------------------------------
-# An impossible round is reported, not fabricated
-# ---------------------------------------------------------------------------------
+def test_pairing_an_impossible_round_returns_no_pairs(tmp_path):
+    checker, _ = run(write(tmp_path, round_robin(declared=3)), ["-p"])
+    assert status(checker) == 2
+    assert checker.chessfile.result["pairs"] == []
+    assert reported_pairs(checker) == []
 
 
-def test_pairing_an_impossible_round_reports_it_instead_of_giving_everyone_a_bye(tmp_path):
-    """`-p` on an exhausted field must not answer with a bye for every unseated team.
-
-    Three rounds of a four-team round robin use up every pair, so round four has no legal
-    pairing at all. The engine says so with GacruxNoLegalPairing, and the only correct
-    answer for the CLI is to report that condition (C.04.6 art. 3.3.3 leaves the decision
-    to the Chief Arbiter). Four teams is an even field, so art. 1.4 -- "should the number
-    of teams to be paired be odd, one team is not paired" -- allows no bye whatsoever
-    here; a report naming competitor 0 as an opponent is therefore an invention, and four
-    of them at once would break art. 1.4 even on an odd field, quite apart from art.
-    2.1.2 [C2], which bars a team that has already had a bye from receiving another.
-
-    The assertion is that no such pair is reported and that the run ends in a failure
-    status rather than a successful-looking pairing.
-    """
-    path = write(tmp_path, round_robin(declared=3))
-
-    (checker, _) = run(path, ["-p"])
-
-    assert [pair for pair in reported_pairs(checker) if 0 in pair] == []
-    assert status(checker) >= 400, "an unpairable round must not be reported as a pairing"
+@pytest.mark.parametrize("options", [["-c"], ["-c", "-p", "-a"]])
+def test_an_impossible_round_keeps_the_declared_pairing_and_quality(tmp_path, options):
+    checker, _ = run(write(tmp_path, round_robin(declared=4)), options + ["-n", "4"])
+    assert status(checker) == 1
+    result = checker.chessfile.result["roundpairing"][0]
+    assert result["pairs"] == []
+    assert result["current"] == [(1, 4), (2, 3)]
+    assert result["check"] is False
+    assert result["competitors"]
+    assert result["analysis"]
+    assert all(bracket["quality"] for bracket in result["analysis"])
+    assert all("remaining" in bracket for bracket in result["analysis"])
 
 
-@pytest.mark.parametrize(
-    "options",
-    [
-        pytest.param(["-c"], id="check"),
-        pytest.param(["-c", "-p"], id="check-pairing"),
-        pytest.param(["-c", "-a"], id="check-analysis"),
-    ],
-)
-def test_checking_an_impossible_round_neither_fabricates_byes_nor_faults(tmp_path, options):
-    """The three check invocations over a round that cannot be paired.
-
-    The file declares a fourth round -- necessarily a repeat of round one, since every
-    pair is used up -- and `-n 4` points each invocation at it. `-d T` asks for the text
-    report, which is where the second half of this holds: the report renders a bracket by
-    reading its "scorelevel", "competitors" and "downfloaters", so a bracket carrying only
-    a "pairs" key makes write_text_details raise KeyError. common_main swallows that into
-    status 503, "Error when writing file" -- a message about the output file for a fault
-    that has nothing to do with it.
-
-    `-c -a` is the control here: analysis reconstructs the pairing the file declares
-    rather than computing one, and this file does declare a fourth round, so on this
-    fixture that path never reaches the unpairable state and must keep reporting the
-    declared round exactly as it always did. (It is reachable in general -- a declared
-    round that cannot be reconstructed as a legal sequence of brackets raises from the
-    analysis call too -- which is why both call sites have to leave the exception alone.)
-
-    Two assertions, both of which hold whatever the invocation: on an even field of four
-    teams art. 1.4 allows no pairing-allocated bye, so no reported pair may name
-    competitor 0; and no run may end in 503, which here can only mean a malformed bracket
-    reached the report.
-    """
-    path = write(tmp_path, round_robin(declared=4))
-
-    (checker, _) = run(path, options + ["-n", "4", "-d", "T"])
-
-    assert [pair for pair in reported_pairs(checker) if 0 in pair] == []
-    assert status(checker) != 503, "the text report faulted on a bracket it cannot render"
-
-
-def test_no_legal_pairing_has_its_own_status_code(tmp_path):
-    """An exhausted field is not a program error, and the CLI must not call it one.
-
-    ``gacruxexeptions.py``: "GacruxNoLegalPairing is a state of the tournament, not a
-    defect of the engine ... A caller that pairs a small tournament is expected to catch
-    this exception -- not to log it as a crash." Status 510 is literally "Program error",
-    so reporting this condition as 510 tells the caller the opposite of the truth, and
-    leaves it no way to tell the one exception that is not a bug apart from the ones that
-    are.
-
-    505 is the status for it -- the neighbour of 504, the other code that means the round
-    asked for cannot be paired -- and the message the engine wrote has to survive with it,
-    because a bare code cannot say which bracket ran out.
-    """
-    path = write(tmp_path, round_robin(declared=3))
-
-    (checker, output) = run(path, ["-p", "-d", "T"])
-
-    assert status(checker) != 510, "an unpairable round is not a defect of the engine"
-    assert status(checker) == 505
-    assert "cannot be paired" in messages(checker)
-    assert "no legal pairing" in messages(checker)
-    assert "Program error" not in messages(checker)
-    # And it reaches the user, not just the JSON: write_error_file prints the status.
-    assert "505" in output
-    assert "no legal pairing" in output
-
-
-def test_a_declared_round_with_no_legal_pairing_is_not_accepted(tmp_path):
-    """A file may not check out on a round the rules prescribe no pairing for.
-
-    This is the corpus class the change turns over. Eighteen team records of
-    tests/corpus reach a round whose field is exhausted, and they were accepted --
-    marked valid, no disagreement -- because the checker computed the same maximum
-    matching for them that had been written into the file. Neither side of that
-    comparison came from C.04.6: art. 3.3.3 prescribes nothing at all for a round that
-    cannot be completed, it hands the round to the Chief Arbiter, so agreeing with the
-    file proves nothing about the file.
-
-    The verdict for such a round is therefore not "check passed" and not "check failed"
-    but "there is no pairing to compare against", which is what 505 says.
-    """
-    path = write(tmp_path, round_robin(declared=4))
-
-    (checker, _) = run(path, ["-c"])
-
-    assert status(checker) == 505
-    assert status(checker) not in (0, 1), "a round the rules do not prescribe has no verdict"
+@pytest.mark.parametrize("options", [["-c"], ["-c", "-p"], ["-c", "-a"]])
+def test_the_empty_pairing_contract_can_be_rendered_as_text(tmp_path, options):
+    checker, _ = run(write(tmp_path, round_robin(declared=4)), options + ["-n", "4", "-d", "T"])
+    assert status(checker) in (0, 1)
+    assert not any(0 in pair for pair in reported_pairs(checker))
 
 
 # ---------------------------------------------------------------------------------
@@ -387,26 +298,65 @@ def three_leaders_who_have_met_every_lower_player():
     return "\n".join(lines) + "\n"
 
 
-def test_art_1_9_3_an_incompletable_dutch_round_is_reported_not_returned_empty(tmp_path):
-    """`-p` on a Dutch round that cannot be completed must say so, not report no pairs.
-
-    C.04.3 art. 1.9.1 says the round-pairing is complete only when every player but at
-    most one has been paired, and art. 1.9.3 hands an incompletable round to the Chief
-    Arbiter. The individual engine has three exits for that state: the top score bracket
-    with no edge at all, the last bracket that cannot be paired -- both already raise
-    ``GacruxNoLegalPairing`` -- and a top-bracket remainder that a maximum matching cannot
-    complete, which returned an empty round-pairing instead. The command line then
-    reported status 0 with ``pairs: []``: a successful-looking pairing of nobody.
-
-    The status has to be 505, the code for an unhandled incompletable round, and the
-    message has to cite the article that says whose decision this now is.
-    """
+def test_an_incompletable_dutch_round_returns_no_pairs(tmp_path):
     path = write(tmp_path, three_leaders_who_have_met_every_lower_player(), "eight.trf")
+    checker, _ = run(path, ["-p"])
+    assert status(checker) == 2
+    assert checker.chessfile.result["pairs"] == []
 
-    (checker, output) = run(path, ["-p"])
 
-    assert status(checker) == 505, "an incompletable round is not a pairing of nobody"
-    assert "1.9.3" in messages(checker)
-    assert "2 competitors" in messages(checker)
+@pytest.mark.parametrize("declared_pairs", [[(1, 4)], []])
+def test_an_incomplete_declared_round_cannot_match_an_empty_prescription(tmp_path, monkeypatch, declared_pairs):
+    monkeypatch.setitem(SCHEDULE, 4, declared_pairs)
+    checker, _ = run(write(tmp_path, round_robin(declared=4)), ["-c", "-n", "4"])
+    assert status(checker) == 1
+    result = checker.chessfile.result["roundpairing"][0]
+    assert result["current"] == declared_pairs
+    assert result["pairs"] == []
+    assert result["check"] is False
+    assert result["analysis"]
+    assert result["competitors"]
+    assert "remaining" in result["analysis"][-1]
+    assert result["analysis"][-1]["quality"]
+
+
+def test_no_complete_pairing_never_uses_the_partial_matching_fallback(tmp_path, monkeypatch):
+    from gacrux.pairingfideteam import pairing_fideteam
+
+    def fallback(*args):
+        pytest.fail("an incomplete matching is not a prescribed round")
+
+    monkeypatch.setattr(pairing_fideteam, "compute_degenerate_pairing", fallback)
+    checker, _ = run(write(tmp_path, round_robin(declared=3)), ["-p"])
+    assert status(checker) == 2
     assert reported_pairs(checker) == []
-    assert "505" in output
+
+
+def test_a_complete_team_round_still_returns_normal_pairs(tmp_path):
+    checker, _ = run(write(tmp_path, round_robin(declared=0)), ["-p"])
+    assert status(checker) == 0
+    pairs = checker.chessfile.result["pairs"]
+    assert len(pairs) == 2
+    assert sorted(cid for pair in pairs for cid in pair) == [1, 2, 3, 4]
+
+
+def test_an_illegal_dutch_round_retains_its_declared_analysis(tmp_path):
+    from test_unpairable_position_reports_cleanly import full_round_robin_of_six
+
+    lines = full_round_robin_of_six()
+    for index, line in enumerate(lines):
+        if line.startswith("001"):
+            cid = int(line[4:8])
+            opponent = 7 - cid
+            colour = "w" if cid < opponent else "b"
+            lines[index] += "  %4d %s =" % (opponent, colour)
+            lines[index] = lines[index][:80] + "%4.1f" % (float(lines[index][80:84]) + 0.5) + lines[index][84:]
+    checker, _ = run(write(tmp_path, "\n".join(lines), "dutch.trf"), ["-c", "-n", "6"])
+    assert status(checker) == 1
+    result = checker.chessfile.result["roundpairing"][0]
+    assert result["pairs"] == []
+    assert result["current"] == [(1, 6), (2, 5), (3, 4)]
+    assert result["check"] is False
+    assert result["analysis"]
+    assert result["competitors"]
+    assert all(bracket["quality"] for bracket in result["analysis"])

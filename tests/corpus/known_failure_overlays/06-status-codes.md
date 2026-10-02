@@ -2,7 +2,8 @@
 
 The checker used to answer a team round with no legal pairing with a pairing of its own,
 so the declared round always compared equal and the file was accepted. This branch leaves
-the condition to the caller, and the round is reported with status 505 instead.
+zero prescribed pairs instead. Check mode retains the declared pairing and its
+quality analysis, and reports a mismatch.
 
 Twenty-two team records were accepted that way, each declaring a round in which more
 than one team has no opponent. `fixture_overlays/00-status-codes.jsonl.gz` carries the
