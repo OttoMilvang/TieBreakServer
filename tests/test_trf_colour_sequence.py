@@ -13,6 +13,8 @@ The record had no validation at all. An empty one reached seq[0] and faulted,
 arbitrary characters were accepted as boards, an individual tournament accepted
 it, and two of them silently left the last one standing.
 """
+from copy import deepcopy
+
 import pytest
 
 from gacrux import gacruxexeptions
@@ -118,18 +120,37 @@ def test_a_sequence_written_before_the_team_section_is_read_the_same_way():
     assert first["teamSize"] == last["teamSize"] == 2
 
 
-@pytest.mark.parametrize("seq", ["BW", "BWWB", "B"])
-def test_record_352_must_lead_with_white(seq):
-    """C.04.6 art. 1.6.1 takes a team's colour from its first board.
+@pytest.mark.parametrize("seq", ["BW", "BWWB", "B", "bwbw"])
+def test_record_352_may_lead_with_black(seq):
+    tournament = read(team_file("352 " + seq)).get_tournament(1)
 
-    The sequence gives the colours of the team the pairing designates White, so
-    it has to start with W for the two to agree. A file with 352 BW was read
-    with every match colour reversed, and every colour difference with it.
-    """
-    with pytest.raises(gacruxexeptions.GacruxInputError, match="must lead with W"):
-        read(team_file("352 " + seq))
+    assert tournament["teamSequence"] == seq.upper()
+    assert tournament["teamColor"] == "B"
+    assert tournament["teamSize"] == len(seq)
 
-    assert read(team_file("352 WB")).get_status() == 0
+
+@pytest.mark.parametrize("seq,white,black", [("BW", 1, 2), ("WB", 2, 1)])
+def test_the_board_sequence_determines_the_match_colours(seq, white, black):
+    lines = team_file("352 " + seq).splitlines()
+    games = [(3, "b"), (4, "w"), (1, "w"), (2, "b")]
+    for index, (opponent, colour) in enumerate(games, 6):
+        line = lines[index]
+        lines[index] = (line[:80] + " 0.5" + line[84:89]).ljust(91) + "%4d %s =" % (opponent, colour)
+    for index in [10, 11]:
+        line = lines[index]
+        lines[index] = line[:54] + "   1.0" + line[60:61] + "   1.0" + line[67:]
+    tournament = read("\n".join(lines)).get_tournament(1)
+
+    match = tournament["matchList"][0]
+    assert match["white"]["cid"] == white
+    assert match["black"]["cid"] == black
+    assert [(game["white"]["cid"], game["black"]["cid"]) for game in tournament["gameList"]] == [(3, 1), (2, 4)]
+    engine = pairing_fideteam(tournament, 2, {"experimental": [], "verbose": 0})
+    competitors, _ = engine.get_crosstable([], False, 0).init_engine(tournament, 2, 1, "w", "cid")
+    assert competitors[white]["csq"].strip() == "w"
+    assert competitors[black]["csq"].strip() == "b"
+    assert competitors[white]["cod"] == 1
+    assert competitors[black]["cod"] == -1
 
 
 def test_a_team_event_with_no_results_has_no_board_count_without_record_352():
@@ -140,14 +161,42 @@ def test_a_team_event_with_no_results_has_no_board_count_without_record_352():
     assert len(tournament["competitors"]) == 2
 
 
-def test_pairing_round_one_without_record_352_is_refused():
-    """Before round one there are no matches to count the boards from.
+@pytest.mark.parametrize("teams", [2, 3])
+def test_pairing_round_one_without_record_352_goes_ahead(teams):
+    lines = team_file().splitlines()
+    if teams == 3:
+        lines[1:4] = ["062 6", "072 6", "082 3"]
+        lines[10:10] = [
+            "001    5      Gamma Board1                     1800                             0.0    0",
+            "001    6      Gamma Board2                     1700                             0.0    0",
+        ]
+        lines.append("310   3 Gamma                                    1800    0.0    0.0   3     5    6")
+    tournament = read("\n".join(lines)).get_tournament(1)
+    before = deepcopy(tournament)
 
-    The pairing went ahead with teamSize 0, which gives a pairing-allocated bye no
-    game points. It is now refused and asks for record 352, here with two teams
-    and no bye to give.
-    """
+    engine = pairing_fideteam(tournament, 1, {"experimental": [], "verbose": 0})
+    pairs = [pair for bracket in engine.compute_pairing(False) for pair in bracket["pairs"]]
+
+    assert len(pairs) == (teams + 1) // 2
+    assert sum(pair["b"] == 0 for pair in pairs) == teams % 2
+    assert sorted(cid for pair in pairs for cid in [pair["w"], pair["b"]] if cid) == list(range(1, teams + 1))
+    assert tournament["scoreSystem"] == before["scoreSystem"]
+    for competitor, original in zip(tournament["competitors"], before["competitors"]):
+        assert {key: competitor[key] for key in original} == original
+    assert tournament["teamSize"] == 0
+    assert tournament["gameList"] == tournament["matchList"] == []
+
+
+def test_pairing_later_rounds_still_requires_a_board_count():
     tournament = read(team_file()).get_tournament(1)
+
+    with pytest.raises(gacruxexeptions.GacruxInputError, match="record 352"):
+        pairing_fideteam(tournament, 2, {"experimental": [], "verbose": 0})
+
+
+def test_pairing_round_one_still_rejects_a_negative_board_count():
+    tournament = read(team_file()).get_tournament(1)
+    tournament["teamSize"] = -1
 
     with pytest.raises(gacruxexeptions.GacruxInputError, match="record 352"):
         pairing_fideteam(tournament, 1, {"experimental": [], "verbose": 0})

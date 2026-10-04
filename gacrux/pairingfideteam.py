@@ -53,11 +53,10 @@ class pairing_fideteam(pairing):
 
     # constructor function
     def __init__(self, tournament, rnd, params):
-        # The game points of a pairing-allocated bye are a draw per board (art. 1.4), so
-        # the board count is needed. A TRF file gives it in record 352, or it is counted
-        # from the played matches; before round one only record 352 can say. JSON input
-        # gives it as teamSize.
-        if tournament.get("teamSize", 0) <= 0:
+        # Pairing round one does not award bye points. Later rounds need the board
+        # count to score any existing byes correctly.
+        teamsize = tournament.get("teamSize", 0)
+        if teamsize < 0 or (rnd > 1 and teamsize == 0):
             raise GacruxInputError(
                 "team board count is unknown; give it in record 352 (TRF) or teamSize"
                 + " (JSON) before pairing a team tournament"
