@@ -27,10 +27,9 @@ coincidence. That is the property most of these tests assert: the standing the r
 publishes for a 013 file is the standing a 310 file would have had to declare to agree
 with its own results.
 
-Which rounds count towards a standing is a separate question, and it is not settled
-here. ``team_score_totals()`` counts a match whose round the file has reached, plus a
-pairing-allocated bye in any round, and that is the rule these tests were written
-against -- not a rule they argue for.
+Which matches count is decided per match. A match counts when the game list has a game
+in its round, or when it sets two teams against each other. So a round decided entirely
+by forfeit is in the standing, and a bye announced for a round nobody has played is not.
 """
 import decimal
 
@@ -82,8 +81,9 @@ def two_teams(record, rounds, matchpoints, gamepoints, byeround=False):
     """The two-team, two-board event of the record 310 tests, in either team record.
 
     Round 1 is team 1 as the white team and team 1 wins it 1.5 - 0.5; round 2 is team 2
-    as the white team and team 1 wins it 1.5 - 0.5 again. A third round, with
-    `byeround`, is one in which both teams sat out and every player recorded it.
+    as the white team and team 1 wins it 1.5 - 0.5 again. A third round is a match
+    awarded to team 1 by forfeit under record 330, or with `byeround` a round in which
+    both teams sat out and every player recorded it.
 
     The totals are the standing after those rounds. Record 310 declares them and the
     reader checks them; record 013 cannot declare them and the reader now works them out.
@@ -99,6 +99,11 @@ def two_teams(record, rounds, matchpoints, gamepoints, byeround=False):
         # for a pairing-allocated bye, against no opponent.
         for game in games:
             game.append((0, "-", "U"))
+    elif rounds > 2:
+        # A forfeited match, board by board: team 1's players "+", team 2's "-", and
+        # nobody has an opponent, because the match was never set up.
+        for player, result in enumerate(["+", "+", "-", "-"]):
+            games[player].append((0, "-", result))
     points = [sum((decimal.Decimal(VALUE[game[2]]) for game in game), decimal.Decimal("0.0"))
               for game in games]
 
@@ -109,6 +114,33 @@ def two_teams(record, rounds, matchpoints, gamepoints, byeround=False):
     for startno, name in enumerate(["One", "Two", "Three", "Four"]):
         lines.append(player_line(startno + 1, name + ", Player", 2400 - 100 * startno,
                                  "%.1f" % points[startno], games[startno]))
+    if rounds > 2 and not byeround:
+        # Record 330: "+-" is the white team winning the forfeited match, in round 3,
+        # between teams 1 and 2.
+        lines.append("330 +-   3   1   2")
+    return lines
+
+
+def three_teams_with_an_announced_bye(record, matchpoints, gamepoints, byes):
+    """Three teams, two rounds played, and record 320 naming the bye of round three too.
+
+    One team sits out every round. Rounds 1 and 2 have been played; the third number of
+    record 320 is a bye written down for a round nobody has played yet.
+    """
+    team_line = TEAM_LINE[record]
+    lines = ["012 Announced bye", "042 2026-03-01", "XXR 3", "352 WB"]
+    lines.append(team_line(1, "Team One", [1, 2], matchpoints[0], gamepoints[0]))
+    lines.append(team_line(2, "Team Two", [3, 4], matchpoints[1], gamepoints[1]))
+    lines.append(team_line(3, "Team Three", [5, 6], matchpoints[2], gamepoints[2]))
+    # Round 1: team 1 beats team 2 by 1.5 - 0.5, team 3 sits out. Round 2: team 3 draws
+    # team 1 by 1 - 1, team 2 sits out. "U" is the TRF code for a pairing-allocated bye.
+    lines.append(player_line(1, "One, Player", 2400, "1.5", [(3, "w", "1"), (5, "b", "=")]))
+    lines.append(player_line(2, "Two, Player", 2300, "1.0", [(4, "b", "="), (6, "w", "=")]))
+    lines.append(player_line(3, "Three, Player", 2200, "1.0", [(1, "b", "0"), (0, "-", "U")]))
+    lines.append(player_line(4, "Four, Player", 2100, "1.5", [(2, "w", "="), (0, "-", "U")]))
+    lines.append(player_line(5, "Five, Player", 2000, "1.5", [(0, "-", "U"), (1, "w", "=")]))
+    lines.append(player_line(6, "Six, Player", 1900, "1.5", [(0, "-", "U"), (2, "b", "=")]))
+    lines.append("320  1.0  2.0 " + " ".join("%03d" % bye for bye in byes))
     return lines
 
 
@@ -154,6 +186,37 @@ def test_the_two_team_records_publish_the_same_standing():
 
     assert modern.get_status() == 0 and legacy.get_status() == 0
     assert standing(legacy) == standing(modern)
+
+
+def test_a_round_decided_entirely_by_forfeit_is_in_the_standing():
+    """Record 330 awards round 3 to team 1 with nobody at the board.
+
+    No game of round 3 was played against an opponent, so currentRound stays at 2, and
+    the round was left out: team 1 stood on 4.0 match points. A forfeit is worth what a
+    win is worth, so the standing is 6.0, for both team records.
+    """
+    modern = parse(two_teams("310", 3, ["6.0", "0.0"], ["5.0", "1.0"]))
+    legacy = parse(two_teams("013", 3, ["6.0", "0.0"], ["5.0", "1.0"]))
+
+    assert modern.get_status() == 0 and legacy.get_status() == 0
+    assert legacy.get_tournament(1)["currentRound"] == 2
+    assert standing(legacy) == {1: points("6.0", "5.0"), 2: points("0.0", "1.0")}
+    assert standing(legacy) == standing(modern)
+
+
+def test_a_bye_announced_for_an_unplayed_round_is_not_in_the_standing():
+    """Record 320's third number is team 1's bye in a round 3 no player has an entry for.
+
+    That match point belongs to a round that has not happened. It was counted, and team
+    1 stood on 4.0 where its win and its draw give 3.0.
+    """
+    legacy = parse(three_teams_with_an_announced_bye(
+        "013", ["3.0", "1.0", "2.0"], ["2.5", "2.5", "3.0"], [3, 2, 1]))
+
+    assert legacy.get_status() == 0
+    assert standing(legacy) == {1: points("3.0", "2.5"),
+                                2: points("1.0", "2.5"),
+                                3: points("2.0", "3.0")}
 
 
 def test_a_round_every_team_sat_out_is_in_the_standing():

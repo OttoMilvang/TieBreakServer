@@ -53,6 +53,14 @@ class pairing_fideteam(pairing):
 
     # constructor function
     def __init__(self, tournament, rnd, params):
+        # Pairing round one does not award bye points. Later rounds need the board
+        # count to score any existing byes correctly.
+        teamsize = tournament.get("teamSize", 0)
+        if teamsize < 0 or (rnd > 1 and teamsize == 0):
+            raise GacruxInputError(
+                "team board count is unknown; give it in record 352 (TRF) or teamSize"
+                + " (JSON) before pairing a team tournament"
+            )
         super().__init__(tournament, rnd, params)
         self.rules = self.FIDETEAM_RULES[0]
         pairingsystem = tournament.get("pairingSystem", [])

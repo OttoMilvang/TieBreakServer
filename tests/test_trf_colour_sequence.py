@@ -13,10 +13,13 @@ The record had no validation at all. An empty one reached seq[0] and faulted,
 arbitrary characters were accepted as boards, an individual tournament accepted
 it, and two of them silently left the last one standing.
 """
+from copy import deepcopy
+
 import pytest
 
 from gacrux import gacruxexeptions
 from gacrux import trf2json
+from gacrux.pairingfideteam import pairing_fideteam
 
 
 def team_file(*extra):
@@ -100,24 +103,140 @@ def test_record_352_wins_over_a_longer_roster():
     lines = team_file().split("\n")
     lines.insert(10, "001    5      Alpha Reserve                    1800                             0.0    0")
     lines[11] += "    5"
-    tournament = read("\n".join(lines + ["352 WBWB"])).get_tournament(1)
+    tournament = read("\n".join(lines + ["352 WB"])).get_tournament(1)
 
     assert len(tournament["competitors"][0]["cplayers"]) == 3
-    assert tournament["teamSize"] == 4
+    assert tournament["teamSize"] == 2
 
 
 def test_a_sequence_written_before_the_team_section_is_read_the_same_way():
-    """Where the record sits in the file does not decide whether it is accepted.
-
-    The reader parses the records in its own order, not the file's, and record 352
-    used to be read before either team-section record. The team-only check would then
-    have refused every team file that declares its teams with a record 310 and
-    nothing else, because nothing had yet said the tournament was a team event. The
-    record is parsed after both team-section forms instead.
-    """
+    """Physical record order does not change the parsed tournament."""
     lines = team_file().split("\n")
     first = read("\n".join(lines[:6] + ["352 WB"] + lines[6:])).get_tournament(1)
     last = read(team_file("352 WB")).get_tournament(1)
 
+    assert first == last
     assert first["teamSequence"] == last["teamSequence"] == "WB"
     assert first["teamSize"] == last["teamSize"] == 2
+
+
+@pytest.mark.parametrize("seq", ["BW", "BWWB", "B", "bwbw"])
+def test_record_352_may_lead_with_black(seq):
+    tournament = read(team_file("352 " + seq)).get_tournament(1)
+
+    assert tournament["teamSequence"] == seq.upper()
+    assert tournament["teamColor"] == "B"
+    assert tournament["teamSize"] == len(seq)
+
+
+@pytest.mark.parametrize("seq,white,black", [("BW", 1, 2), ("WB", 2, 1)])
+def test_the_board_sequence_determines_the_match_colours(seq, white, black):
+    lines = team_file("352 " + seq).splitlines()
+    games = [(3, "b"), (4, "w"), (1, "w"), (2, "b")]
+    for index, (opponent, colour) in enumerate(games, 6):
+        line = lines[index]
+        lines[index] = (line[:80] + " 0.5" + line[84:89]).ljust(91) + "%4d %s =" % (opponent, colour)
+    for index in [10, 11]:
+        line = lines[index]
+        lines[index] = line[:54] + "   1.0" + line[60:61] + "   1.0" + line[67:]
+    tournament = read("\n".join(lines)).get_tournament(1)
+
+    match = tournament["matchList"][0]
+    assert match["white"]["cid"] == white
+    assert match["black"]["cid"] == black
+    assert [(game["white"]["cid"], game["black"]["cid"]) for game in tournament["gameList"]] == [(3, 1), (2, 4)]
+    engine = pairing_fideteam(tournament, 2, {"experimental": [], "verbose": 0})
+    competitors, _ = engine.get_crosstable([], False, 0).init_engine(tournament, 2, 1, "w", "cid")
+    assert competitors[white]["csq"].strip() == "w"
+    assert competitors[black]["csq"].strip() == "b"
+    assert competitors[white]["cod"] == 1
+    assert competitors[black]["cod"] == -1
+
+
+def test_a_team_event_with_no_results_has_no_board_count_without_record_352():
+    """Record 310 lists a squad, reserves included, so it is not a board count."""
+    tournament = read(team_file()).get_tournament(1)
+
+    assert tournament["teamSize"] == 0
+    assert len(tournament["competitors"]) == 2
+
+
+@pytest.mark.parametrize("teams", [2, 3])
+def test_pairing_round_one_without_record_352_goes_ahead(teams):
+    lines = team_file().splitlines()
+    if teams == 3:
+        lines[1:4] = ["062 6", "072 6", "082 3"]
+        lines[10:10] = [
+            "001    5      Gamma Board1                     1800                             0.0    0",
+            "001    6      Gamma Board2                     1700                             0.0    0",
+        ]
+        lines.append("310   3 Gamma                                    1800    0.0    0.0   3     5    6")
+    tournament = read("\n".join(lines)).get_tournament(1)
+    before = deepcopy(tournament)
+
+    engine = pairing_fideteam(tournament, 1, {"experimental": [], "verbose": 0})
+    pairs = [pair for bracket in engine.compute_pairing(False) for pair in bracket["pairs"]]
+
+    assert len(pairs) == (teams + 1) // 2
+    assert sum(pair["b"] == 0 for pair in pairs) == teams % 2
+    assert sorted(cid for pair in pairs for cid in [pair["w"], pair["b"]] if cid) == list(range(1, teams + 1))
+    assert tournament["scoreSystem"] == before["scoreSystem"]
+    for competitor, original in zip(tournament["competitors"], before["competitors"]):
+        assert {key: competitor[key] for key in original} == original
+    assert tournament["teamSize"] == 0
+    assert tournament["gameList"] == tournament["matchList"] == []
+
+
+def test_pairing_later_rounds_still_requires_a_board_count():
+    tournament = read(team_file()).get_tournament(1)
+
+    with pytest.raises(gacruxexeptions.GacruxInputError, match="record 352"):
+        pairing_fideteam(tournament, 2, {"experimental": [], "verbose": 0})
+
+
+def test_pairing_round_one_still_rejects_a_negative_board_count():
+    tournament = read(team_file()).get_tournament(1)
+    tournament["teamSize"] = -1
+
+    with pytest.raises(gacruxexeptions.GacruxInputError, match="record 352"):
+        pairing_fideteam(tournament, 1, {"experimental": [], "verbose": 0})
+
+
+def test_pairing_round_one_with_record_352_goes_ahead():
+    tournament = read(team_file("352 WB")).get_tournament(1)
+
+    engine = pairing_fideteam(tournament, 1, {"experimental": [], "verbose": 0})
+    pairs = [pair for bracket in engine.compute_pairing(False) for pair in bracket["pairs"]]
+    assert len(pairs) == 1
+
+
+def test_a_team_event_with_matches_still_sizes_itself_from_them():
+    """With matches and no record 352, the board count comes from the matches.
+
+    The fixture is nine teams of two boards, seven rounds played, declared in
+    record 310 and with no record 352.
+    """
+    with open("tests/fixtures/fideteam_nocolor.trf", encoding="latin1") as handle:
+        tournament = read(handle.read()).get_tournament(1)
+
+    assert tournament["teamSize"] == 2
+    assert len(tournament["matchList"]) > 0
+
+
+@pytest.mark.parametrize("section", ["310", "013"])
+def test_board_count_is_available_before_reading_the_team_section(section):
+    class Reader(trf2json.trf2json):
+        def parse_trf_team(self, tournament, line):
+            assert tournament["teamTournament"] is True
+            assert tournament["teamSize"] == 2
+            assert tournament["teamSequence"] == "WB"
+            return super().parse_trf_team(tournament, line)
+
+    text = team_file("352 WB")
+    if section == "013":
+        text = "\n".join(line for line in text.splitlines() if not line.startswith("310"))
+        text += "\n013 " + "Alpha".ljust(32) + "    1    2"
+        text += "\n013 " + "Beta".ljust(32) + "    3    4"
+    reader = Reader()
+    reader.parse_file(text, 1)
+    assert reader.get_status() == 0
