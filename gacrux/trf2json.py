@@ -52,19 +52,19 @@ class trf2json(chessjson.chessjson):
             {"id": "162", "read": self.parse_trf_gamescore,     "write": self.output_trf_gamescore,     "desc": "Game score system"},
             {"id": "172", "read": self.parse_trf_natsupport,    "write": self.output_trf_noop,          "desc": "National support"},
             {"id": "182", "read": self.parse_trf_ttype,         "write": self.output_trf_noop,          "desc": "Pairing Controller Identifier"},
-            {"id": "192", "read": self.parse_trf_typetournament,"write": self.output_trf_noop,          "desc": "Encoded Type Of Tournament"},
+            {"id": "192", "read": self.parse_trf_typetournament,"write": self.output_trf_typetournament,"desc": "Encoded Type Of Tournament"},
             {"id": "202", "read": self.parse_tiebreaks202,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to break ties"},
             {"id": "212", "read": self.parse_tiebreaks212,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to define standings"},
             {"id": "222", "read": self.parse_trf_timecontrol,   "write": self.output_trf_noop,          "desc": "Encoded Time Control"},
+            # Record 352 is parsed before both team-section forms, so its team-only check
+            # does not depend on where the records happened to appear in the file.
+            {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
             {"id": "362", "read": self.parse_trf_matchscore,    "write": self.output_trf_noop,          "desc": "Scoring point system for teams"},
             {"id": "001", "read": self.parse_trf_player,        "write": self.output_trf_player,        "desc": "Player section"},
             {"id": "FID", "read": self.parse_trf_natrating,     "write": self.output_trf_noop,          "desc": "National Rating Support"},
             {"id": "310", "read": self.parse_trf_team,          "write": self.output_trf_noop,          "desc": "Team section"},
             {"id": "013", "read": self.parse_trf_team,          "write": self.output_trf_noop,          "desc": "Team section"},
-            # Record 352 is parsed after both team-section forms, so its team-only check
-            # does not depend on where the records happened to appear in the file.
-            {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
-            {"id": "250", "read": self.parse_trf_accelerated,   "write": self.output_trf_accelerated,  "desc": "Accelerated Round"},
+            {"id": "250", "read": self.parse_trf_accelerated,   "write": self.output_trf_accelerated,   "desc": "Accelerated Round"},
             {"id": "260", "read": self.parse_trf_prohibited,    "write": self.output_trf_prohibited,    "desc": "Prohibited pairings"},
             {"id": "240", "read": self.parse_trf_bye4,          "write": self.output_trf_noop,          "desc": "Bye section HPB and FPB"},
             {"id": "320", "read": self.parse_trf_pab,           "write": self.output_trf_noop,          "desc": "Bye section PAB"},
@@ -108,14 +108,15 @@ class trf2json(chessjson.chessjson):
         }
 
         self.code192 = {
+            "FIDE_DUTCH"                   : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
+            "FIDE_DUTCH_2026"              : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
             "FIDE_DUTCH_2017"              : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        },    
-            "FIDE_DUTCH_2025"              : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
             "FIDE_DUTCH"                   : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
             "FIDE_DUBOV"                   : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dobov"]        }, 
             "FIDE_BURSTEIN"                : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["burstein"]     }, 
-            "FIDE_DUTCH_2017_BAKU"         : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
-            "FIDE_DUTCH_2025_BAKU"         : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
             "FIDE_DUTCH_BAKU"              : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
+            "FIDE_DUTCH_2026_BAKU"         : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
+            "FIDE_DUTCH_2017_BAKU"         : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dutch"]        }, 
             "FIDE_DUBOV_BAKU"              : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["dobov"]        }, 
             "FIDE_BURSTEIN_BAKU"           : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["burstein"]     }, 
             "CUSTOM_SWISS"                 : {"format": "swiss",        "teamTournament": False, "pairingSystem": ["custom"]       }, 
@@ -933,6 +934,8 @@ class trf2json(chessjson.chessjson):
     def parse_trf_typetournament(self, tournament, line):
         trfvalue = line[4:].upper()
         self.parse_trf_info(tournament, "typeOfTournament", trfvalue)
+        if trfvalue in self.code192:
+            tournament["pairingSystem"] = self.code192[trfvalue]["pairingSystem"]
         rec = self.code192[trfvalue] if trfvalue in self.code192 else {}
         tournament.update(rec)
         if "_MP_GP" in trfvalue:
@@ -1025,7 +1028,7 @@ class trf2json(chessjson.chessjson):
         self.parse_tiebreaks(tournament, line, True)
 
     def parse_colorsequence(self, tournament, line):
-        if not tournament["teamTournament"]:
+        if not tournament["teamTournament"] and tournament["teamSize"] <=1:
             message = "Record 352 is only valid in a team tournament"
             self.put_status(401, message)
             raise GacruxInputError(message)
@@ -2055,7 +2058,7 @@ class trf2json(chessjson.chessjson):
 
     def output_trf_datetime(self, tournament, trfkey):
         keyword = "startDate" if trfkey == "042" else "endDate"
-        line = trfkey + " " + helpers.format_datetime(helpers.safe([tournament, self.chessjson["event"]], ["eventInfo", keyword], "")) + "\n"
+        line = trfkey + " " + helpers.format_datetime(helpers.safe([tournament, self.chessjson["event"]], ["eventInfo", keyword], ""), year="YYYY") + "\n"
         return line
         
     def output_trf_num_comp(self, tournament, trfkey):
@@ -2124,6 +2127,14 @@ class trf2json(chessjson.chessjson):
             self.scores.get_score(tournament, "game", "A"),
         )
         return line
+
+    def output_trf_typetournament(self, tournament, trfkey):
+        pairingSystem = tournament.get("pairingSystem", ["dutch"] if not tournament.get("teamTournament") else ["fideteam"]) 
+        for key, value in self.code192.items():
+            if set(pairingSystem) == set(value["pairingSystem"]):
+                line = "192 " + key + "\n"
+                return line
+        return "" # No match found       
 
 
     def output_trf_accelerated(self, tournament, trfkey):

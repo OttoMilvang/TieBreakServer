@@ -211,9 +211,10 @@ def format_name(profile):
     return name
 
 
-def format_datetime(datetime):
+def format_datetime(datetime, year="YY"):
+    start = 4 - len(year)
     if len(datetime) == 10 and datetime[4] == "-" and datetime[7] == "-":
-        return datetime[2:4] + "/" + datetime[5:7] + "/" + datetime[8:10]
+        return datetime[start:4] + "/" + datetime[5:7] + "/" + datetime[8:10]
     return datetime
 
 def ascii_name(name):

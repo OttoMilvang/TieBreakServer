@@ -1,3 +1,16 @@
+2026-10-03
+tournamentgenerator:
+Change date format on 042 and 052 to YYYY-MM-DD 
+Add 192 record on generated tournaments
+Tiebreak:
+Fix DE in swiss tournaments where a player has bote forfeited game + played game against same opponent
+FIC all EDE + BC + xx where BC had reversed standing 
+Set number of decimals in AOB according to number of rounds
+TRF:
+Change FIDE_DUTCH_2025 to FIDE_DUTCH_2026 and FIDE_DUTCH_2025_BAKU to FIDE_DUTCH_2026_BAKU. This is both read and write
+Move reading of 352 bfore 013 and 310 (as it was in ver 1.9.xx)
+Treat matches with forfeited win for both teams as played.
+
 2026-09-19
 Promote the test-branch to main
 Now the program is stored under the gacrax directory

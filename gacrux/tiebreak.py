@@ -726,6 +726,8 @@ class tiebreak:
             player["tbval"]["moreloops"] = True  # As long as True we have more to check
         # part 1, run recursive until no more are tied
         loopcount = 0
+        # print("Reciftied",  [s["cid"] for s in cmps.values()], "rounds", rounds)
+
         moretodo = compute_singlerun(tb, cmps, rounds, ro, loopcount)
 
         # part 2, Run loop until no more are tied
@@ -754,6 +756,7 @@ class tiebreak:
             moreloops = compute_singlerun(tb, cmps, rounds, [], loopcount)
             moretodo = moretodo or moreloops
             ro = sorted(ro, key=lambda p: (p["rank"], p["tbval"][prefix + name]["val"], p["cid"]))
+            # print([(s['rank'], s["tbval"][prefix + name]["val"], s["cid"]) for s in ro])
 
         # part 2, Reorder rank
         start = 0
@@ -787,7 +790,7 @@ class tiebreak:
         return self.compute_recursive_if_tied(tb, cmps, rounds, func)
 
     # -----------------
-    # Compute Basic Direct encounter
+    # Compute compute_singlerun_ext_direct_encounter
     #
     # The core in DE, EDE and also  EDEBT, EDEBB, EDET, EDEB, 
     # We compute the average score against all opponents on the same rank. 
@@ -803,125 +806,19 @@ class tiebreak:
     #   prefix - prefix for score, mpoints_, gpoints_ or points_ 
     # Output:
     #   changes - number of changes in rank, if 0 we have finished
+    #
+    # EDE - Primary Score - Secondary score
+    # EDEC - Primary Score - Secondary score - BC
+    # EDET - Primary Score - Secondary score - TBR
+    # EDEB - Primary Score - Secondary score - BBE
+    # EDEBT - Primary Score - Secondary score - BC -TBR
+    # EDEBB - Primary Score - Secondary score - BC - BBE
+    # Does work ...
 
-
-    def compute_basic_direct_encounter(self, tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix):
-        name = tb["name"].lower()
-        (_, _, _, prefix) = self.get_scoreinfo(tb, True)
-        # changes keep track of number of changes in rank, if 0 we have finished
-        changes = 0
-        rpos = loopcount - tb["ede"]["swap"]  # Report pos
-        postfix = "_" + scorename[0] if tb["name"][0:3] == "EDE" else "" # _g or _m for EDE, EDEBT, EDEBB, EDET, EDEB
-        currentrank = subro[0]["tbval"][prefix + name]["val"]  # All players in subro have same rank
-        metall = True  # Met all opponents on same range
-        metmax = len(subro) - 1  # Max number of opponents
-        # For all plyers in subro compute average score against all opponents on the same rank. 
-        # If not all opponents have met we compute the maximum possible score against all opponents on the same rank.
-        for player in range(0, len(subro)):
-            de = subro[player]["tbval"]
-            de["denum"] = 0  # number of opponens
-            de["deval"] = Decimal("0")  # sum score against of opponens
-            de["demax"] = Decimal("0")  # sum score against of opponens, unplayed = win
-            de["delist"] = {}  # list of results numgames, score, maxscore
-            for rnd, rst in subro[player]["rsts"].items():
-                if rnd <= rounds:
-                    opponent = rst["opponent"]
-                    if opponent > 0:
-                        played = True if tb["modifiers"].get("predetermined", False) else rst["played"]
-                        if played and cmps[opponent]["tbval"][prefix + name]["val"] == currentrank:
-                            # 6.1.2 compute average score
-                            if opponent in de["delist"]:
-                                score = de["delist"][opponent]["score"]
-                                num = de["delist"][opponent]["cnt"]
-                                sumscore = score * num
-                                de["deval"] -= score
-                                num += 1
-                                sumscore += rst[points]
-                                score = sumscore / num
-                                de["denum"] = 1
-                                de["deval"] += score
-                                de["delist"][opponent]["cnt"] = 1
-                                de["delist"][opponent]["score"] = score
-                            else:
-                                de["denum"] += 1
-                                de["deval"] += rst[points]
-                                de["delist"][opponent] = {"cnt": 1, "score": rst[points]}
-            # if not tb['modifiers']['predetermined'] and de['denum'] < metmax:
-            # if (not tb['modifiers']['predetermined'] and de['denum'] < metmax) or tb['modifiers']['swiss']:
-            if (not self.rr and de["denum"] < metmax) or tb["modifiers"].get("swiss", False):
-                metall = False
-                de["demax"] = de["deval"] + (metmax - de["denum"]) * scoretype["W"] * (self.teamsize if points == "gpoints" else 1)
-            else:
-                de["demax"] = de["deval"]
-            # print("Player", subro[player]["cid"], "denum", de["denum"], "deval", de["deval"], "demax", de["demax"])
-        
-        # 6.2 If all players have met we compute the average score against all opponents on the same rank.
-        if metall:  # 6.2 All players have met
-            # print("T")
-            subro = sorted(subro, key=lambda p: (-p["tbval"]["deval"], p["cid"]))
-            crank = rank = subro[0]["tbval"][prefix + name]["val"] 
-            # This is still currentrank, but we will change it if we find a different score
-            val = subro[0]["tbval"]["deval"]
-            sprefix = "\t" if rpos in subro[0]["tbval"][prefix + name] else ""
-            self.addtbval(subro[0]["tbval"][prefix + name], rpos, sprefix + str(val) + postfix)
-            for i in range(1, len(subro)):
-                rank += 1
-                de = subro[i]["tbval"]
-                if val != de["deval"]:
-                    crank = de[prefix + name]["val"] = rank
-                    val = de["deval"]
-                    changes += 1
-                else:
-                    de[prefix + name]["val"] = crank
-                sprefix = "\t" if rpos in de[prefix + name] else ""
-                self.addtbval(de[prefix + name], rpos, sprefix + str(val) + postfix)
-        else:  # 6.2 swiss tournament. Not all players have met. We compute the maximum possible score against all opponents on the same rank.
-            # print("F")
-            subro = sorted(subro, key=lambda p: (-p["tbval"]["deval"], -p["tbval"]["demax"], p["cid"]))
-            crank = rank = subro[0]["tbval"][prefix + name]["val"]
-            # This is still currentrank, but we will change it if we find a different score
-            val = subro[0]["tbval"]["deval"]
-            maxval = subro[0]["tbval"]["demax"]
-            sprefix = "\t" if rpos in subro[0]["tbval"][prefix + name] else ""
-            self.addtbval(subro[0]["tbval"][prefix + name], rpos, sprefix + str(val) + "/" + str(maxval) + postfix)
-            unique = True
-            # continue as long as we have unique maximum score, 
-            # if not we will assign the same rank to all players with the same maximum score
-            for i in range(1, len(subro)):
-                rank += 1
-                tbmax = max(subro[i:], key=lambda tbval: tbval["tbval"]["demax"])
-                de = subro[i]["tbval"]
-                if unique and val > tbmax["tbval"]["demax"]:
-                    crank = de[prefix + name]["val"] = rank
-                    val = de["deval"]
-                    maxval = de["demax"]
-                    changes += 1
-                else:
-                    val = de["deval"]
-                    maxval = de["demax"]
-                    de[prefix + name]["val"] = crank
-                    unique = False
-                sprefix = "\t" if rpos in de[prefix + name] else ""
-                self.addtbval(de[prefix + name], rpos, sprefix + str(val) + "/" + str(maxval) + postfix)
-                # self.addtbval(de[prefix + name], rpos,  str(val) + '/' + str(maxval) + postfix)
-        return changes
-
-
-    """
-    EDE - Primary Score - Secondary score
-    EDEC - Primary Score - Secondary score - BC
-    EDET - Primary Score - Secondary score - TBR
-    EDEB - Primary Score - Secondary score - BBE
-    EDEBT - Primary Score - Secondary score - BC -TBR
-    EDEBB - Primary Score - Secondary score - BC - BBE
-    Does work ...
-
-    """
 
     def compute_singlerun_ext_direct_encounter(self, tb, cmps, rounds, subro, loopcount):
         (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, True)
         # name = tb["name"].lower()
-        # print("compute_singlerun_ext_direct_encounter", loopcount, points, scoretype, prefix, subro[0]['rank'] if len(subro) > 0 else 0, len(subro))
         # The loops is controlled by:
         # tb["ede"]["loopcount"] = The current loopcount, for example 0 = initial run, 1 = first run, etc
         # tb["ede"]["functions"] - The functions to run in order, for example "PSCT" (primary, secondary, count, topboard)
@@ -930,6 +827,7 @@ class tiebreak:
         # tb["ede"]["num"] - Number of times a function has been run, used for BC, TBR and BBE.
         # tb["ede"]["changes"] - The number of changes in the current function,
 
+        # print("Singlerun_Ext", loopcount, [s["cid"] for s in subro])
         changes = 0  # Changes for this subrange
         # Initialize functions to run in loopcount 0, for example EDEBT = "PSCT" (primary, secondary, count, topboard)
         if loopcount == 0:
@@ -978,7 +876,7 @@ class tiebreak:
         #breakpoint()
         if func == "P" or func == "S":
             (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, func == "P")
-            changes += self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
+            changes += self.compute_basic_direct_encounter(tb, func, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix)
         elif func == "C" or func == "T" or func == "B":
             if len(subro) == 2:  # 13.3.2,  If exactly two teams are still tied in both MP and GP
                 (scorename, points, scoretype, prefix) = self.get_scoreinfo(tb, False)
@@ -999,12 +897,124 @@ class tiebreak:
                             tscore += weights[game["board"]-1] * game["points"]
                         rst["tpoints"] = tscore
                 # breakpoint()
-                self.compute_basic_direct_encounter(tb, cmps, rounds, subro, loopcount, "tpoints", scorename, scoretype, prefix)
+                self.compute_basic_direct_encounter(tb, func, cmps, rounds, subro, loopcount, "tpoints", scorename, scoretype, prefix)
 
         
         tb["ede"]["changes"] += changes
         # print("EDE", loopcount, func, changes, tb["ede"]["edechanges"], tb["ede"]["swap"], tb["ede"]["changes"]  )
         return changes and loopcount < 30
+
+
+    # -----------------
+    # Compute Basic Direct encounter
+    #
+
+    def compute_basic_direct_encounter(self, tb, func, cmps, rounds, subro, loopcount, points, scorename, scoretype, prefix):
+        name = tb["name"].lower()
+        (_, _, _, prefix) = self.get_scoreinfo(tb, True)
+        # changes keep track of number of changes in rank, if 0 we have finished
+        changes = 0
+        sign = 1 if func == "B" else -1 # sort B in EDEB, EDEBT, EDEBB, EDET, EDEB in ascending order,
+        # print("Basic", func, sign, loopcount, [s["cid"] for s in subro])
+        rpos = loopcount - tb["ede"]["swap"]  # Report pos
+        postfix = "_" + scorename[0] if tb["name"][0:3] == "EDE" else "" # _g or _m for EDE, EDEBT, EDEBB, EDET, EDEB
+        currentrank = subro[0]["tbval"][prefix + name]["val"]  # All players in subro have same rank
+        metall = True  # Met all opponents on same range
+        metmax = len(subro) - 1  # Max number of opponents
+        # print("Compute Basic Direct encounter", postfix, loopcount, [s["cid"] for s in subro], currentrank, metmax)
+        # For all plyers in subro compute average score against all opponents on the same rank. 
+        # If not all opponents have met we compute the maximum possible score against all opponents on the same rank.
+        for player in range(0, len(subro)):
+            de = subro[player]["tbval"]
+            de["denum"] = 0  # number of unique opponens
+            de["deval"] = Decimal("0")  # sum score against of opponens
+            de["demax"] = Decimal("0")  # sum score against of opponens, unplayed = win
+            de["delist"] = {}  # list of results numgames, score, maxscore
+            for rnd, rst in subro[player]["rsts"].items():
+                if rnd <= rounds:
+                    opponent = rst["opponent"]
+                    if opponent > 0:
+                        played = True if tb["modifiers"].get("predetermined", False) else rst["played"]
+                        if played and cmps[opponent]["tbval"][prefix + name]["val"] == currentrank:
+                            # 6.1.2 compute average score
+                            if opponent in de["delist"]:
+                                score = de["delist"][opponent]["score"]
+                                num = de["delist"][opponent]["cnt"]
+                                sumscore = score * num
+                                de["deval"] -= score
+                                num += 1
+                                sumscore += rst[points]
+                                score = sumscore / num
+                                #de["denum"] = 1
+                                de["deval"] += score
+                                de["delist"][opponent]["cnt"] += 1
+                                de["delist"][opponent]["score"] = score
+                            else:
+                                de["denum"] += 1
+                                de["deval"] += rst[points]
+                                de["delist"][opponent] = {"cnt": 1, "score": rst[points]}
+            # if not tb['modifiers']['predetermined'] and de['denum'] < metmax:
+            # if (not tb['modifiers']['predetermined'] and de['denum'] < metmax) or tb['modifiers']['swiss']:
+             
+            if (not self.rr and de["denum"] < metmax) or tb["modifiers"].get("swiss", False):
+                metall = False
+                de["demax"] = de["deval"] + (metmax - de["denum"]) * scoretype["W"] * (self.teamsize if points == "gpoints" else 1)
+            else:
+                de["demax"] = de["deval"]
+            # print("Player", metall, metmax, subro[player]["cid"], "denum", de["denum"], "deval", de["deval"], "demax", de["demax"])
+        
+        # 6.2 If all players have met we compute the average score against all opponents on the same rank.
+        if metall:  # 6.2 All players have met
+            # print("T")
+            subro = sorted(subro, key=lambda p: (sign * p["tbval"]["deval"], p["cid"]))
+            crank = rank = subro[0]["tbval"][prefix + name]["val"] 
+            # This is still currentrank, but we will change it if we find a different score
+            val = subro[0]["tbval"]["deval"]
+            sprefix = "\t" if rpos in subro[0]["tbval"][prefix + name] else ""
+            self.addtbval(subro[0]["tbval"][prefix + name], rpos, sprefix + str(val) + postfix)
+            for i in range(1, len(subro)):
+                rank += 1
+                de = subro[i]["tbval"]
+                if val != de["deval"]:
+                    crank = de[prefix + name]["val"] = rank
+                    val = de["deval"]
+                    changes += 1
+                else:
+                    de[prefix + name]["val"] = crank
+                sprefix = "\t" if rpos in de[prefix + name] else ""
+                self.addtbval(de[prefix + name], rpos, sprefix + str(val) + postfix)
+        else:  # 6.2 swiss tournament. Not all players have met. We compute the maximum possible score against all opponents on the same rank.
+            # print("F")
+            subro = sorted(subro, key=lambda p: (sign * p["tbval"]["deval"], -p["tbval"]["demax"], p["cid"]))
+            crank = rank = subro[0]["tbval"][prefix + name]["val"]
+            # This is still currentrank, but we will change it if we find a different score
+            val = subro[0]["tbval"]["deval"]
+            maxval = subro[0]["tbval"]["demax"]
+            sprefix = "\t" if rpos in subro[0]["tbval"][prefix + name] else ""
+            self.addtbval(subro[0]["tbval"][prefix + name], rpos, sprefix + str(val) + "/" + str(maxval) + postfix)
+            unique = True
+            # continue as long as we have unique maximum score, 
+            # if not we will assign the same rank to all players with the same maximum score
+            for i in range(1, len(subro)):
+                rank += 1
+                tbmax = max(subro[i:], key=lambda tbval: tbval["tbval"]["demax"])
+                de = subro[i]["tbval"]
+                if unique and val > tbmax["tbval"]["demax"]:
+                    crank = de[prefix + name]["val"] = rank
+                    val = de["deval"]
+                    maxval = de["demax"]
+                    changes += 1
+                else:
+                    val = de["deval"]
+                    maxval = de["demax"]
+                    de[prefix + name]["val"] = crank
+                    unique = False
+                sprefix = "\t" if rpos in de[prefix + name] else ""
+                self.addtbval(de[prefix + name], rpos, sprefix + str(val) + "/" + str(maxval) + postfix)
+                # self.addtbval(de[prefix + name], rpos,  str(val) + '/' + str(maxval) + postfix)
+            # print(unique)
+        return changes
+
 
 
     def compute_progressive_score(self, tb, cmps, rounds):
@@ -1709,8 +1719,16 @@ class tiebreak:
     # Average
     
     def compute_average_of_buchholz(self, tb, cmps, rounds):
+        if rounds < 9:
+            norm = "0.01"  # 2 decimals holds for 8 rounds
+        elif rounds < 27:
+            norm = "0.001"  # 3 decimals holds for 26 rounds    
+        elif rounds < 73:
+            norm = "0.0001"  # 4 decimals holds for 73 rounds    
+        else:
+            norm = "0.00001"  # 5 decimals holds for dont know how many rounds       
         tbname = self.compute_buchholz_sonneborn_berger(tb, cmps, rounds)
-        tbname = self.compute_average(tb, "bh", cmps, rounds, False, "0.01")  # 0.01 => two decimals
+        tbname = self.compute_average(tb, "bh", cmps, rounds, False, norm)  # 0.001 => 3 decimals holds for 26 rounds
         return tbname
 
     def compute_average_rating_performance(self, tb, cmps, rounds):

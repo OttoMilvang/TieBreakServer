@@ -34,6 +34,7 @@ class games2matches():
         self.byelist = options.get("byelist", [])
         self.forfeitedlist = options.get("forfeitedlist", [])
         self.ooolist = options.get("ooolist", [])
+        self.zero = Decimal("0.0")
 
 
     def merge_matches(self):
@@ -282,7 +283,7 @@ class games2matches():
                         } 
             else:
                 tmatch["games"] = []
-        
+
     # Sort tmatches
     #   For each tmatch sort games on scheduled game and then order in team
 
@@ -450,7 +451,7 @@ class games2matches():
             (rnd, teama, teamb) = key.split("-")
             arg = int(teama)
             games = [cgames[game] for game in tmatch["games"] if game in cgames]
-            points = {"white": Decimal("0.0"), "black": Decimal("0.0")}
+            points = {"white": self.zero, "black": self.zero}
             if len(games) > 0:
                 whitecid = self.parent.get_result_cid(tmatch, "white")
                 blackcid = self.parent.get_result_cid(tmatch, "black")
@@ -469,7 +470,8 @@ class games2matches():
                     played = played or cgame["played"]
                     points[wcol] += scores.get_score(self.tournament, "game", self.parent.get_result_res(cgame, "white"))
                     points[bcol] += scores.get_score(self.tournament, "game", self.parent.get_result_res(cgame, "black"))
-                tmatch["played"] = played
+                # if both team have points we consider the match played     
+                tmatch["played"] = played or (points[wcol] > self.zero and points[bcol] > self.zero)
             if self.parent.get_result_cid(tmatch, "black") > 0:
                 loss = "L" if played else "Z"
                 if points["white"] > points["black"]:
@@ -478,7 +480,7 @@ class games2matches():
                 elif points["white"] < points["black"]:
                     tmatch["white"].update({"result": loss})
                     tmatch["black"].update({"result": "W"})
-                elif points["white"] > Decimal("0.0") and points["black"] > Decimal("0.0"):
+                elif points["white"] > self.zero and points["black"] > self.zero:
                     tmatch["white"].update({"result": "D"})
                     tmatch["black"].update({"result": "D"})
                 else:
