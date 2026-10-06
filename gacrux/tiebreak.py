@@ -919,7 +919,7 @@ class tiebreak:
         (_, _, _, prefix) = self.get_scoreinfo(tb, True)
         # changes keep track of number of changes in rank, if 0 we have finished
         changes = 0
-        sign = 1 if func == "B" else -1 # sort B in EDEB, EDEBT, EDEBB, EDET, EDEB in ascending order,
+        sign = -1  # Board Count is already negated; all other scores prefer larger values.
         # print("Basic", func, sign, loopcount, [s["cid"] for s in subro])
         rpos = loopcount - tb["ede"]["swap"]  # Report pos
         postfix = "_" + scorename[0] if tb["name"][0:3] == "EDE" else "" # _g or _m for EDE, EDEBT, EDEBB, EDET, EDEB
