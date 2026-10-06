@@ -336,7 +336,7 @@ class chessjson:
 
 
     def get_score(self, slist, result, color):
-        res = self.recorded_result(result, color, default="Z")
+        res = self.recorded_result(result, color, default=None)
         if res is None:
             # print("get_score" ,  slist, result, color, "Null")
             return Decimal("0.0")
@@ -350,7 +350,7 @@ class chessjson:
     def is_vur(self, result, color):  #
         if result["played"]:
             return False
-        res = self.recorded_result(result, color, default="Z")
+        res = self.recorded_result(result, color, default=None)
         if res is None:
             return True
         # if res == 'W' and result['black'] > 0:  // Full point bye is not vur
@@ -457,5 +457,5 @@ class chessjson:
         res = self.get_result_res(result, color, default)
         other = "black" if color == "white" else "white"
         if res is None and self.get_result_cid(result, "black") > 0 and other in result:
-            return self.reverse.get(self.get_result_res(result, other))
+            return self.reverse.get(self.get_result_res(result, other, default=None))
         return res

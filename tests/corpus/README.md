@@ -147,3 +147,11 @@ PYTHONPATH=tests/corpus python3 -c 'import _harness; print(len(_harness.load_kno
 
 Regeneration refuses unclassified failures by default. Review and classify every
 new disagreement rather than treating regeneration as an automatic re-baseline.
+
+The fixtures follow the same rule. `corpus.jsonl.gz` is the common snapshot and
+is not rewritten by a feature: a compressed file cannot be merged, so two
+features that each edit it conflict whichever lands second. A feature that must
+change fixtures instead ships the complete replacement records in its own
+`fixture_overlays/<feature>.jsonl.gz`, in the snapshot's format. Each record
+replaces the snapshot record of the same name; overlays apply in filename
+order, so where two replace the same fixture the later one wins.
