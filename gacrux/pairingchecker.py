@@ -496,7 +496,7 @@ class pairingchecker(commonmain):
             oplayers = set()
             for pair in affected:
                 oplayers.add(cid(pair, "white"))
-                oplayers.add(cid(pair, "black")) 
+                oplayers.add(cid(pair, "black"))
             if players != oplayers:
                 errtxt = "Illegal exchange format: " + str(players) + " != " + str(oplayers)
                 raise
