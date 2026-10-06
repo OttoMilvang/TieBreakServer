@@ -64,10 +64,15 @@ NOPAB = ["pab", "+", "F"]
 class crosstable_fideteam(crosstable):
 
     # constructor function
-    def __init__(self, experimental, checkonly, verbose, typeb=False, usecolor=True):
+    def __init__(self, experimental, checkonly, verbose, typeb=False, usecolor=True,
+                 lasttworounds=False):
         super().__init__(experimental, checkonly, verbose)
         self.typeb = typeb
         self.usecolor = usecolor
+        # art. 2.3.4 [C7] and art. 2.3.7 [C10] - "with the exception of the last two
+        # rounds". Decided once by pairing_fideteam and not recomputed here, so the
+        # diagnostic and the pairing cannot disagree about which rounds they apply to.
+        self.lasttworounds = lasttworounds
         self.maxpsd = 0
         self.pablevel = -1
 
@@ -84,6 +89,37 @@ class crosstable_fideteam(crosstable):
 
     def maxquality(self):
         return qdefs.IW.value
+
+    """
+    assign_tpn - art. 1.1, the tournament pairing number
+
+    art. 1.1.1 - "each team must have a different TPN, from 1 to the number of teams".
+    art. 1.1.2 - "the rules of the team competition shall describe how to assign a TPN to
+    each team. Otherwise, it is a decision of the Chief Arbiter", with the note that this
+    "overrides Articles 2.1 to 2.3 of the General Handling Rules for Swiss Tournaments".
+    art. 1.1.3 - "once defined, the TPN should not be modified (except as stated in
+    Articles 2.4 and 2.5 of the General Handling Rules for Swiss Tournaments), unless the
+    Chief Arbiter decides otherwise".
+
+    So C.04.6 does not derive the number from the standings: it is assigned once, outside
+    these rules, and then held. What states that assignment here is the fixed order the
+    engine is given - the declared start numbers, or the original ranking when the caller
+    selects that - and neither changes from round to round. Each team therefore keeps its
+    place in that order, rather than taking the running count over the teams ready to be
+    paired that the base class keeps for the individual systems: a team that is absent must
+    keep its own number and must not hand it down to the team behind it. Seven articles
+    read the number back - 3.4.4, 3.5.3, 3.5.4, 3.6.1, 3.6.2, 4.2.3 and 4.3.1 - and 4.3.1
+    reads its parity, so one absent team would otherwise reverse the colours of every team
+    below it.
+
+    In a field where every team is present the two numberings are the same value, which is
+    why only an absence ever tells them apart.
+    """
+
+    def assign_tpn(self, competitors, size):
+        rr = sorted(competitors, key=lambda s: (s[self.rank]))
+        for i in range(1, size):
+            rr[i]["tpn"] = i
 
     """
     color_preference - art. 1.7
@@ -164,13 +200,18 @@ class crosstable_fideteam(crosstable):
     """
     update_edge - the quality criteria of art. 2.3 that a single pair can carry
 
-    [C4] and [C5] (art. 2.3.1 and 2.3.2) are decided when the set of upfloaters is
-    chosen (art. 3.5), and [C6] (art. 2.3.3) is a property of that set as well, not of a
-    pair. They are computed here all the same, so that the quality vector of a bracket -
-    which pairingchecker prints and compares - reports them.
+    [C4] and [C5] (art. 2.3.1 and 2.3.2) are decided when the set of upfloaters is chosen
+    (art. 3.5), but they can be read off a pair all the same - the upfloaters a pair holds
+    and the score difference between its teams - and are computed here, so that the
+    quality vector of a bracket, which pairingchecker prints and compares, reports them.
+
+    [C6] (art. 2.3.3) cannot: it is a property of the whole set of upfloaters and of the
+    scoregroup the bracket leaves behind, so no pair carries any of it. It stays zero here
+    and pairing_fideteam.pair_bracket writes the bracket's value over it.
 
     In a bracket, a team of the top-scoregroup is a resident and every other team is an
-    upfloater (art. 1.3.2), so "b is an upfloater" is "b has a lower score level than a".
+    upfloater (art. 1.3.2), so a team is an upfloater when its score level is below the
+    score level of the bracket.
     """
 
     def update_edge(self, edge):
@@ -193,17 +234,37 @@ class crosstable_fideteam(crosstable):
         b = self.competitors[c["cb"]]
         if a["scorelevel"] < b["scorelevel"]:
             (a, b) = (b, a)
-        psd = a["scorelevel"] - b["scorelevel"]
-        lasttworounds = self.rnd > self.numrounds - 2
-        if psd > 0:
-            # b is an upfloater, and art. 1.5 makes both teams of this pair floaters.
-            q[QC4] = 1                                  # [C4] art. 2.3.1
-            q[QC5][maxpsd - psd] = 1                    # [C5] art. 2.3.2
-            if not lasttworounds:
-                # [C7] art. 2.3.4 - an upfloater that was a floater in the previous round
-                q[QC7] = 1 if b["flt"] else 0
-                # [C10] art. 2.3.7 - an upfloater's opponent that was one
-                q[QC10] = 1 if a["flt"] else 0
+        # [C4] art. 2.3.1 - "minimise the number of upfloaters". The criterion counts
+        # teams, so a pair is worth the number of ITS teams that are upfloaters: none, one
+        # or two. A team of the bracket is an upfloater when its score is below the score
+        # of the bracket (art. 1.3.2) - which is not the same test as "lower than the
+        # other team of the pair", and differs from it in a pair of two upfloaters.
+        q[QC4] = len([team for team in (a, b) if team["scorelevel"] < self.scorelevel])
+        # [C5] art. 2.3.2 reads the score of every upfloater, not the score difference
+        # between the two teams of the pair. Those are the same only when the pair holds
+        # one upfloater and one resident. Count from the bracket's score level so a pair
+        # of two upfloaters reports both members at their respective distances.
+        for team in (a, b):
+            if team["scorelevel"] < self.scorelevel:
+                psd = self.scorelevel - team["scorelevel"]
+                q[QC5][maxpsd - psd] += 1
+        if not self.lasttworounds:
+            # A pair can contain two upfloaters: an upfloater is a team below the score
+            # level of the bracket, not merely the lower-scoring team of this pair.
+            # [C7] art. 2.3.4 counts every upfloater that was a floater in the previous
+            # round. [C10] art. 2.3.7 counts the opponent of every such upfloater when
+            # that opponent was a floater. In a pair of two upfloaters, each team is the
+            # other's opponent and either or both can contribute to both criteria.
+            q[QC7] = sum(
+                bool(team["flt"])
+                for team in (a, b)
+                if team["scorelevel"] < self.scorelevel
+            )
+            q[QC10] = sum(
+                bool(opponent["flt"])
+                for team, opponent in ((a, b), (b, a))
+                if team["scorelevel"] < self.scorelevel
+            )
         # [C8] art. 2.3.5 - a pair of teams that want the same colour leaves one of them
         # unfulfilled, whatever the colour allocation of art. 4 does with it.
         (acop, bcop) = (a["cop"], b["cop"])
@@ -232,7 +293,12 @@ class crosstable_fideteam(crosstable):
         the bottom members of the identifier                          (art. 3.6.2)
 
     bsn is the position of a team in the bracket, the teams taken in TPN order. The team
-    with the smaller bsn in a pair is the top member of the pair (art. 3.6.1).
+    with the smaller bsn in a pair is the top member of the pair (art. 3.6.1). The map is
+    built here, out of the TPNs of the teams that were handed in, rather than read off the
+    order they arrive in: the callers order a bracket by score first (get_edges needs
+    that), and residents therefore precede upfloaters whatever their TPNs are, which is
+    not the order art. 3.6 reads a bracket in. Deriving bsn here leaves the two ends
+    nothing to disagree about.
 
     The identifier holds all the top members before the first bottom member, so a pairing
     that makes a low-TPN team a bottom member is worse than any pairing that does not,
@@ -245,7 +311,11 @@ class crosstable_fideteam(crosstable):
     """
 
     def update_bracket(self, scorelevel, nodes, edges):
-        self.bsn = bsn = {node["cid"]: i + 1 for i, node in enumerate(nodes)}
+        # art. 3.6.1 - the teams of the bracket, taken in TPN order
+        self.bsn = bsn = {
+            node["cid"]: i + 1
+            for i, node in enumerate(sorted(nodes, key=lambda node: node["tpn"]))
+        }
         self.B = B = len(nodes)
         base = B + 1
         self.weight = weight = {qd.name: 0 for qd in qdefs}
