@@ -228,6 +228,8 @@ class pairing_fideteam(pairing):
                 return (bracket, pablevel, mod_nodes, mod_edges)
         # art. 3.3.3 - if it is impossible to complete a round-pairing, the Chief Arbiter
         # shall decide what to do.
+        if self.checkonly:
+            return (None, -1, nodes, edges)
         raise GacruxNoLegalPairing(
             "no team can be given the pairing-allocated-bye and leave a legal pairing for"
             + " all the other teams (see C.04.6 art. 3.3.3 and art. 3.4.1)"

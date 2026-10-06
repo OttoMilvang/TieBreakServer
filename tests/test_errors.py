@@ -88,3 +88,55 @@ def test_a_pairable_round_still_pairs():
         for pair in bracket.get("pairs", []):
             pairs.append((pair["w"], pair["b"]))
     assert sorted([sorted(pair) for pair in pairs]) == [[1, 4], [2, 3]]
+
+
+def three_leaders_who_have_met_every_lower_player():
+    # Eight players, five rounds. Players 1, 2 and 3 have each beaten all of 4 to 8, so in
+    # round six they can only meet each other -- three players, one pair, one over -- and
+    # the even field allows no pairing-allocated bye (C.04.3 art. 1.9.1). The lower five
+    # have edges among themselves, so the top of the field is not edgeless: the engine
+    # gets past its first exit and has to recognise this state in the Hamilton remainder.
+    lines = ["012 Three leaders who have met every lower player", "042 2026-03-01", "XXR 7"]
+    lines.append(player_line(1, "One, Player", 2390, "5.0",
+                             [(4, "b", "1"), (5, "w", "1"), (6, "b", "1"), (7, "w", "1"), (8, "b", "1")]))
+    lines.append(player_line(2, "Two, Player", 2380, "5.0",
+                             [(5, "w", "1"), (6, "b", "1"), (7, "w", "1"), (8, "b", "1"), (4, "w", "1")]))
+    lines.append(player_line(3, "Three, Player", 2370, "5.0",
+                             [(6, "b", "1"), (7, "w", "1"), (8, "b", "1"), (4, "w", "1"), (5, "b", "1")]))
+    lines.append(player_line(4, "Four, Player", 2360, "1.0",
+                             [(1, "w", "0"), (8, "b", "="), (5, "w", "="), (3, "b", "0"), (2, "b", "0")]))
+    lines.append(player_line(5, "Five, Player", 2350, "1.0",
+                             [(2, "b", "0"), (1, "b", "0"), (4, "b", "="), (6, "b", "="), (3, "w", "0")]))
+    lines.append(player_line(6, "Six, Player", 2340, "1.0",
+                             [(3, "w", "0"), (2, "w", "0"), (1, "w", "0"), (5, "w", "="), (7, "w", "=")]))
+    lines.append(player_line(7, "Seven, Player", 2330, "1.0",
+                             [(8, "w", "="), (3, "b", "0"), (2, "b", "0"), (1, "b", "0"), (6, "b", "=")]))
+    lines.append(player_line(8, "Eight, Player", 2320, "1.0",
+                             [(7, "b", "="), (4, "w", "="), (3, "w", "0"), (2, "w", "0"), (1, "w", "0")]))
+    return lines
+
+
+def test_art_1_9_3_a_top_bracket_that_cannot_be_completed_raises_before_find_pab():
+    """The third exit of compute_pairing: a Hamilton remainder the top bracket cannot close.
+
+    compute_pairing recognises an incompletable round (C.04.3 art. 1.9.3) in three places.
+    The first two -- no edge at all at the top, and a last bracket that will not pair --
+    raise GacruxNoLegalPairing. The third, a top-level remainder whose maximum matching
+    leaves players over, returned an empty round-pairing, which no caller could tell from
+    a round with nothing to pair.
+
+    The second assertion documents that this fixture reaches that third exit and not one
+    of the other two: the top level of the Hamilton table records players left unpaired.
+    """
+    chessfile = trf2json.trf2json()
+    chessfile.parse_file("\n".join(three_leaders_who_have_met_every_lower_player()), True)
+    tournament = chessfile.get_tournament(1)
+    params = {"experimental": [], "verbose": 0, "rank": False, "top_color": "w"}
+    engine = pairing_dutch(tournament, 6, params)
+
+    with pytest.raises(gacruxexeptions.GacruxNoLegalPairing) as excinfo:
+        engine.compute_pairing(False, 0)
+
+    assert engine.hamilton[-1]["rem_unpaired"] != 0
+    assert "1.9.3" in str(excinfo.value)
+    assert "2 competitors" in str(excinfo.value)

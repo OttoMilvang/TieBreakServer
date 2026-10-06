@@ -228,9 +228,8 @@ class crosstable:
         cb = b["cid"]
         if self.checkonly:
             hb = b.get("hst", {}).get("val", "")
-            if hb == "":
-                hb = "0w"
-            canmeet = hb != "" and int(hb[0:-1]) == a["cid"]
+            # RFP may be Y for a future round, which declares no opponent.
+            canmeet = hb[:-1].isdigit() and int(hb[:-1]) == a["cid"]
         else:    
            canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
         return canmeet
