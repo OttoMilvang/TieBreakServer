@@ -1201,9 +1201,9 @@ class tiebreak:
                             if opponent > 0:  # 16.4.1
                                 score = min(score, cmps[opponent]["tbval"][oprefix + "abh"]["val"])
                             else:             # 16.4.2
-                                # "number of rounds in the tournament": the scheduled
-                                # rounds, also in standings after an earlier round
-                                score = min(score, opointsfordraw * self.rounds)
+                                # "number of rounds in the tournament": 
+                                # for intermediate rounds, the number of rounds played so far, for the last round, the total number of rounds in the tournament
+                                score = min(score, opointsfordraw * rounds)
                     else:
                         score = Decimal("0")
                     if tb["modifiers"].get("urd", False) and not self.rr:
