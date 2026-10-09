@@ -181,8 +181,15 @@ class pairing:
 
         t0 = time.time()
         self.hamilton = self.compute_hamilton(nodes, edges)
-        if self.hamilton[levels - 1].get("rem_unpaired", 0) != 0:
-            return []
+        unpaired = self.hamilton[levels - 1].get("rem_unpaired", 0)
+        if unpaired != 0:
+            # A whole-field shortfall cannot be repaired within a score bracket.
+            # The checker translates this search sentinel to zero prescribed pairs.
+            raise GacruxNoLegalPairing(
+                "the round-pairing cannot be completed: %d competitors would remain "
+                "unpaired whatever the rest of the field does, and C.04.3 art. 1.9.3 "
+                "leaves what to do to the Chief Arbiter" % abs(unpaired)
+            )
         t1 = time.time()
         if self.verbose > 1:
             print("Init Hamilton:", f"{t1 - t0:3f} s")
@@ -211,7 +218,8 @@ class pairing:
             if bracket:
                 self.roundpairing.append(bracket)
             scorelevel -= 1
-        if len(nodes) > 0:
+        # Analysis retains unmatched competitors; only generation must complete the round.
+        if len(nodes) > 0 and not self.checkonly:
             raise GacruxNoLegalPairing(
                 str(len(nodes)) + " competitor(s) remain after every score bracket has been paired"
                 + " (no legal pairing of the whole field exists, see C.04.3 art. 1.9.3)"
