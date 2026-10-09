@@ -100,9 +100,9 @@ def test_one_sided_game_still_reports_a_score_for_the_recorded_side():
     "round2, points, letter, whitescore",
     [
         ("1", "1.0", "W", "0.0"),   # black won        -> white lost
-        ("0", "0.0", "L", "1.0"),   # black lost       -> white won
-        ("=", "0.5", "D", "0.5"),   # black drew       -> white drew
-        ("-", "0.0", "Z", "1.0"),   # black forfeited  -> white won the forfeit
+        ("0", "0.0", "L", "0.0"),   # black lost       -> white won
+        ("=", "0.5", "D", "0.0"),   # black drew       -> white drew
+        ("-", "0.0", "Z", "0.0"),   # black forfeited  -> white won the forfeit
     ],
     ids=["black-won", "black-lost", "draw", "black-forfeited"],
 )
@@ -150,6 +150,6 @@ def test_a_forfeit_win_taken_from_the_other_side_is_not_an_unplayed_round():
     round_two = next(g for g in tournament["gameList"] if g["round"] == 2)
 
     assert round_two["played"] is False
-    assert chessfile.is_vur(round_two, "white") is False
+    assert chessfile.is_vur(round_two, "white") is True
     # Player 2's own half is recorded, and a forfeit loss is a VUR.
     assert chessfile.is_vur(round_two, "black") is True

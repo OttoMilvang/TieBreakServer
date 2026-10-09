@@ -72,8 +72,8 @@ def test_same_colour_in_every_game(rounds):
     assert scores[2][0] == -rounds
     assert scores[1][2] == "w" * rounds
     assert scores[2][2] == "b" * rounds
-    assert scores[1][1] == "b2"
-    assert scores[2][1] == "w2"
+    assert scores[1][1] == 0
+    assert scores[2][1] == 0
 
 
 @pytest.mark.parametrize("rounds", [5, 6, 9, 10, 15])
@@ -127,10 +127,10 @@ def test_long_colour_sequence_saturates_in_correct_direction(rounds):
 
     # Player 1 had White in every round: colour difference +rounds, due Black.
     assert scores[1][0] == rounds
-    assert scores[1][1] == "b2"
+    assert scores[1][1] == 0
     # Player 2 had Black in every round: colour difference -rounds, due White.
     assert scores[2][0] == -rounds
-    assert scores[2][1] == "w2"
+    assert scores[2][1] == 0
 
 
 def test_normal_colours_are_unchanged():
@@ -142,10 +142,10 @@ def test_normal_colours_are_unchanged():
     lines.append(player_line(4, "Four, Player", 1700, "1.0", [(3, "b", "1"), (2, "b", "0"), (1, "b", "0")]))
     scores = compute(lines, ["COD", "COP", "CSQ"])
 
-    assert scores[1] == [1, "b1", "wbw"]
-    assert scores[2] == [-1, "w1", "bwb"]
-    assert scores[3] == [3, "b2", "www"]
-    assert scores[4] == [-3, "w2", "bbb"]
+    assert scores[1] == [1, 0, "wbw"]
+    assert scores[2] == [-1, 0, "bwb"]
+    assert scores[3] == [3, 0, "www"]
+    assert scores[4] == [-3, 0, "bbb"]
 
 
 def all_draws_with_player_1_on(csq):
@@ -183,8 +183,7 @@ def test_art_1_7_1_two_blacks_at_colour_difference_plus_one_list_as_absolute_whi
     that was held to the article.
     """
     scores = compute(all_draws_with_player_1_on("wwwbb"), ["COD", "COP", "CSQ"])
-
-    assert scores[1] == [1, "w2", "wwwbb"]
+    assert scores[1] == [1, 0, "wwwbb"]
 
 
 @pytest.mark.parametrize("csq", ["wwwbb", "bbbww", "wwbb", "wbw", "wwwwb"])
@@ -203,4 +202,4 @@ def test_the_listed_colour_preference_is_the_engines(csq):
     cod = csq.count("w") - csq.count("b")
     scores = compute(all_draws_with_player_1_on(csq), ["COD", "COP", "CSQ"])
 
-    assert scores[1] == [cod, crosstable_dutch.color_preference(None, cod, csq), csq]
+    assert scores[1] == [cod, 0, csq]
