@@ -332,6 +332,10 @@ class commonmain:
 
             if params.get("number_of_rounds", 0) > 0:
                 tournament["numRounds"] = params["number_of_rounds"]
+                # A command-line round count is an explicit schedule, just like
+                # record 142, so the rules that need to know which round is the
+                # last one may read it.
+                tournament["numRoundsExplicit"] = True
             if "berger" in methodlist:
                 numrounds = ((len(tournament["competitors"]) + 1) // 2 ) * 2 - 1
                 if "double" in methodlist:
