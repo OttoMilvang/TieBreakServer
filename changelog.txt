@@ -1,3 +1,32 @@
+2026-10-12
+
+The command-line parameter for FIDE teampairing is:
+-m fideteam               = fideteam  typeA  mp + gp
+-m fideteam-typea         = fideteam  typeA  mp + gp
+-m fideteam-typeb         = fideteam  typeB  mp + gp
+-m fideteam-nocolor       = fideteam  nocolor  mp + gp
+-m fideteam-mp+gp         = fideteam  typeA  mp + gp
+-m fideteam-mp            = fideteam  typeA  mp, gp not used
+-m fideteam-gp            = fideteam  typeA  gp, mp not used
+-m fideteam-typea-mp+gp   = fideteam  typeA  mp + gp
+-m fideteam-typea-mp      = fideteam  typeA  mp, gp not used
+-m fideteam-typea-gp      = fideteam  typeA  gp, mp not used
+-m fideteam-typeb-mp+gp   = fideteam  typeB  mp + gp
+-m fideteam-typeb-mp      = fideteam  typeB  mp, gp not used
+-m fideteam-typeb-gp      = fideteam  typeB  gp, mp not used
+-m fideteam-nocolor-mp+gp = fideteam  nocolor  mp + gp
+-m fideteam-nocolor-mp    = fideteam  nocolor  mp, gp not used
+-m fideteam-nocolor-gp    = fideteam  nocolor  gp, mp not used
+
+-m <args> will override 192 record in the TRF file if any such line.
+
+
+Changes in internal tiebreaks:
+RFP - returns "N" for Not paired instead of ""
+Result in RFP is also used in HST, so note that tests on "" must be replaced by tet on "N"
+COP is removed from the internal Tie-break list
+
+
 2026-10-03
 tournamentgenerator:
 Change date format on 042 and 052 to YYYY-MM-DD 

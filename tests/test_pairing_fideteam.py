@@ -29,7 +29,7 @@ from gacrux.pairingfideteam import (
     TYPE_B,
     pairing_fideteam,
     resolve_colour_model,
-    resolve_secondary_score,
+    resolve_scoresystem,
 )
 
 WIN = decimal.Decimal("1.0")
@@ -459,9 +459,35 @@ def test_art_1_6_1_a_match_that_was_not_played_gives_no_colour():
 #   code    the record 192 code resolve_colour_model reads the model from, or None when
 #           none does - it reads TYPEA and TYPEB only
 #   typeb / usecolor  the two questions the crosstable asks of the model
+
+
+TEAMCODES = [
+    { "FIDE_TEAM_TYPEA_MP_GP"        : "typea"},
+    { "FIDE_TEAM_TYPEA_GP_MP"        : "typea"},
+    { "FIDE_TEAM_TYPEA_MP"           : "typea"},
+    { "FIDE_TEAM_TYPEA_GP"           : "typea"},
+    { "FIDE_TEAM_TYPEB_MP_GP"        : "typeb"},
+    { "FIDE_TEAM_TYPEB_GP_MP"        : "typeb"},
+    { "FIDE_TEAM_TYPEB_MP"           : "typeb"},
+    { "FIDE_TEAM_TYPEB_GP"           : "typeb"},
+    { "FIDE_TEAM_MP_GP"              : "nocolor"},
+    { "FIDE_TEAM_GP_MP"              : "nocolor"},
+    { "FIDE_TEAM_MP"                 : "nocolor"},
+    { "FIDE_TEAM_GP"                 : "nocolor"},
+    { "FIDE_TEAM"                    : "typea"},
+    { "FIDE_TEAM_TYPEA_MP_GP_BAKU"   : "typea"},
+    { "FIDE_TEAM_TYPEA_MP_BAKU"      : "typea"},
+    { "FIDE_TEAM_TYPEB_MP_GP_BAKU"   : "typeb"},
+    { "FIDE_TEAM_TYPEB_MP_BAKU"      : "typeb"},
+    { "FIDE_TEAM_MP_GP_BAKU"         : "nocolor"},
+    { "FIDE_TEAM_MP_BAKU"            : "nocolor"},
+    { "FIDE_TEAM_BAKU"               : "typea"},
+]
+
+
 COLOUR_MODELS = [
-    ("typea",   "typea",   "team_typea", "FIDE_TEAM_TYPEA_MP_GP", False, True),
-    ("typeb",   "typeb",   "team_typeb", "FIDE_TEAM_TYPEB_MP_GP", True,  True),
+    ("typea",   "typea",   "typea", "FIDE_TEAM_TYPEA_MP_GP", False, True),
+    ("typeb",   "typeb",   "typeb", "FIDE_TEAM_TYPEB_MP_GP", True,  True),
     ("nocolor", "nocolor", "nocolor",    None,                    False, False),
 ]
 
@@ -472,7 +498,12 @@ def colour_model_engine(tokens, code):
     """An engine whose pairing system carries "tokens" and whose record 192 code is
     "code" - the two places art. 1.7's model can reach the engine from."""
     tournament = event(4, 5)
-    tournament.tournament["pairingSystem"] = ["fideteam"] + list(tokens)
+    if len(tokens) > 0:
+        tournament.tournament["pairingSystem"] = ["fideteam"] + list(tokens)
+    else:
+        trf = trf2json.trf2json()
+        code192 = trf.code192
+        tournament.tournament["pairingSystem"] = code192.get(code, {}).get("pairingSystem", [])
     tournament.tournament["tournamentInfo"] = {"typeOfTournament": code}
     return tournament.engine(1)
 
@@ -504,7 +535,7 @@ def test_art_1_7_each_source_names_the_colour_model_on_its_own(model, mtoken, rt
         engine = colour_model_engine([token], "")
         assert (engine.typeb, engine.usecolor) == (typeb, usecolor), (model, token)
     expected = (typeb, usecolor) if code is not None else TYPE_A_MODEL
-    engine = colour_model_engine([], code or "FIDE_TEAM_MP_GP")
+    engine = colour_model_engine([], code)
     assert (engine.typeb, engine.usecolor) == expected, (model, code)
 
 
@@ -516,22 +547,18 @@ def test_art_1_7_the_resolver_names_one_model_for_the_whole_engine():
     is that question; this pins its three answers and the precedence between its two
     sources, without an engine in the way.
     """
-    assert resolve_colour_model(["fideteam", "typea"], "") == TYPE_A
-    assert resolve_colour_model(["fideteam", "team_typea"], "") == TYPE_A
-    assert resolve_colour_model(["fideteam", "typeb"], "") == TYPE_B
-    assert resolve_colour_model(["fideteam", "team_typeb"], "") == TYPE_B
-    assert resolve_colour_model(["fideteam", "nocolor"], "") == NO_COLOUR
+    assert resolve_colour_model(["fideteam", "typea"]) == TYPE_A
+    assert resolve_colour_model(["fideteam", "typeb"]) == TYPE_B
+    assert resolve_colour_model(["fideteam", "nocolor"]) == NO_COLOUR
+    assert resolve_colour_model(["fideteam"]) == TYPE_A
+ 
     # the record 192 code, read only when the pairing system names no model
-    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEA_MP_GP") == TYPE_A
-    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEB_MP_BAKU") == TYPE_B
-    # and art. 1.7's own default when neither source names one
-    assert resolve_colour_model(["fideteam"], "") == TYPE_A
-    assert resolve_colour_model([], "") == TYPE_A
-    # a code that is not a C.04.6 team code states nothing about art. 1.7
-    assert resolve_colour_model(["fideteam"], "CUSTOM_TEAM_SWISS_MP") == TYPE_A
-    # and the pairing system wins over the code whenever it names a model
-    assert resolve_colour_model(["fideteam", "typea"], "FIDE_TEAM_TYPEB_MP_GP") == TYPE_A
-    assert resolve_colour_model(["fideteam", "nocolor"], "FIDE_TEAM_TYPEB_MP_GP") == NO_COLOUR
+    # and it wins over the code of the file, which is what -m is for
+    trf = trf2json.trf2json()
+    code192 = trf.code192
+    for teamcode in TEAMCODES:
+        for (code, model) in teamcode.items():
+            assert resolve_colour_model(code192[code]["pairingSystem"]) == model
 
 
 @pytest.mark.parametrize("model,mtoken,rtoken,code,typeb,usecolor", COLOUR_MODELS)
@@ -1952,6 +1979,7 @@ def test_art_4_2_2_the_secondary_score_and_the_rules_that_switch_it_off():
     decides and the first-team is the smaller TPN (team 2).
     """
     tournament = event(4, 5, primary="match", secondary="game")
+    tournament.tournament["pairingSystem"] = ["fideteam", "typea", "mp+gp"]
     tournament.match(1, 2, 4, ["W", "D"])       # team 2: 1.5 game points, 2 match points
     tournament.match(1, 3, 1, ["W", "W"])       # team 3: 2.0 game points, 2 match points
     engine = tournament.engine(2)
@@ -1963,6 +1991,7 @@ def test_art_4_2_2_the_secondary_score_and_the_rules_that_switch_it_off():
     assert engine.first_team(three, two) is True
 
     noscondary = event(4, 5, primary="match")   # FIDE_TEAM_TYPEA_MP: no secondary score
+    noscondary.tournament["pairingSystem"] = ["fideteam", "typea", "mp"]
     noscondary.match(1, 2, 4, ["W", "D"])
     noscondary.match(1, 3, 1, ["W", "W"])
     engine = noscondary.engine(2)
@@ -1983,15 +2012,15 @@ def test_art_1_2_the_three_states_of_the_secondary_score():
     for tournaments whose rules never said so.
     """
     # -m fideteam-mp-gp names both scores: the competition stated that the other is used
-    assert resolve_secondary_score(["fideteam", "mp", "gp"], {"primary": "mp"}) == SECONDARY_USED
+    assert resolve_scoresystem(["fideteam", "mp", "gp"], {"primary": "mp"}) == SECONDARY_USED
     # a record 192 _MP_GP code writes both into the score system
-    assert resolve_secondary_score(["fideteam"], {"primary": "match", "secondary": "game"}) == SECONDARY_USED
+    assert resolve_scoresystem(["fideteam"], {"primary": "match", "secondary": "game"}) == SECONDARY_USED
     # a record 192 _MP code writes one score and no other: the other is stated unused
-    assert resolve_secondary_score(["fideteam"], {"primary": "match"}) == SECONDARY_UNUSED
+    assert resolve_scoresystem(["fideteam"], {"primary": "match"}) == SECONDARY_USED
     # -m fideteam-mp names the primary score only, which states nothing about the other
-    assert resolve_secondary_score(["fideteam", "mp"], {"primary": "mp"}) == SECONDARY_UNSTATED
+    assert resolve_scoresystem(["fideteam", "mp"], {"primary": "mp"}) == SECONDARY_UNUSED
     # and a file that names no score at all leaves art. 1.2.2 to answer
-    assert resolve_secondary_score(["fideteam"], {}) == SECONDARY_UNSTATED
+    assert resolve_scoresystem(["fideteam"], {}) == SECONDARY_USED
 
 
 def test_art_1_2_2_naming_the_primary_score_does_not_switch_the_secondary_off():
@@ -2003,8 +2032,7 @@ def test_art_1_2_2_naming_the_primary_score_does_not_switch_the_secondary_off():
 
     The article asks two questions, and answering the first is not answering the second.
     "-m fideteam-mp" names match points as the primary score on the command line; it says
-    nothing at all about game points, so art. 1.2.2 still supplies the answer and game
-    points are used for the colour allocation of art. 4.2.2.
+    that game pointsare not used, 
 
     That is the opposite case to a record 192 code, which encodes both decisions at once -
     FIDE_TEAM_TYPEA_MP_GP writes a secondary score and FIDE_TEAM_TYPEA_MP deliberately
@@ -2021,19 +2049,19 @@ def test_art_1_2_2_naming_the_primary_score_does_not_switch_the_secondary_off():
     tournament = event(4, 5)
     # -m fideteam-mp, as commonmain builds it: the method list becomes the pairing system,
     # and the score token in it becomes the primary score.
-    tournament.tournament["pairingSystem"] = ["fideteam", "mp"]
-    tournament.tournament["scoreSystem"]["primary"] = "mp"
+    tournament.tournament["pairingSystem"] = ["fideteam", "typea", "mp"]
+    tournament.tournament["scoreSystem"].update({"primary": "mp", "secondary": None})
     tournament.match(1, 2, 4, ["W", "D"])       # team 2: 1.5 game points, 2 match points
     tournament.match(1, 3, 1, ["W", "W"])       # team 3: 2.0 game points, 2 match points
     engine = tournament.engine(2)
     engine.compute_pairing(False)
     (two, three) = (engine.competitors[2], engine.competitors[3])
-    assert engine.secondary
+    assert not engine.secondary
     assert two["pts"] == three["pts"]           # the same match points: 4.2.1 is silent
     assert three["ptx"] > two["ptx"]            # more game points
     assert two["tpn"] < three["tpn"]            # and 4.2.3 would have said the other team
-    assert engine.first_team(three, two) is True
-    assert engine.first_team(two, three) is False
+    assert engine.first_team(three, two) is False # seconday score is not used, so 4.2.3 fires and the smaller TPN is the first-team
+    assert engine.first_team(two, three) is True
 
 
 def test_art_1_2_1_a_command_line_primary_keeps_the_files_secondary_answer():
@@ -2052,13 +2080,18 @@ def test_art_1_2_1_a_command_line_primary_keeps_the_files_secondary_answer():
     points, so art. 4.2.2 would make team 3 the first-team and art. 4.2.3 makes it team 2.
     """
     # the resolver itself
-    assert resolve_secondary_score(["fideteam", "mp"], {"primary": "mp", "secondaryUsed": False}) == SECONDARY_UNUSED
-    assert resolve_secondary_score(["fideteam", "mp"], {"primary": "mp", "secondaryUsed": True}) == SECONDARY_USED
-    assert resolve_secondary_score(["fideteam", "mp", "gp"], {"primary": "mp", "secondaryUsed": False}) == SECONDARY_USED
+    assert resolve_scoresystem(["fideteam", "mp"], {"primary": "mp"}) == SECONDARY_UNUSED
+    assert resolve_scoresystem(["fideteam", "gp"], {"primary": "gp"}) == SECONDARY_UNUSED
+    assert resolve_scoresystem(["fideteam", "mp", "gp"], {"primary": "mp+gp"}) == SECONDARY_USED
+    assert resolve_scoresystem(["fideteam", "mp+gp"], {"primary": "mp+gp"}) == SECONDARY_USED
+    assert resolve_scoresystem(["fideteam", "mp"], {}) == SECONDARY_UNUSED
+    assert resolve_scoresystem(["fideteam", "gp"], {}) == SECONDARY_UNUSED
+    assert resolve_scoresystem(["fideteam", "mp", "gp"], {}) == SECONDARY_USED
+    assert resolve_scoresystem(["fideteam", "mp+gp"], {}) == SECONDARY_USED
+
     # and the engine, on the tournament commonmain builds from a FIDE_TEAM_TYPEA_MP file
     # read with -m fideteam-mp
     tournament = event(4, 5, primary="match")
-    tournament.tournament["scoreSystem"]["secondaryUsed"] = False
     tournament.tournament["pairingSystem"] = ["fideteam", "mp"]
     tournament.tournament["scoreSystem"]["primary"] = "mp"
     tournament.match(1, 2, 4, ["W", "D"])       # team 2: 1.5 game points, 2 match points
@@ -2072,6 +2105,7 @@ def test_art_1_2_1_a_command_line_primary_keeps_the_files_secondary_answer():
     assert engine.first_team(two, three) is True
 
 
+
 def test_art_1_7_the_three_colour_models_and_where_they_are_named():
     """Art. 1.7 - "Type A colour preferences are used unless the rules of the team
     competition specify Type B, or no colour preferences at all".
@@ -2082,21 +2116,11 @@ def test_art_1_7_the_three_colour_models_and_where_they_are_named():
     asks, so the two cannot come out of different sources and leave a model half-applied.
     """
     # a model named in the pairing system wins, whichever spelling it arrived in
-    assert resolve_colour_model(["fideteam", "typeb"], "") == TYPE_B
-    assert resolve_colour_model(["fideteam", "team_typeb"], "") == TYPE_B
-    assert resolve_colour_model(["fideteam", "nocolor"], "") == NO_COLOUR
-    assert resolve_colour_model(["fideteam", "typea"], "") == TYPE_A
-    # and it wins over the code of the file, which is what -m is for
-    assert resolve_colour_model(["fideteam", "typea"], "FIDE_TEAM_TYPEB_MP_GP") == TYPE_A
-    # the code is read when the pairing system names no model, as -m fideteam leaves it
-    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEB_MP_GP") == TYPE_B
-    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_TYPEA_MP") == TYPE_A
-    # no record 192 code states the third model: there is no TYPEC token to write, so a
-    # code with no TYPE token falls to the art. 1.7 default here, and the record 192
-    # table of trf2json is what maps such a code to "nocolor".
-    assert resolve_colour_model(["fideteam"], "FIDE_TEAM_MP_GP") == TYPE_A
-    # failing both, art. 1.7's own default
-    assert resolve_colour_model(["fideteam"], "") == TYPE_A
+    assert resolve_colour_model(["fideteam", "typea"]) == TYPE_A
+    assert resolve_colour_model(["fideteam", "typeb"]) == TYPE_B
+    assert resolve_colour_model(["fideteam", "nocolor"]) == NO_COLOUR
+    assert resolve_colour_model(["fideteam"]) == TYPE_A
+
 
 
 def test_art_4_3_2_grant_the_only_preference():
@@ -2372,6 +2396,8 @@ def test_art_1_2_match_points_and_game_points_pair_differently():
     """
     matchpoints = event(6, 5, primary="match")
     gamepoints = event(6, 5, primary="game")
+    matchpoints.tournament["pairingSystem"] = ["fideteam", "typea", "mp+gp"]
+    gamepoints.tournament["pairingSystem"] = ["fideteam", "typea", "gp+mp"]
     for tournament in (matchpoints, gamepoints):
         tournament.match(1, 1, 4, ["W", "W"])       # 1: 2 mp, 2.0 gp   4: 0 mp, 0.0 gp
         tournament.match(1, 2, 5, ["W", "D"])       # 2: 2 mp, 1.5 gp   5: 0 mp, 0.5 gp

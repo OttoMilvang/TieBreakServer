@@ -125,10 +125,10 @@ def test_240_names_a_team_in_a_team_tournament():
 @pytest.mark.parametrize(
     "code, model",
     [
-        ("FIDE_TEAM_TYPEA_MP_GP", "team_typea"),
-        ("FIDE_TEAM_TYPEB_MP_GP", "team_typeb"),
+        ("FIDE_TEAM_TYPEA_MP_GP", "typea"),
+        ("FIDE_TEAM_TYPEB_MP_GP", "typeb"),
         ("FIDE_TEAM_MP_GP", "nocolor"),
-        ("FIDE_TEAM_BAKU", "team_typea"),
+        ("FIDE_TEAM_BAKU", "typea"),
     ],
 )
 def test_record_192_selects_the_declared_team_colour_model(code, model):

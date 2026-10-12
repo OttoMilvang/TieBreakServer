@@ -1560,12 +1560,12 @@ class tiebreak:
                     val = (
                         str(cmp["rsts"][rnd]["opponent"]) + clr
                         if cmp["rsts"][rnd]["played"] or (cmp["rsts"][rnd]["opponent"] > 0)
-                        else ""
+                        else "N"
                     )
                 elif rnd > self.lastplayedround:
-                    val = "Y" if cmp["present"] else ""
+                    val = "Y" if cmp["present"] else "N"
                 else:
-                    val = ""
+                    val = "N"
                 if rnd <= rounds:
                     val = "pab" if val == "0w" else val
                     if not cmp["rsts"][rnd]["played"]:

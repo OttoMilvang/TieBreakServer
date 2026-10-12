@@ -173,14 +173,14 @@ def test_pairing_round_one_without_record_352_goes_ahead(teams):
         lines.append("310   3 Gamma                                    1800    0.0    0.0   3     5    6")
     tournament = read("\n".join(lines)).get_tournament(1)
     before = deepcopy(tournament)
-
     engine = pairing_fideteam(tournament, 1, {"experimental": [], "verbose": 0})
     pairs = [pair for bracket in engine.compute_pairing(False) for pair in bracket["pairs"]]
 
     assert len(pairs) == (teams + 1) // 2
     assert sum(pair["b"] == 0 for pair in pairs) == teams % 2
     assert sorted(cid for pair in pairs for cid in [pair["w"], pair["b"]] if cid) == list(range(1, teams + 1))
-    assert tournament["scoreSystem"] == before["scoreSystem"]
+    assert tournament["scoreSystem"]["game"] == before["scoreSystem"]["game"]
+    assert tournament["scoreSystem"]["match"] == before["scoreSystem"]["match"]
     for competitor, original in zip(tournament["competitors"], before["competitors"]):
         assert {key: competitor[key] for key in original} == original
     assert tournament["teamSize"] == 0

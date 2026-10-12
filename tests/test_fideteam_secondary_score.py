@@ -6,7 +6,7 @@ Art. 1.2.1 asks the rules of the competition two questions: which score is the
 primary one, and whether the other is used for colour allocation (art. 4.2.2).
 A record 192 code answers both at once - FIDE_TEAM_TYPEA_MP_GP says the
 secondary score is used, FIDE_TEAM_TYPEA_MP says it is not - and trf2json
-records the second answer as scoreSystem["secondaryUsed"].
+records the second answer as scoreSystem["secondary"] in not None.
 
 "-m fideteam-mp" names the primary score only. commonmain writes that token
 into the score system as the primary score, over the one the file named, so
@@ -76,10 +76,12 @@ def test_art_1_2_1_naming_both_scores_on_the_command_line_overrides_the_file(mon
 
 def test_art_1_2_1_a_file_that_uses_the_secondary_score_keeps_it_under_a_command_line_primary(monkeypatch, tmp_path):
     """FIDE_TEAM_TYPEA_MP_GP read with -m fideteam-mp: the file said the secondary score
-    is used, and the command line does not say otherwise."""
+    is used, and the command line does not say otherwise.
+    The command line has priority
+    """
     for engine in engines_built_by(monkeypatch, tmp_path, "FIDE_TEAM_TYPEA_MP_GP", ["-m", "fideteam-mp"]):
-        assert engine.tournament["scoreSystem"]["secondaryUsed"] is True
-        assert engine.secondary is True
+        assert engine.tournament["scoreSystem"]["secondary"] is None
+        assert engine.secondary is False
 
 
 def test_art_1_2_1_a_file_that_does_not_use_the_secondary_score_keeps_that_under_a_command_line_primary(monkeypatch, tmp_path):

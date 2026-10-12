@@ -128,7 +128,7 @@ class crosstable:
                 "ptx": tbval[PTX]["val"] if tbval else Decimal("-1.0"),
                 "acc": tbval[ACC]["val"] if tbval else Decimal("-1.0"),
                 "acx": tbval[ACX]["val"] if tbval else Decimal("-1.0"),
-                "rfp": tbval[RFP]["val"] != "" if tbval else False,
+                "rfp": tbval[RFP]["val"] not in ["", "N"] if tbval else False,
                 "hst": tbval[RFP] if tbval else {},
                 "num": tbval[NUM] if tbval else {},
                 "rip": tbval[RIP]["val"] if tbval else 0,

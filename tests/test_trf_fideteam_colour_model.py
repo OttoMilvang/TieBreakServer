@@ -72,7 +72,7 @@ def check(argv):
 def test_record_192_selects_the_no_colour_preference_model():
     """Art. 1.7 - FIDE_TEAM_MP_GP names neither type A nor type B, so the tournament is
     paired with no colour preferences at all."""
-    assert read()["pairingSystem"] == ["fideteam", "nocolor"]
+    assert read()["pairingSystem"] == ["fideteam", "nocolor", "mp+gp"]
 
     built = engine(6)
 
@@ -149,43 +149,43 @@ def test_forcing_a_colour_preference_model_rejects_the_same_file(method):
 # ==============================================================================
 
 RECORD_192_TEAM_CODES = [
-    # record 192 code,              pairing system,                 primary,  secondary
-    ("FIDE_TEAM_TYPEA_MP_GP",       ["fideteam", "team_typea"],     "match",  "game"),
-    ("FIDE_TEAM_TYPEA_GP_MP",       ["fideteam", "team_typea"],     "game",   "match"),
-    ("FIDE_TEAM_TYPEA_MP",          ["fideteam", "team_typea"],     "match",  None),
-    ("FIDE_TEAM_TYPEA_GP",          ["fideteam", "team_typea"],     "game",   None),
-    ("FIDE_TEAM_TYPEB_MP_GP",       ["fideteam", "team_typeb"],     "match",  "game"),
-    ("FIDE_TEAM_TYPEB_GP_MP",       ["fideteam", "team_typeb"],     "game",   "match"),
-    ("FIDE_TEAM_TYPEB_MP",          ["fideteam", "team_typeb"],     "match",  None),
-    ("FIDE_TEAM_TYPEB_GP",          ["fideteam", "team_typeb"],     "game",   None),
-    ("FIDE_TEAM_MP_GP",             ["fideteam", "nocolor"],        "match",  "game"),
-    ("FIDE_TEAM_GP_MP",             ["fideteam", "nocolor"],        "game",   "match"),
-    ("FIDE_TEAM_MP",                ["fideteam", "nocolor"],        "match",  None),
-    ("FIDE_TEAM_GP",                ["fideteam", "nocolor"],        "game",   None),
-    ("FIDE_TEAM",                   ["fideteam", "team_typea"],     None,     None),
-    ("CUSTOM_TEAM_SWISS_MP",        ["custom"],                     "match",  None),
-    ("CUSTOM_TEAM_SWISS_GP",        ["custom"],                     "game",   None),
-    ("FIDE_TEAM_TYPEA_MP_GP_BAKU",  ["fideteam", "team_typea"],     "match",  "game"),
-    ("FIDE_TEAM_TYPEA_MP_BAKU",     ["fideteam", "team_typea"],     "match",  None),
-    ("FIDE_TEAM_TYPEB_MP_GP_BAKU",  ["fideteam", "team_typeb"],     "match",  "game"),
-    ("FIDE_TEAM_TYPEB_MP_BAKU",     ["fideteam", "team_typeb"],     "match",  None),
-    ("FIDE_TEAM_MP_GP_BAKU",        ["fideteam", "nocolor"],        "match",  "game"),
-    ("FIDE_TEAM_MP_BAKU",           ["fideteam", "nocolor"],        "match",  None),
-    ("FIDE_TEAM_BAKU",              ["fideteam", "team_typea"],     None,     None),
-    ("CUSTOM_TEAM_SWISS",           ["custom"],                     None,     None),
-    ("BERGER_TEAM_ROUNDROBIN",      ["berger"],                     None,     None),
-    ("BERGER_TEAM_DOUBLEROUNDROBIN", ["berger"],                    None,     None),
-    ("FIDE_TEAM_ROUNDROBIN",        ["berger"],                     None,     None),
-    ("FIDE_TEAM_DOUBLEROUNDROBIN",  ["berger"],                     None,     None),
-    ("CUSTOM_TEAM_ROUNDROBIN",      ["custom"],                     None,     None),
-    ("CUSTOM_TEAM_KNOCKOUT",        ["custom"],                     None,     None),
+    # record 192 code,              pairing system,                  primary,  secondary
+    ("FIDE_TEAM_TYPEA_MP_GP",       ["fideteam", "typea", "mp+gp"],  "match",  "game"),
+    ("FIDE_TEAM_TYPEA_GP_MP",       ["fideteam", "typea", "gp+mp"],  "game",   "match"),
+    ("FIDE_TEAM_TYPEA_MP",          ["fideteam", "typea", "mp"],     "match",  None),
+    ("FIDE_TEAM_TYPEA_GP",          ["fideteam", "typea", "gp"],     "game",   None),
+    ("FIDE_TEAM_TYPEB_MP_GP",       ["fideteam", "typeb", "mp+gp"],  "match",  "game"),
+    ("FIDE_TEAM_TYPEB_GP_MP",       ["fideteam", "typeb", "gp+mp"],  "game",   "match"),
+    ("FIDE_TEAM_TYPEB_MP",          ["fideteam", "typeb", "mp"],     "match",  None),
+    ("FIDE_TEAM_TYPEB_GP",          ["fideteam", "typeb", "gp"],     "game",   None),
+    ("FIDE_TEAM_MP_GP",             ["fideteam", "nocolor", "mp+gp"],"match",  "game"),
+    ("FIDE_TEAM_GP_MP",             ["fideteam", "nocolor", "gp+mp"],"game",   "match"),
+    ("FIDE_TEAM_MP",                ["fideteam", "nocolor", "mp"],   "match",  None),
+    ("FIDE_TEAM_GP",                ["fideteam", "nocolor", "gp"],   "game",   None),
+    ("FIDE_TEAM",                   ["fideteam", "typea", "mp+gp"],  "match",  "game"),
+    ("CUSTOM_TEAM_SWISS_MP",        ["custom", "mp"],                "match",  None),
+    ("CUSTOM_TEAM_SWISS_GP",        ["custom", "gp"],                "game",   None),
+    ("FIDE_TEAM_TYPEA_MP_GP_BAKU",  ["fideteam", "typea", "mp+gp"],  "match",  "game"),
+    ("FIDE_TEAM_TYPEA_MP_BAKU",     ["fideteam", "typea", "mp"],     "match",  None),
+    ("FIDE_TEAM_TYPEB_MP_GP_BAKU",  ["fideteam", "typeb", "mp+gp"],  "match",  "game"),
+    ("FIDE_TEAM_TYPEB_MP_BAKU",     ["fideteam", "typeb", "mp"],     "match",  None),
+    ("FIDE_TEAM_MP_GP_BAKU",        ["fideteam", "nocolor", "mp+gp"],"match",  "game"),
+    ("FIDE_TEAM_MP_BAKU",           ["fideteam", "nocolor", "mp"],   "match",  None),
+    ("FIDE_TEAM_BAKU",              ["fideteam", "typea", "mp+gp"],  "match",  "game"),
+    ("CUSTOM_TEAM_SWISS",           ["custom"],                      None,     None),
+    ("BERGER_TEAM_ROUNDROBIN",      ["berger"],                      None,     None),
+    ("BERGER_TEAM_DOUBLEROUNDROBIN", ["berger"],                     None,     None),
+    ("FIDE_TEAM_ROUNDROBIN",        ["berger"],                      None,     None),
+    ("FIDE_TEAM_DOUBLEROUNDROBIN",  ["berger"],                      None,     None),
+    ("CUSTOM_TEAM_ROUNDROBIN",      ["custom"],                      None,     None),
+    ("CUSTOM_TEAM_KNOCKOUT",        ["custom"],                      None,     None),
 ]
 
 # The colour model each pairing system stands for, as pairing_fideteam builds it:
 # art. 1.7.1 type A, art. 1.7.2 type B, or art. 1.7 no preferences at all.
 COLOUR_MODELS = {
-    "team_typea": {"usecolor": True, "typeb": False},
-    "team_typeb": {"usecolor": True, "typeb": True},
+    "typea": {"usecolor": True, "typeb": False},
+    "typeb": {"usecolor": True, "typeb": True},
     "nocolor": {"usecolor": False, "typeb": False},
 }
 
@@ -258,10 +258,9 @@ def test_record_192_colour_model_table(code, pairingsystem, primary, secondary):
     substring of "_GP_MP", so the order those four tests are written in matters.
     """
     tournament = resolve_192(code)
-
-    assert tournament["pairingSystem"] == pairingsystem
-    assert tournament["scoreSystem"].get("primary") == primary
-    assert tournament["scoreSystem"].get("secondary") == secondary
+    assert tournament["pairingSystem"] == pairingsystem, code
+    assert tournament["scoreSystem"].get("primary") == primary, code
+    assert tournament["scoreSystem"].get("secondary") == secondary, code
 
 
 def test_record_192_table_lists_every_team_code():
@@ -313,7 +312,6 @@ def test_record_192_colour_model_reaches_the_engine(code, pairingsystem, primary
     reads that as "match points rank, game points decide the colour".
     """
     built = engine_for(code)
-
     assert built.usecolor is COLOUR_MODELS[pairingsystem[1]]["usecolor"]
     assert built.typeb is COLOUR_MODELS[pairingsystem[1]]["typeb"]
     # art. 1.2 - a second score is in play unless the code named exactly one, which is

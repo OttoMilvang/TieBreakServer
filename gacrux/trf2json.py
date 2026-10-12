@@ -132,28 +132,28 @@ class trf2json(chessjson.chessjson):
             "FIDE_DOUBLESCHEVENINGEN"      : {"format": "scheveningen", "teamTournament": True , "pairingSystem": ["scheveningen"] },
             "CUSTOM_SCHEVENINGEN"          : {"format": "scheveningen", "teamTournament": True , "pairingSystem": ["scheveningen"] },
             "CUSTOM_KNOCKOUT"              : {"format": "knokout",      "teamTournament": False, "pairingSystem": ["custom"]       },
-            "FIDE_TEAM_TYPEA_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
-            "FIDE_TEAM_TYPEA_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
-            "FIDE_TEAM_TYPEA_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
-            "FIDE_TEAM_TYPEA_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
-            "FIDE_TEAM_TYPEB_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
-            "FIDE_TEAM_TYPEB_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
-            "FIDE_TEAM_TYPEB_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
-            "FIDE_TEAM_TYPEB_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
-            "FIDE_TEAM_MP_GP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
-            "FIDE_TEAM_GP_MP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
-            "FIDE_TEAM_MP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
-            "FIDE_TEAM_GP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
-            "FIDE_TEAM"                    : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
-            "CUSTOM_TEAM_SWISS_MP"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom"]       },
-            "CUSTOM_TEAM_SWISS_GP"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom"]       },
-            "FIDE_TEAM_TYPEA_MP_GP_BAKU"   : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
-            "FIDE_TEAM_TYPEA_MP_BAKU"      : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
-            "FIDE_TEAM_TYPEB_MP_GP_BAKU"   : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
-            "FIDE_TEAM_TYPEB_MP_BAKU"      : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typeb"] },
-            "FIDE_TEAM_MP_GP_BAKU"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
-            "FIDE_TEAM_MP_BAKU"            : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor"] },
-            "FIDE_TEAM_BAKU"               : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "team_typea"] },
+            "FIDE_TEAM_TYPEA_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "mp+gp"] },
+            "FIDE_TEAM_TYPEA_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "gp+mp"] },
+            "FIDE_TEAM_TYPEA_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "mp"] },
+            "FIDE_TEAM_TYPEA_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "gp"] },
+            "FIDE_TEAM_TYPEB_MP_GP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typeb", "mp+gp"] },
+            "FIDE_TEAM_TYPEB_GP_MP"        : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typeb", "gp+mp"] },
+            "FIDE_TEAM_TYPEB_MP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typeb", "mp"] },
+            "FIDE_TEAM_TYPEB_GP"           : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typeb", "gp"] },
+            "FIDE_TEAM_MP_GP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor", "mp+gp"] },
+            "FIDE_TEAM_GP_MP"              : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor", "gp+mp"] },
+            "FIDE_TEAM_MP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor", "mp"] },
+            "FIDE_TEAM_GP"                 : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor", "gp"] },
+            "FIDE_TEAM"                    : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "mp+gp"] },
+            "CUSTOM_TEAM_SWISS_MP"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom", "mp"] },
+            "CUSTOM_TEAM_SWISS_GP"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom", "gp"] },
+            "FIDE_TEAM_TYPEA_MP_GP_BAKU"   : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "mp+gp"] },
+            "FIDE_TEAM_TYPEA_MP_BAKU"      : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "mp"] },
+            "FIDE_TEAM_TYPEB_MP_GP_BAKU"   : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typeb", "mp+gp"] },
+            "FIDE_TEAM_TYPEB_MP_BAKU"      : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typeb", "mp"] },
+            "FIDE_TEAM_MP_GP_BAKU"         : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor", "mp+gp"] },
+            "FIDE_TEAM_MP_BAKU"            : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "nocolor", "mp"] },
+            "FIDE_TEAM_BAKU"               : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["fideteam", "typea", "mp+gp"] },
             "CUSTOM_TEAM_SWISS"            : {"format": "swiss",        "teamTournament": True , "pairingSystem": ["custom"]       },
             "BERGER_TEAM_ROUNDROBIN"       : {"format": "roundrobin",   "teamTournament": True , "pairingSystem": ["berger"]       },
             "BERGER_TEAM_DOUBLEROUNDROBIN" : {"format": "roundrobin",   "teamTournament": True , "pairingSystem": ["berger"]       },
@@ -1033,17 +1033,16 @@ class trf2json(chessjson.chessjson):
         if "_MP_GP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "match"
             tournament["scoreSystem"]["secondary"] = "game"
-            tournament["scoreSystem"]["secondaryUsed"] = True
         elif "_GP_MP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "game"
             tournament["scoreSystem"]["secondary"] = "match"
-            tournament["scoreSystem"]["secondaryUsed"] = True
         elif "_MP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "match"
-            tournament["scoreSystem"]["secondaryUsed"] = False
         elif "_GP" in trfvalue:
             tournament["scoreSystem"]["primary"] = "game"
-            tournament["scoreSystem"]["secondaryUsed"] = False
+        elif trfvalue in ["FIDE_TEAM", "FIDE_TEAM_BAKU"]:
+            tournament["scoreSystem"]["primary"] = "match"
+            tournament["scoreSystem"]["secondary"] = "game"
 
     def parse_timecontrol(self, tournament, line):
         trfvalue = line[4:]

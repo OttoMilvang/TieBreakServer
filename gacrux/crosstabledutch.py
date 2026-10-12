@@ -255,8 +255,8 @@ class crosstable_dutch(crosstable):
         ca = a["cid"]
         cb = b["cid"]
         if self.checkonly:
-            hb = b.get("hst", {}).get("val", "")
-            canmeet = hb != "" and int(hb[0:-1]) == a["cid"]
+            hb = b.get("hst", {}).get("val", "N")
+            canmeet = hb not in ["", "N"] and int(hb[0:-1]) == a["cid"]
         else:    
             canmeet = played < self.maxmeets and ca != cb and a["rfp"] and b["rfp"] or ca < self.BLOB and cb == self.BLOB
             for col in ["w", "b"]:

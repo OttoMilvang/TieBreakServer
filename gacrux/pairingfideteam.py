@@ -52,11 +52,11 @@ TYPE_B = "typeb"          # art. 1.7.2
 NO_COLOUR = "nocolor"     # art. 1.7, no colour preferences at all
 
 # The tokens a pairing system can carry to name one of them. "-m fideteam-typeb" writes
-# "typeb"; the record 192 table of trf2json writes "team_typeb".
+# "typeb"; the record 192 table of trf2json translate "team_typea" to typea and "team_typeb" to typeb. 
 COLOUR_MODEL_TOKENS = {
-    "typea": TYPE_A, "team_typea": TYPE_A,
-    "typeb": TYPE_B, "team_typeb": TYPE_B,
-    "nocolor": NO_COLOUR, "team_nocolor": NO_COLOUR,
+    "typea": TYPE_A,
+    "typeb": TYPE_B,
+    "nocolor": NO_COLOUR,
 }
 
 # The tokens of a record 192 team code that name one. The code vocabulary has only two:
@@ -74,10 +74,10 @@ SECONDARY_UNUSED = "unused"       # art. 1.2.1 - the competition states that it 
 SECONDARY_UNSTATED = "unstated"   # art. 1.2.2 - nothing was stated, so the default applies
 
 # The tokens that name a score in a pairing system: "-m fideteam-mp-gp" writes both.
-SCORE_TOKENS = ["mp", "gp", "match", "game"]
+SCORE_TOKENS = ["mp+gp", "gp+mp", "mp", "gp"]
 
 
-def resolve_secondary_score(pairingsystem, scoresystem):
+def resolve_scoresystem(pairingsystem, scoresystem):
     """art. 1.2 - whether the secondary score is used for the colour allocation of art.
     4.2.2.
 
@@ -86,7 +86,7 @@ def resolve_secondary_score(pairingsystem, scoresystem):
     answering the second. The three states are read like this:
 
       * the command line names scores as tokens of the pairing system. Two of them
-        ("-m fideteam-mp-gp") state that the secondary score is used. One of them
+        ("-m fideteam-mp+gp") state that the secondary score is used. One of them
         ("-m fideteam-mp") names the primary score and says nothing about the other, so
         it leaves whatever the file stated in place, and failing that art. 1.2.2.
       * a record 192 code encodes both answers at once: FIDE_TEAM_TYPEA_MP_GP writes a
@@ -101,20 +101,23 @@ def resolve_secondary_score(pairingsystem, scoresystem):
         allocation".
     """
     scores = [arg for arg in pairingsystem if arg in SCORE_TOKENS]
-    if len(scores) > 1:
-        return SECONDARY_USED
-    if "secondaryUsed" in scoresystem:
-        return SECONDARY_USED if scoresystem["secondaryUsed"] else SECONDARY_UNUSED
-    if "secondary" in scoresystem:
-        return SECONDARY_USED
-    if len(scores) > 0:
-        return SECONDARY_UNSTATED
-    if "primary" in scoresystem:
-        return SECONDARY_UNUSED
-    return SECONDARY_UNSTATED
+    score = scores[0] if len(scores) >= 1 else "mp+gp"  # the default of art. 1.2.2
+    
+    scoresystem.update(
+        {   "mp+gp": {"primary": "match", "secondary": "game"},
+            "gp+mp": {"primary": "game", "secondary": "match"},
+            "mp": {"primary": "match", "secondary": None},
+            "gp": {"primary": "game", "secondary": None}
+        }[score]
+    )
+    if len(scores) == 2:
+        scoresystem["secondary"] = scores[1]
+    secondary_used = "secondary" in scoresystem and scoresystem["secondary"] is not None
+    return SECONDARY_USED if secondary_used else SECONDARY_UNUSED
 
 
-def resolve_colour_model(pairingsystem, typeoftournament):
+
+def resolve_colour_model(pairingsystem):
     """art. 1.7 - which of the three colour models the rules of the competition state.
 
     The rules reach the engine from two places, and this is the precedence between them:
@@ -137,11 +140,6 @@ def resolve_colour_model(pairingsystem, typeoftournament):
     for token in pairingsystem:
         if token in COLOUR_MODEL_TOKENS:
             return COLOUR_MODEL_TOKENS[token]
-    code = typeoftournament.upper().split("_")
-    if code[:2] == ["FIDE", "TEAM"]:
-        for token in code[2:]:
-            if token in COLOUR_MODEL_CODES:
-                return COLOUR_MODEL_CODES[token]
     return TYPE_A
 
 
@@ -163,16 +161,18 @@ class pairing_fideteam(pairing):
             )
         super().__init__(tournament, rnd, params)
         self.rules = self.FIDETEAM_RULES[0]
-        pairingsystem = tournament.get("pairingSystem", [])
+        pairingsystem = params.get("methodList", [])
+        if len(pairingsystem) == 0:
+            pairingsystem = tournament.get("pairingSystem", [])
         scoresystem = tournament.get("scoreSystem", {})
-        typeoftournament = tournament.get("tournamentInfo", {}).get("typeOfTournament", "")
         self.numrounds = tournament["numRounds"]
 
         # art. 1.7 - type A colour preferences, unless the rules of the competition ask
         # for type B, or for no colour preferences at all. Record 192 states it
         # (FIDE_TEAM_TYPEB_MP_GP and friends), and so does -m fideteam-typeb. The one
         # model answers both of the questions the crosstable asks.
-        self.colourmodel = resolve_colour_model(pairingsystem, typeoftournament)
+        self.colourmodel = resolve_colour_model(pairingsystem)
+        # print("pairing_fideteam.__init__: colourmodel = " + str(self.colourmodel))
         self.typeb = self.colourmodel == TYPE_B
         self.usecolor = self.colourmodel != NO_COLOUR
 
@@ -214,7 +214,7 @@ class pairing_fideteam(pairing):
         # used switches art. 4.2.2 off; a competition that said nothing about it gets the
         # art. 1.2.2 default, which uses it.
         # (The primary score itself is read by crosstable.compute_tiebreak.)
-        self.secondaryscore = resolve_secondary_score(pairingsystem, scoresystem)
+        self.secondaryscore = resolve_scoresystem(pairingsystem, scoresystem)
         self.secondary = self.secondaryscore != SECONDARY_UNUSED
 
         # C.04.7 art. 1.4.4 - the Baku acceleration cannot be used when game points are
