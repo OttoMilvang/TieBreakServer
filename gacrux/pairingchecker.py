@@ -14,6 +14,7 @@ import time
 
 from collections import defaultdict
 
+
 if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
     from gacrux import version
     from gacrux import pairingdutch
@@ -26,6 +27,7 @@ if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacr
     from gacrux.pairingberger import pairing_berger
     from gacrux.gacruxexeptions import GacruxNoLegalPairing
     from gacrux.pairingfideteam import pairing_fideteam
+    from gacrux.trf2json import trf2json
 else:
     import version
     import pairingdutch
@@ -38,6 +40,7 @@ else:
     from pairingberger import pairing_berger
     from gacruxexeptions import GacruxNoLegalPairing
     from pairingfideteam import pairing_fideteam
+    from trf2json import trf2json
 
 
 AHEAD = "  Tournament analysis   "
@@ -406,6 +409,33 @@ class pairingchecker(commonmain):
         f.writelines(line + "\n" for line in lines)
         # if not eq: breakpoint()
         return eq
+
+    def write_trf_file(self, result, tournamentno, verbose):
+        trf = trf2json()
+        event = self.chessfile.chessjson["event"]
+        tournament = self.chessfile.get_tournament(self.tournamentno)
+        if "pairs" in result and result["pairs"] is not None and len(result["pairs"]) > 0:
+            # update game list with new pairing
+            tournament["currentRound"] = result["round"]
+            for (w, b) in result["pairs"]:
+                white = {"cid": w, "result": "A" if b > 0 else "P"}
+                black = {"cid": b, "result": "A"} if b > 0 else None
+                tournament["gameList"].append({"round": result["round"], "played": True, "white": white, "black": black})
+
+            # update game scores
+            competitors = {comp["cid"]: comp for comp in tournament["competitors"]}
+            for game in [game for game in tournament["gameList"] if game["round"] == result["round"]]:
+                for color in ["white", "black"]:
+                    if game[color] is not None and game[color]["cid"] > 0:
+                        gamepoints = tournament["scoreSystem"]["game"][game[color]["result"]]
+                        while isinstance(gamepoints, str) and gamepoints in tournament["scoreSystem"]["game"]:
+                            gamepoints = tournament["scoreSystem"]["game"][gamepoints]
+                        competitors[game[color]["cid"]]["gamePoints"] += gamepoints
+
+        data = trf.output_file(self.chessfile.chessjson["event"], tournamentno, verbose)
+        return data
+
+
 
     def compute_pairs(self, pairing):
         # pairing = analysis if pairing is None or len(pairing) == 0 else pairing

@@ -20,12 +20,18 @@ The command-line parameter for FIDE teampairing is:
 
 -m <args> will override 192 record in the TRF file if any such line.
 
-
 Changes in internal tiebreaks:
 RFP - returns "N" for Not paired instead of ""
 Result in RFP is also used in HST, so note that tests on "" must be replaced by tet on "N"
 COP is removed from the internal Tie-break list
 
+Added -F TRF output for tiebreakchecker and pairingchecker for individual tournaments.
+For tiebreakchecker TRF output will write correct 212 record, and correct rank order
+For pairingchecker TRF output will write correct 001 record, updated with the next round
+
+-x strict
+If you want to only accept only TRF that are 100% correct add the -x strict options.
+Just now this is only used for the 240 record. More will come.
 
 2026-10-03
 tournamentgenerator:

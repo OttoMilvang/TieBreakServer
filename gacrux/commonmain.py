@@ -158,6 +158,8 @@ class commonmain:
                     charset = "utf-8"
             elif fileformat == "TRF":
                     chessfile = trf2json()
+                    if "experimental" in self.params and "strict" in self.params["experimental"]:
+                        chessfile.strict = True
                     charset = "latin1"
 
             elif fileformat == "TS":
@@ -244,8 +246,7 @@ class commonmain:
                         self.write_text_file(f, result, delimiter, decimal_point)
                 else:
                     if fileformat == "TRF":
-                            trf = trf2json()
-                            data = trf.output_file(result, self.tournamentno, self.params["verbose"])
+                            data = self.write_trf_file(result, self.tournamentno, params["verbose"])
                             f.write(data)
                     elif fileformat == "JSON":
                             helpers.json_output(f, resultjson)
@@ -265,6 +266,11 @@ class commonmain:
                 f.close()
             raise
         return chessfile.chessjson["status"]["code"]
+
+    def write_trf_file(self, result, tournamentno, verbose):
+        trf = trf2json()
+        data = trf.output_file(result, tournamentno, verbose)
+        return data
 
     def write_error_file(self):
         fileopen = False

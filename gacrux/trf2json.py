@@ -32,6 +32,7 @@ class trf2json(chessjson.chessjson):
     # constructor function
     def __init__(self):
         super().__init__()
+        self.strict = False     # Dont be too strict on TRF file format, accept some errors and try to continue
         self.trfrecords = [
             {"id": "###", "read": self.parse_trf_noop,          "write": self.output_trf_noop,          "desc": "Comments"},
             {"id": "012", "read": self.parse_trf_tournament,    "write": self.output_trf_info,          "desc": "Tournament Name"},
@@ -54,7 +55,7 @@ class trf2json(chessjson.chessjson):
             {"id": "182", "read": self.parse_trf_ttype,         "write": self.output_trf_noop,          "desc": "Pairing Controller Identifier"},
             {"id": "192", "read": self.parse_trf_typetournament,"write": self.output_trf_typetournament,"desc": "Encoded Type Of Tournament"},
             {"id": "202", "read": self.parse_tiebreaks202,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to break ties"},
-            {"id": "212", "read": self.parse_tiebreaks212,      "write": self.output_trf_noop,          "desc": "FIDE Tie-Breaks used to define standings"},
+            {"id": "212", "read": self.parse_tiebreaks212,      "write": self.output_tiebreaks212,      "desc": "FIDE Tie-Breaks used to define standings"},
             {"id": "222", "read": self.parse_trf_timecontrol,   "write": self.output_trf_noop,          "desc": "Encoded Time Control"},
             {"id": "352", "read": self.parse_colorsequence,     "write": self.output_trf_noop,          "desc": "Colour sequence (W or B) for boards in team competitions"},
             {"id": "362", "read": self.parse_trf_matchscore,    "write": self.output_trf_noop,          "desc": "Scoring point system for teams"},
@@ -1417,7 +1418,7 @@ class trf2json(chessjson.chessjson):
             # TRF-2026: "Half (HPB) or Full (FPB) Point-Bye (at most one record per
             # type per round)". Everybody getting that bye in that round is listed on
             # the one record, so a second one is a repeat or a contradiction.
-            if (bye, rnd) in self.byerecordlines:
+            if self.strict and (bye, rnd) in self.byerecordlines:
                 message = (
                     "Record 240 may occur at most once per type per round (TRF-2026):"
                     + " a second record of type " + bye + " for round " + str(rnd)
@@ -2289,6 +2290,11 @@ class trf2json(chessjson.chessjson):
                 return line
         return "" # No match found       
 
+    def output_tiebreaks212(self, tournament, trfkey):
+        line = ""
+        if "rankOrder" in tournament:
+            line += "212 " + ",".join(tournament["rankOrder"]) + "\n"
+        return line
 
     def output_trf_accelerated(self, tournament, trfkey):
         t250 = ""

@@ -86,8 +86,9 @@ def teams(records, first=1):
     return lines + records
 
 
-def parse(lines):
+def parse(lines, strict=False):
     chessfile = trf2json.trf2json()
+    chessfile.strict = strict
     # verbose off: this is how a program that is handed a file reads it, and it is the
     # setting under which the reader used to swallow what it knew and crash later.
     chessfile.parse_file("\n".join(lines), 0)
@@ -199,13 +200,18 @@ def test_a_second_record_240_of_the_same_type_and_round_is_refused():
     different type in the same round, or of the same type in another round, is what
     the specification allows, and the control below keeps it readable.
     """
+
     with pytest.raises(gacruxexeptions.GacruxInputError) as excinfo:
-        parse(teams(["240 H 003    3", "240 H 003    4"]))
+        parse(teams(["240 H 003    3", "240 H 003    4"]), strict=True)
 
     message = str(excinfo.value)
     assert "240" in message
     assert "per type per round" in message
     assert "H" in message and "round 3" in message
+
+    # Same with strict == False
+    assert parse(teams(["240 H 003    3", "240 H 003    4"]), strict=False).get_status() == 0
+
 
     # Control: a different type in the same round, and the same type in another round.
     assert parse(teams(["240 H 003    3", "240 F 003    4"])).get_status() == 0

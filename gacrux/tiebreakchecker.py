@@ -5,15 +5,18 @@ Created on Mon Aug  7 16:48:53 2023
 """
 import sys
 
+
 if __name__[:7] == "gacrux." or __package__ is not None and __package__ == "gacrux":
     from gacrux import helpers
     from gacrux import version
     from gacrux.commonmain import commonmain
+    from gacrux.trf2json import trf2json
     from gacrux.tiebreak import tiebreak
 else:
     import helpers
     import version
     from commonmain import commonmain
+    from trf2json import trf2json
     from tiebreak import tiebreak
 
 # ==============================
@@ -106,6 +109,19 @@ class tiebreakchecker(commonmain):
             f.write(line + "\n")
         if self.params["check"]:
             f.write(f"Check: {result.get('check', True)}\n")
+
+    def write_trf_file(self, result, tournamentno, verbose):
+        trf = trf2json()
+        event = self.chessfile.chessjson["event"]
+        tournament = self.chessfile.get_tournament(self.tournamentno)
+        tournament["rankOrder"] = [tiebreak["desc"] for tiebreak in result["tiebreaks"]]
+        # for (tb, comp) in zip(result["competitors"], tournament["competitors"]):
+        #     comp["rank"] = tb["rank"]
+        tb = {comp["cid"]: comp["rank"] for comp in result["competitors"]}
+        for comp in tournament["competitors"]:
+            comp["rank"] = tb.get(comp["cid"], None)
+        data = trf.output_file(self.chessfile.chessjson["event"], tournamentno, verbose)
+        return data
 
 
     def do_checker(self):
