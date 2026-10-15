@@ -104,7 +104,6 @@ def test_a_record_142_declares_the_round_count(tmp_path):
     """A file with a record 142 states its schedule, and the flag says so."""
     tournament = read(tmp_path, team_file(declared_rounds=5))
     assert tournament["numRounds"] == 5
-    assert tournament["numRoundsExplicit"] is True
 
 
 def test_without_a_record_142_the_count_is_only_inferred(tmp_path):
@@ -113,8 +112,7 @@ def test_without_a_record_142_the_count_is_only_inferred(tmp_path):
     which is a lower bound on the schedule and says nothing about which round is last.
     """
     tournament = read(tmp_path, team_file(declared_rounds=None))
-    assert tournament["numRounds"] == 2
-    assert tournament["numRoundsExplicit"] is False
+    assert tournament["numRounds"] == 0
 
 
 def test_a_declared_count_is_not_raised_by_the_rounds_played(tmp_path):
@@ -125,11 +123,9 @@ def test_a_declared_count_is_not_raised_by_the_rounds_played(tmp_path):
     """
     tournament = read(tmp_path, team_file(declared_rounds=1))
     assert tournament["numRounds"] == 1
-    assert tournament["numRoundsExplicit"] is True
 
 
 def test_the_command_line_count_declares_it_too(tmp_path):
     """-N is as much a declared schedule as a record 142."""
     tournament = read(tmp_path, team_file(declared_rounds=None), options=["-N", "7"])
     assert tournament["numRounds"] == 7
-    assert tournament["numRoundsExplicit"] is True

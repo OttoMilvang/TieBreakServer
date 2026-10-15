@@ -168,7 +168,7 @@ class tiebreak:
         self.isteam = self.isteam = tournament["teamTournament"] if "teamTournament" in tournament else False
         self.teamsize = tournament["teamSize"] if "teamSize" in tournament else 1
         chessevent.update_tournament_random(tournament, self.isteam)
-        self.rounds = tournament["numRounds"]
+        self.rounds = max(tournament.get("numRounds", 0), tournament.get("currentRound", 0))
         self.currentround = currentround if currentround >= 0 else self.rounds
         self.maxboard = 0
         self.lastplayedround = 0

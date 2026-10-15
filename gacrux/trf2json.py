@@ -210,7 +210,6 @@ class trf2json(chessjson.chessjson):
                 # Record 142 is the only TRF field that states the scheduled length.
                 # A later player record may reveal that rounds were played, but that
                 # inferred lower bound cannot answer which round is the last one.
-                "numRoundsExplicit": False,
                 "currentRound": 0,
                 "teamTournament": False,
                 "rankOrder": ["PTS"],
@@ -611,7 +610,7 @@ class trf2json(chessjson.chessjson):
         if "rr" not in self.__dict__:
             tt = tournament["tournamentType"].upper()
             numcomp = len(tournament["competitors"])
-            numrounds = tournament["numRounds"]
+            numrounds = max(tournament["numRounds"], tournament["currentRound"])
             rr = False
             if tt.find("SWISS") >= 0:
                 rr = False
@@ -934,8 +933,8 @@ class trf2json(chessjson.chessjson):
                     lastplayed = currentround
                     if self.get_result_cid(game, "white") > 0 and self.get_result_cid(game, "black") > 0 and currentround > lastpaired:
                         lastpaired = currentround
-        if lastplayed > tournament["numRounds"] and not tournament.get("numRoundsExplicit", False):
-            tournament["numRounds"] = lastplayed
+        # if lastplayed > tournament["numRounds"] and not tournament.get("numRoundsExplicit", False):
+        #    tournament["numRounds"] = lastplayed
         if lastpaired > tournament["currentRound"]:
             tournament["currentRound"] = lastpaired
         return 1
@@ -1143,7 +1142,6 @@ class trf2json(chessjson.chessjson):
 
     def parse_trf_numbrounds(self, tournament, line):
         tournament["numRounds"] = helpers.parse_int(line[4:].rstrip())
-        tournament["numRoundsExplicit"] = True
 
     def parse_trf_initialcolor(self, tournament, line):
         tournament["topColor"] = line[4:].rstrip().upper()
@@ -2250,7 +2248,8 @@ class trf2json(chessjson.chessjson):
     def output_trf_dates(self, tournament, trfkey):
         line = "" 
         if "rounds" in tournament:
-            line = "132 " +(" "*(85+10*tournament["numRounds"]))
+            numrounds = max(tournament["numRounds"], tournament["currentRound"])
+            line = "132 " +(" "*(85+10*numrounds))
             for round in tournament["rounds"]:
                 start = round["startTime"]
                 rno = round["roundNo"]
@@ -2264,7 +2263,10 @@ class trf2json(chessjson.chessjson):
 
 
     def output_trf_numrounds(self, tournament, trfkey):
-        line = "142 " + str(tournament["numRounds"]) + "\n"
+        if tournament["numRounds"] > 0:
+            line = "142 " + str(tournament["numRounds"]) + "\n"
+        else:
+            line = ""
         return line
 
     def output_trf_topcolor(self, tournament, trfkey):

@@ -126,7 +126,8 @@ class pairing:
         self.numcompetitors = len(tournament["competitors"])
         self.experimental = params.get("experimental", None)
         self.verbose = params.get("verbose", None)
-        self.nummeets = int((rnd-1) * tournament.get("maxMeets", 1) / tournament["numRounds"]) + 1
+        numrounds =max(tournament.get("numRounds", 0), tournament.get("currentRound", 0))
+        self.nummeets = int((rnd-1) * tournament.get("maxMeets", 1) / numrounds) + 1
         # self.rank names the field that orders the competitors, and so - through
         # crosstable.list_edges - their pairing numbers. It is set before get_topcolor,
         # which needs it in the team system: C.04.6 art. 4.3.1 ties the initial-colour to

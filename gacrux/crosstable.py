@@ -71,7 +71,7 @@ class crosstable:
         self.maxmeets = maxmeets
         self.topcolor = topcolor
         self.rank = rank
-        self.numrounds = tournament["numRounds"]
+        self.numrounds = max(tournament["numRounds"], tournament["currentRound"])
         cmps = self.compute_tiebreak(tournament, rnd)
         prohibited = tournament.get("prohibited", [])
         (competitors, opponents) = self.list_edges(cmps, maxmeets, topcolor, prohibited)

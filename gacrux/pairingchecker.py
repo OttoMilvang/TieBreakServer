@@ -555,7 +555,7 @@ class pairingchecker(commonmain):
             if self.tournamentno > 0:
                 tournament = chessfile.get_tournament(self.tournamentno)
                 currentround = tournament["currentRound"]
-                numrounds = tournament["numRounds"]
+                numrounds = max(tournament.get("numRounds", 0), tournament.get("currentRound", 0))
                 firstround = lastround = params.get("current_round", -1)
                 if len(self.params["exchange"]):
                     self.add_exchanges(tournament, firstround, self.params["exchange"])

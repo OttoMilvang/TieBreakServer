@@ -146,8 +146,7 @@ def test_check_mode_stops_two_rounds_before_an_inferred_end(tmp_path):
     text = team_file("FIDE_TEAM_TYPEA_MP_GP", rounds="")
     checker = check(tmp_path, text)
     tournament = checker.chessfile.get_tournament(1)
-    assert tournament["numRounds"] == 7
-    assert tournament["numRoundsExplicit"] is False
+    assert tournament["numRounds"] == 0
     assert rounds_checked(checker) == [1, 2, 3, 4, 5]
     assert checker.resultjson["status"]["code"] >= 400
     # -v lets the engine's own error through: it is round 6, and it names record 142
@@ -155,7 +154,7 @@ def test_check_mode_stops_two_rounds_before_an_inferred_end(tmp_path):
         check(tmp_path, text, ["-v"])
 
     checker = check(tmp_path, text, ["-N", "9"])
-    assert checker.chessfile.get_tournament(1)["numRoundsExplicit"] is True
+    assert checker.chessfile.get_tournament(1)["numRounds"] == 9
     assert rounds_checked(checker) == [1, 2, 3, 4, 5, 6, 7]
     assert checker.resultjson["status"]["code"] in (0, 1)
 

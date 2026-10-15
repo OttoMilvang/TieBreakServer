@@ -165,7 +165,7 @@ class pairing_fideteam(pairing):
         if len(pairingsystem) == 0:
             pairingsystem = tournament.get("pairingSystem", [])
         scoresystem = tournament.get("scoreSystem", {})
-        self.numrounds = tournament["numRounds"]
+        self.numrounds = max(tournament["numRounds"], tournament["currentRound"])
 
         # art. 1.7 - type A colour preferences, unless the rules of the competition ask
         # for type B, or for no colour preferences at all. Record 192 states it
@@ -181,7 +181,7 @@ class pairing_fideteam(pairing):
         # last round. Only record 142 (or -N) says how long the event is; without it
         # trf2json takes the last round played, so every round asked for looks like one of
         # the last two. Such a round is refused, for every colour model.
-        if not tournament.get("numRoundsExplicit", True) and rnd > self.numrounds - 2:
+        if tournament["numRounds"] == 0 and rnd > self.numrounds - 2:
             raise GacruxInputError(
                 "round " + str(rnd) + " of a team tournament whose length is not declared:"
                 + " the file has no record 142, so the " + str(self.numrounds) + " round(s)"
