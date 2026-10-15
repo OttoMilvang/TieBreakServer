@@ -88,7 +88,6 @@ class event:
             # A record 152 states the drawing of lots of art. 4.1. topcolor=None is a file
             # that does not, which the engine has to read back out of the round played.
             self.tournament["topColor"] = topcolor
-            self.tournament["topColorExplicit"] = True
         for team in range(1, numteams + 1):
             self.tournament["competitors"].append(
                 {
@@ -1266,7 +1265,7 @@ def test_art_2_3_4_c7_cannot_be_evaluated_without_a_round_count():
     refused instead, naming the record, the flag and the article.
     """
     tournament = c7_tournament(2)
-    tournament.tournament["numRoundsExplicit"] = False
+    tournament.tournament["numRounds"] = 0
     with pytest.raises(GacruxInputError) as excinfo:
         tournament.engine(3)
     message = str(excinfo.value)
